@@ -237,13 +237,17 @@ const ago = (at: number) => {
 function HotelLog({ state }: { state: SimState }) {
   const { items } = useActivity();
   // When each of the day's moments appeared, so they interleave with guest activity in the order they happened.
+  // Moments this screen catches up on all at once (opened mid-day, or joining the shared day) didn't happen just
+  // now, so they go below what guests did in the app; moments that pass while it's open appear as they happen.
   const seenAt = useRef(new Map<string, number>());
+  const mounted = useRef(false);
+  useEffect(() => void (mounted.current = true), []);
   const passed = state.events.slice(0, state.nextEventIndex);
   const ids = new Set(passed.map((e) => e.id));
   for (const id of seenAt.current.keys()) if (!ids.has(id)) seenAt.current.delete(id);
-  passed.forEach((e, i) => {
-    if (!seenAt.current.has(e.id)) seenAt.current.set(e.id, Date.now() + i);
-  });
+  const fresh = passed.filter((e) => !seenAt.current.has(e.id));
+  const caughtUp = !mounted.current || fresh.length > 1;
+  for (const e of fresh) seenAt.current.set(e.id, (caughtUp ? 0 : Date.now()) + passed.indexOf(e));
   const ai = state.mode === 'ai';
   const moment = (e: ScenarioEvent): Entry => ({
     key: e.id,
