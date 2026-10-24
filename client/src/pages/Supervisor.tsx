@@ -162,13 +162,15 @@ function StaffingCard({ f }: { f: StaffingForecast }) {
 function AutoApprove({ s }: { s: SimState }) {
   const toast = useToast();
   return (
-    <label className="row" style={{ fontWeight: 600, fontSize: 13.5, gap: 8 }}>
+    <label className="switch-row" title="Approve each new cleaning plan as soon as it comes up">
+      Auto-approve
       <input
         type="checkbox"
+        role="switch"
+        className="switch"
         checked={s.autoApprove}
-        onChange={(e) => hotel('auto-approve', { value: e.target.checked }).catch((err) => toast({ title: 'Error', body: (err as Error).message, tone: 'bad' }))}
+        onChange={(e) => hotel('auto-approve', { value: e.target.checked }).catch((err) => toast({ title: 'That didn’t work', body: (err as Error).message, tone: 'bad' }))}
       />
-      Auto-approve
     </label>
   );
 }

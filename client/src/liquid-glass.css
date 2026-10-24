@@ -3946,3 +3946,106 @@ body {
     animation:none;
   }
 }
+
+/* Room temperature grid: the floors share whatever height the card has, so the grid never spills over its
+   caption or the note below, on any screen. */
+.climate-grid {
+  min-height:0;
+  justify-content:safe center;
+}
+.climate-grid .cg-floor {
+  flex:1 1 0;
+  min-height:16px;
+  max-height:46px;
+}
+.climate-grid .cg-room {
+  height:auto;
+}
+.climate-grid .legend {
+  flex:none;
+}
+
+/* Speed picker: a glass capsule with a quiet chevron instead of the browser's own arrow. */
+.pl-speed {
+  -webkit-appearance:none;
+  appearance:none;
+  cursor:pointer;
+  padding:0 26px 0 13px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:600;
+  color:var(--ink);
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23485b6e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right 11px center/10px 6px no-repeat,var(--btn-glass);
+  box-shadow:var(--btn-shadow);
+  transition:box-shadow .2s ease;
+}
+.pl-speed:hover {
+  box-shadow:var(--btn-glow);
+}
+
+/* Switches (auto-approve): an iOS-style toggle in glass, blue when on. */
+.switch-row {
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  font-size:13px;
+  font-weight:600;
+  color:var(--ink);
+  cursor:pointer;
+  user-select:none;
+}
+input.switch {
+  -webkit-appearance:none;
+  appearance:none;
+  position:relative;
+  flex:none;
+  width:44px;
+  height:26px;
+  margin:0;
+  border-radius:999px;
+  cursor:pointer;
+  background:rgba(120,140,170,.22);
+  box-shadow:inset 0 1px 2px rgba(40,60,100,.14),inset 0 0 0 1px rgba(255,255,255,.45);
+  transition:background-color .25s ease,box-shadow .25s ease;
+}
+input.switch::before {
+  content:'';
+  position:absolute;
+  top:2px;
+  left:2px;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 25%,#fff,rgba(246,249,255,.96));
+  box-shadow:0 2px 6px rgba(30,50,90,.22),0 0 0 .5px rgba(30,50,90,.12);
+  transition:transform .28s cubic-bezier(.3,1.4,.5,1);
+}
+input.switch:checked {
+  background:linear-gradient(150deg,rgba(83,153,237,.92),rgba(48,112,204,.95));
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.45),0 4px 12px -5px rgba(49,105,187,.5);
+}
+input.switch:checked::before {
+  transform:translateX(18px);
+}
+input.switch:focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
+@media (prefers-reduced-motion:reduce) {
+  input.switch,input.switch::before {
+    transition:none;
+  }
+}
+@media (min-width:1101px) and (max-height:820px) {
+  .energy-hero { padding:12px 24px 0; }
+  .energy-hero strong { font-size:34px; margin-top:4px; }
+  .energy-hero p { margin-top:4px; }
+  .energy-orb { width:58px; height:58px; border-radius:19px; }
+  .energy-orb svg { width:27px; height:27px; }
+  .estats { padding:10px 24px; }
+  .estats .fstat { padding:9px 12px; }
+  .estats .fstat b { font-size:20px; }
+  .climate-caption { padding-top:11px; margin-top:2px; }
+  .climate-grid { padding:9px 21px; gap:5px; }
+  .energy-comfort-note { padding:9px 14px; margin:0 20px 13px; }
+}
