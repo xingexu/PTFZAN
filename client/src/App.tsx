@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { SimState } from '../../shared/types';
 import { fmtTime } from '../../shared/types';
@@ -9,7 +9,8 @@ import { Icon, type IconName } from './components/Icon';
 import { fade } from './components/fade';
 import { useSlide } from './components/slide';
 import { GUEST_TAB, guestUrl, hasServer, HOTEL_TAB, isGuestView, separateSites } from './links';
-import Engineering from './pages/Engineering';
+import Engineering, { EnergyPage } from './pages/Engineering';
+import Comparison from './pages/Comparison';
 import FrontDesk from './pages/FrontDesk';
 import GuestApp from './pages/guest/GuestApp';
 import Welcome from './pages/guest/Welcome';
@@ -68,6 +69,8 @@ export default function App() {
             <Route path="supervisor" element={<Supervisor />} />
             <Route path="attendant" element={<Housekeeping />} />
             <Route path="engineering" element={<Engineering />} />
+            <Route path="energy" element={<EnergyPage />} />
+            <Route path="comparison" element={<Comparison />} />
             <Route path="housekeeping" element={<Navigate to="/attendant" replace />} />
             <Route path="login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -96,10 +99,11 @@ function Away({ to }: { to: string }) {
 }
 
 const NAV: { to: string; label: string; icon: IconName; also?: string }[] = [
-  { to: '/', label: 'Live overview', icon: 'gauge' },
+  { to: '/', label: 'Overview', icon: 'gauge' },
   { to: '/front-desk', label: 'Rooms', icon: 'bed' },
-  { to: '/supervisor', label: 'Team', icon: 'users', also: '/attendant' },
-  { to: '/engineering', label: 'Building', icon: 'building' },
+  { to: '/supervisor', label: 'Housekeeping', icon: 'users', also: '/attendant' },
+  { to: '/engineering', label: 'Maintenance', icon: 'wrench' },
+  { to: '/energy', label: 'Energy', icon: 'leaf' },
 ];
 
 function HotelShell() {
@@ -110,7 +114,8 @@ function HotelShell() {
   const { pathname } = useLocation();
   const navRef = useSlide<HTMLElement>(pathname);
   const pending = state.proposals.some((p) => p.status === 'pending');
-  const current = NAV.find((n) => n.to === pathname || n.also === pathname)?.label ?? 'Live overview';
+  useLayoutEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }, [pathname]);
+  const current = NAV.find((n) => n.to === pathname || n.also === pathname)?.label ?? 'Compare the day';
 
   // Changes made on another hotel screen show up here too, with a short note saying so.
   useEffect(() => onRemoteChange((title) => toast({ title, body: 'Every hotel screen follows the same day.' })), [toast]);
@@ -129,7 +134,7 @@ function HotelShell() {
           <a className="skip-nav" href="#hotel-content">Skip to content</a>
           <aside className="hq-rail glass" aria-label="Hotel workspace">
             <NavLink to="/" className="rail-brand" aria-label="Founders Hotel Network · hotel view home" viewTransition>
-              <span>Founders<br />Hotel Network</span>
+              <span>Founders Hotel<br />Network</span>
             </NavLink>
             <div className="rail-property"><span className="rail-property-icon"><Icon name="building" size={19} /></span><div><b>Toronto Downtown</b><span>48 rooms · Floors 3–6</span></div></div>
             <span className="rail-label">WORKSPACE</span>
@@ -142,6 +147,7 @@ function HotelShell() {
               ))}
             </nav>
             <div className="rail-bottom">
+              <NavLink className="rail-guest" to="/comparison"><span><Icon name="gauge" size={17} />Compare the day</span><Icon name="right" size={14} /></NavLink>
               <a className="rail-guest" href={guestUrl('/')} target={GUEST_TAB}><span><Icon name="phoneDevice" size={17} />Guest app</span><Icon name="external" size={14} /></a>
               <div className="rail-footer"><span className="rail-avatar"><Icon name="shield" size={17} /></span><div><b>Hotel operations</b><span>Pitch the Future · 2026</span></div></div>
             </div>
@@ -149,8 +155,9 @@ function HotelShell() {
           <header className="hq-top">
             <div className="hq-bar glass">
               <NavLink to="/" className="hq-mobile-brand" aria-label="Founders Hotel Network home">Founders<br />Hotel Network</NavLink>
-              <div className="hq-breadcrumb"><span>Hotel workspace</span><Icon name="right" size={13} /><b>{current}</b></div>
+              <div className="hq-breadcrumb"><span>Operations</span><Icon name="right" size={13} /><b>{current}</b></div>
               <div className="hq-actions">
+                <NavLink className="hq-compare" to="/comparison">Compare</NavLink>
                 <span className="hq-date">Friday, October 16</span>
                 <SyncChip sync={sync} />
                 {hasServer && (
@@ -167,7 +174,7 @@ function HotelShell() {
             </div>
           </header>
           <div id="hotel-content" className="hotel-content" tabIndex={-1}><Outlet /></div>
-          <DecisionCard state={state} />
+          {pathname !== '/' && pathname !== '/supervisor' && <DecisionCard state={state} />}
           <Player state={state} />
         </div>
       </ActivityContext.Provider>

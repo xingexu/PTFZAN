@@ -1,309 +1,90 @@
-import QRCode from 'qrcode';
-import { useEffect, useRef, useState } from 'react';
-import type { CompareSnapshot, Metrics, RoomStatus, ScenarioEvent, SimState } from '../../../shared/types';
-import { fmtTime } from '../../../shared/types';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { fmtTime, type Room } from '../../../shared/types';
 import { useSim } from '../api';
-import { CompareBars, Num } from '../components/Compare';
-import { Icon, type IconName } from '../components/Icon';
-import { sides } from '../components/rooms';
-import { arrivalState, mmss, useActivity, useServerNow, waitingArrivals, type ActivityItem } from '../hotel/activity';
-import { GUEST_TAB, guestQrUrl, guestUrl } from '../links';
+import { arrivalState, mmss, useActivity, useServerNow, waitingArrivals } from '../hotel/activity';
+import { Icon } from '../components/Icon';
+import { atRisk, STATUS_LABEL, visibleStatus } from '../components/rooms';
+import { RoomTile } from './FrontDesk';
 
-type M = Metrics | null;
-type BoardRoom = CompareSnapshot['rooms'][number];
-const SEATS = 40;
-const FLOORS = [6, 5, 4, 3];
-const LEGEND: [string, string][] = [
-  ['ready', 'Ready'],
-  ['cleaning', 'Cleaning'],
-  ['inspection', 'Final check'],
-  ['dirty', 'Needs cleaning'],
-  ['occupied', 'Guest inside'],
-];
-const STATUS_WORD: Record<RoomStatus, string> = {
-  ready: 'ready', cleaning: 'being cleaned', inspection: 'final check', dirty: 'needs cleaning', occupied: 'guest inside', stayover: 'guest staying', ooo: 'being repaired',
-};
-
+/** The day's actionable room state; the detailed before/after demo has its own screen. */
 export default function Overview() {
-  const { state } = useSim();
-  if (!state) return null;
-  const { ai, today } = sides(state);
-  const other = state.compare?.rooms ?? [];
-  const aiRooms = state.mode === 'ai' ? state.rooms : other;
-  const todayRooms = state.mode === 'ai' ? other : state.rooms;
-  const acBroken = state.now >= 14 * 60 + 5;
-  const wasted = (m: M) => (m ? m.attendantMinLost + m.pulledStaffMin : 0);
+  const { state: s } = useSim();
+  const navigate = useNavigate();
+  const { arrivals: appArrivals, skew } = useActivity();
+  const now = useServerNow(skew, appArrivals.length > 0);
+  const liveArrivals = waitingArrivals(appArrivals, now).sort((a, b) => a.highMs - b.highMs);
+  const [filter, setFilter] = useState<'all' | 'arriving' | 'risk'>('all');
+  const [query, setQuery] = useState('');
+  if (!s) return null;
+  const ready = s.rooms.filter((r) => visibleStatus(s, r) === 'ready').length;
+  const arrivals = s.guests.filter((g) => !g.inHouse && !g.isDemoGuest && g.state !== 'checked-in').sort((a, b) => a.expectedArrival - b.expectedArrival);
+  const nextHour = arrivals.filter((g) => g.expectedArrival >= s.now && g.expectedArrival <= s.now + 60).length;
+  const pending = s.proposals.find((p) => p.status === 'pending');
+  const tickets = s.tickets.filter((t) => t.status === 'open');
+  const attention = tickets.length + (pending ? 1 : 0);
+  const attendants = s.attendants.filter((a) => a.present);
+  const matches = (r: Room) => r.id.includes(query.trim()) && (filter === 'all' || (filter === 'arriving' ? arrivals.some((g) => g.roomId === r.id) : atRisk(s, r) || r.status === 'ooo'));
+  const matchCount = s.rooms.filter(matches).length;
+  const weddingRooms = s.rooms.filter((r) => r.groupBlock);
+  const weddingReady = weddingRooms.filter((r) => visibleStatus(s, r) === 'ready').length;
 
   return (
-    <main className="page live">
-      <header className="sim-head">
-        <div><span className="page-eyebrow">TORONTO DOWNTOWN</span><h1>Today’s overview</h1><p className="page-subtitle">Room readiness and guest arrivals for Friday, October 16.</p></div>
-        <DayStatus state={state} />
-      </header>
-      <section className="live-summary" aria-label="Shift at a glance">
-        <div className="summary-metric glass"><span className="summary-metric-icon"><Icon name="bed" size={20} /></span><div><span>Rooms ready</span><b><Num value={aiRooms.filter((r) => r.status === 'ready').length} /><small> / 48</small></b></div><span className="summary-metric-note">FHN AI</span></div>
-        <div className="summary-metric glass"><span className="summary-metric-icon"><Icon name="users" size={20} /></span><div><span>Guests waiting</span><b><Num value={ai?.lobbyWaiting ?? 0} /><small> in the lobby</small></b></div><span className="summary-metric-note">FHN AI</span></div>
-        <div className="summary-metric glass"><span className="summary-metric-icon"><Icon name="leaf" size={20} /></span><div><span>Energy saved</span><b><Num value={ai?.kwhSaved ?? 0} /><small> kWh</small></b></div><span className="summary-metric-note">Today</span></div>
-      </section>
-      <section className="versus" aria-label="Every room, side by side">
-        <Board kind="today" rooms={todayRooms} m={today} />
-        <Board kind="ai" rooms={aiRooms} m={ai} />
-        <div className="legend" aria-hidden="true">
-          {LEGEND.map(([k, label]) => (
-            <span key={k}>
-              <i className={`s-${k}`} /> {label}
-            </span>
-          ))}
-          <span>
-            <i className="wed-key" /> Wedding party room
-          </span>
+    <main className="page overview-page">
+      <section className="overview-hero" aria-label="Today at a glance">
+        <div className="overview-greeting"><span className="page-eyebrow">FRIDAY, OCTOBER 16</span><h1>Today at<br className="mobile-break" /> Toronto Downtown</h1><p>{ready} rooms ready <span>·</span> {nextHour} arrivals in the next hour</p></div>
+        <div className="overview-metrics">
+          <Link to="/front-desk" className="overview-metric"><span className="metric-icon green"><Icon name="bed" size={21} /></span><div><span>Ready for arrival</span><strong>{ready}<small> / 48</small></strong></div></Link>
+          <Link to="/front-desk" className="overview-metric"><span className="metric-icon blue"><Icon name="users" size={21} /></span><div><span>Guests waiting</span><strong>{s.metrics.lobbyWaiting}</strong></div></Link>
+          <a href="#overview-attention" className="overview-metric"><span className="metric-icon amber"><Icon name="alert" size={21} /></span><div><span>Needs attention</span><strong>{attention}</strong></div></a>
         </div>
       </section>
-
-      <section className="wins" aria-label="The four challenges">
-        <Challenge icon="users" label="Most guests waiting" today={today?.lobbyPeak} ai={ai?.lobbyPeak} />
-        <Challenge icon="clock" label="Staff time wasted" unit="min" today={wasted(today)} ai={wasted(ai)} />
-        <Challenge icon="wrench" label="Broken AC fixed in" unit="min" today={today?.acFixMin} ai={ai?.acFixMin} open="still broken" waiting={acBroken ? undefined : 'Room 411’s AC breaks at 2:05 PM'} />
-        <Challenge icon="leaf" label="Energy saved" unit="kWh" today={today?.kwhSaved} ai={ai?.kwhSaved} more />
+      <div className="overview-layout">
+        <section className="card overview-rooms" aria-label="Room readiness">
+          <div className="overview-card-head"><h2>Room readiness</h2><Link to="/front-desk" className="text-link">View rooms <Icon name="right" size={14} /></Link></div>
+          <div className="overview-room-tools">
+            <div className="room-highlights" role="group" aria-label="Filter room readiness">
+              {([['all', 'All rooms'], ['arriving', 'Arriving today'], ['risk', 'At risk']] as const).map(([key, label]) => <button key={key} className={filter === key ? 'active' : ''} aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}</button>)}
+            </div>
+            <label className="room-search"><Icon name="bed" size={15} /><input type="search" inputMode="numeric" placeholder="Search rooms…" aria-label="Search room readiness" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
+          </div>
+          <span className="sr-only" role="status">{matchCount} matching rooms highlighted</span>
+          <div className="overview-floors">
+            {[6, 5, 4, 3].map((floor) => <div className="overview-floor" key={floor}><div className="overview-floor-label"><b>{floor}</b><span>12 rooms</span></div><div className="overview-floor-rooms">{s.rooms.filter((r) => r.floor === floor).map((r) => <RoomTile key={r.id} s={s} r={r} layer="readiness" selected={false} dimmed={!matches(r)} onClick={() => navigate(`/front-desk?room=${r.id}`)} />)}</div></div>)}
+          </div>
+          <div className="overview-legend"><span><i className="ready" />Ready</span><span><i className="cleaning" />Cleaning</span><span><i className="inspection" />Final check</span><span><i className="dirty" />To clean</span><span><i className="occupied" />Guest in</span><span><i className="ooo" />Repair</span></div>
+        </section>
+        <aside className="overview-side">
+          <section className="card attention-card" id="overview-attention" aria-label="Needs attention">
+            <div className="overview-card-head"><h2>Attention <span>({attention})</span></h2><Icon name="bell" size={17} /></div>
+            <div className="attention-items">
+              {pending && <Link to="/supervisor" className="attention-item"><span className="metric-icon amber"><Icon name="users" size={19} /></span><div><b>{pending.trigger}</b><p>{pending.changes.length} rooms · approval needed</p><span className="attention-action">Review plan <Icon name="right" size={12} /></span></div></Link>}
+              {tickets.slice(0, 2).map((t) => <Link to={t.roomId ? `/front-desk?room=${t.roomId}` : '/engineering'} className="attention-item" key={t.id}><span className="metric-icon amber"><Icon name="wrench" size={19} /></span><div><b>{t.asset}</b><p>{t.issue}</p><span className="attention-meta">{t.owner}</span></div><Icon name="right" size={15} /></Link>)}
+              {attention === 0 && <div className="attention-item"><span className="metric-icon green"><Icon name="check" size={19} /></span><div><b>All caught up</b><p>No decisions or repairs waiting.</p></div></div>}
+              <Link to="/front-desk" className="attention-item wedding-item"><span className="metric-icon blue"><Icon name="users" size={19} /></span><div><b>Wedding arrivals</b><p>{weddingReady} of {weddingRooms.length} rooms ready</p></div><Icon name="right" size={15} /></Link>
+            </div>
+          </section>
+          <section className="card next-arrivals" aria-label="Next arrivals">
+            <div className="overview-card-head"><h2>Next arrivals</h2><Link className="text-link" to="/front-desk">View all</Link></div>
+            <div className="next-arrival-list">{liveArrivals.slice(0, 3).map((a) => {
+              const { phase, left } = arrivalState(a, now);
+              return <Link key={`${a.roomId}-${a.startMs}`} to="/front-desk" className="next-arrival"><span className="arrival-avatar"><Icon name="phoneDevice" size={17} /></span><div><b>{a.first}</b><small>Room {a.roomId} · Guest app</small></div><span className={`pill ${phase === 'ready' ? 'green' : 'ai'}`}>{phase === 'ready' ? 'Key active' : `${mmss(left)} left`}</span></Link>;
+            })}{arrivals.slice(0, Math.max(0, 3 - liveArrivals.length)).map((g) => {
+              const r = s.rooms.find((room) => room.id === g.roomId);
+              if (!r) return null;
+              const status = visibleStatus(s, r);
+              return <Link key={g.code} to={`/front-desk?room=${r.id}`} className="next-arrival"><span className="arrival-avatar"><Icon name="user" size={17} /></span><div><b>{g.name}</b><small>Room {r.id} · {fmtTime(g.expectedArrival)}</small></div><span className={`pill ${status === 'ready' ? 'green' : status === 'ooo' ? 'red' : 'slate'}`}>{status === 'ready' ? 'Ready' : s.mode === 'ai' && r.eta ? `By ${fmtTime(r.eta.high)}` : STATUS_LABEL[status]}</span></Link>;
+            })}{arrivals.length === 0 && liveArrivals.length === 0 && <p className="empty">Everyone has checked in.</p>}</div>
+          </section>
+        </aside>
+      </div>
+      <section className="card overview-team" aria-label="Housekeeping today">
+        <div className="overview-card-head"><div className="overview-team-title"><h2>Housekeeping today</h2><span>{attendants.length} attendants on shift</span></div><Link className="text-link" to="/supervisor">View team <Icon name="right" size={14} /></Link></div>
+        <div className="overview-team-grid">{attendants.map((a) => {
+          const rooms = [...(a.currentRoom ? [a.currentRoom] : []), ...a.queue];
+          return <Link to="/supervisor" className="overview-attendant" key={a.id}><div className="overview-attendant-head"><span className="arrival-avatar"><Icon name="user" size={17} /></span><div><b>{a.label}</b><small>{rooms.length ? `${rooms.length} rooms in queue` : 'Queue complete'}</small></div><span className="team-status-dot" /></div>{rooms.slice(0, 3).map((id, i) => <div className="overview-task" key={id}><b>{id}</b><span>{i === 0 && a.currentRoom ? 'Cleaning now' : 'Up next'}</span><Icon name={i === 0 && a.currentRoom ? 'sparkles' : 'right'} size={13} /></div>)}{rooms.length === 0 && <div className="overview-task"><Icon name="check" size={14} /><span>Available to help</span></div>}</Link>;
+        })}</div>
       </section>
-
-      <aside className="live-side">
-        <GuestCard />
-        <HotelLog state={state} />
-      </aside>
     </main>
-  );
-}
-
-/** One side of the comparison: the hotel drawn as a 2D cross-section — four guest floors over the lobby. */
-function Board({ kind, rooms, m }: { kind: 'today' | 'ai'; rooms: BoardRoom[]; m: M }) {
-  const wedding = rooms.filter((r) => r.groupBlock);
-  const total = wedding.length || 20;
-  const ready = wedding.filter((r) => r.status === 'ready').length;
-  const waiting = m?.groupWaiting ?? 0;
-
-  return (
-    <div className={`board glass ${kind}`}>
-      <header className="bd-head">
-        <div className="bd-title">
-          <span className="board-eyebrow">{kind === 'ai' ? 'AI-ASSISTED PLAN' : 'MANUAL PLAN'}</span>
-          <h2>{kind === 'ai' ? 'With FHN AI' : 'Previous method'}</h2>
-          <p>{kind === 'ai' ? 'Live room status and updated assignments.' : 'Paper lists and phone updates.'}</p>
-        </div>
-        <div className="bd-stat" aria-label={`${ready} of ${total} wedding rooms ready`}>
-          <span className="bd-stat-label">Wedding rooms ready</span>
-          <span className="bd-stat-num">
-            <b>
-              <Num value={ready} />
-            </b>
-            <span>/ {total}</span>
-          </span>
-        </div>
-      </header>
-      <div className="bd-progress" aria-hidden="true">
-        <i style={{ width: `${(ready / total) * 100}%` }} />
-      </div>
-
-      <div className="building" role="img" aria-label={`Cross-section of the hotel: ${ready} of ${total} wedding rooms ready, ${waiting} guests waiting in the lobby`}>
-        <div className="roof" aria-hidden="true" />
-        {FLOORS.map((f) => (
-          <div className="storey" key={f}>
-            <span className="fl-n">{f}</span>
-            {rooms
-              .filter((r) => r.id.startsWith(String(f)))
-              .map((r) => (
-                <span key={r.id} title={`Room ${r.id} · ${STATUS_WORD[r.status]}`} className={`rm s-${r.status === 'stayover' ? 'occupied' : r.status} ${r.groupBlock ? 'wed' : ''}`}>
-                  <span className="rm-f">{f}</span>
-                  {r.id.slice(1)}
-                </span>
-              ))}
-          </div>
-        ))}
-        <div className="storey lobby">
-          <span className="fl-n">L</span>
-          <div className="lobby-floor">
-            <span className="lb-label">Lobby</span>
-            <People waiting={waiting} />
-            <span className={`lb-num ${waiting ? 'hot' : ''}`}>
-              <b>
-                <Num value={waiting} />
-              </b>{' '}
-              waiting
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const PERSON = 'M5.5 3.2a2.2 2.2 0 1 1 0 .01ZM2 13v-3.2C2 7.9 3.6 6.6 5.5 6.6S9 7.9 9 9.8V13z';
-
-/** The 40 wedding guests; the ones waiting in the lobby are shown in colour. */
-function People({ waiting }: { waiting: number }) {
-  return (
-    <span className="people" aria-hidden="true">
-      {Array.from({ length: SEATS }, (_, i) => (
-        <svg key={i} viewBox="0 0 11 13" className={i < waiting ? 'on' : ''}>
-          <path d={PERSON} />
-        </svg>
-      ))}
-    </span>
-  );
-}
-
-/** One challenge: today's way and FHN AI side by side. */
-function Challenge({
-  icon, label, unit, today, ai, more, open, waiting,
-}: { icon: IconName; label: string; unit?: string; today?: number | null; ai?: number | null; more?: boolean; open?: string; waiting?: string }) {
-  // FHN AI is ahead once its number is in and today's is worse or still open.
-  const better = ai != null && (today == null ? !more : more ? ai > today : ai < today);
-  return (
-    <div className="win glass">
-      <div className="win-top">
-        <span className="win-ic">
-          <Icon name={icon} size={15} />
-        </span>
-        <span className="win-label">{label}</span>
-        {better && !waiting && <Icon name="check" size={14} className="win-ok" />}
-      </div>
-      {waiting ? <span className="win-wait">{waiting}</span> : <CompareBars today={today} ai={ai} unit={unit} open={open} />}
-    </div>
-  );
-}
-
-/** The QR code that opens the guest app, with how many people are using it right now. */
-function GuestCard() {
-  const { counts, online, arrivals, skew } = useActivity();
-  const waiting = waitingArrivals(arrivals, Date.now() + skew);
-  const now = useServerNow(skew, waiting.length > 0);
-  const url = guestQrUrl();
-  const [src, setSrc] = useState('');
-  useEffect(() => {
-    // Dark modules on a clear background, so the code sits on the glass instead of a white box.
-    QRCode.toDataURL(url, { margin: 2, width: 260, color: { dark: '#1d1d1f', light: '#00000000' } })
-      .then(setSrc)
-      .catch(() => setSrc(''));
-  }, [url]);
-  let count = online ? 'Live' : 'Connecting…';
-  if (counts) count = counts.registered ? `${counts.registered} registered · ${counts.checkedIn} checked in` : 'Live · be the first to register';
-  // The next app guest's room, with the same countdown as their phone.
-  const next = waiting.map((a) => ({ a, ...arrivalState(a, now) })).filter((x) => x.phase !== 'ready').sort((x, y) => x.left - y.left)[0];
-  if (next) count = `${next.a.first} · room ${next.a.roomId} · ready in ${next.left > 0 ? mmss(next.left) : 'a moment'}`;
-  return (
-    <a className="guest-card glass" href={guestUrl('/')} target={GUEST_TAB} title={url}>
-      {src ? <img src={src} alt={`QR code to ${url}`} className="fade-img" /> : <span className="qr-blank" />}
-      <span className="gc-text">
-        <b>Be a wedding guest</b>
-        <span className="gc-sub">Scan to try the guest app</span>
-        <span className={`gc-count ${online ? 'on' : ''}`}>
-          <i />
-          {count}
-        </span>
-      </span>
-    </a>
-  );
-}
-
-const MOMENT_ICON: Record<string, IconName> = {
-  absence: 'users', late: 'clock', elevator: 'alert', group: 'calendar', calls: 'phone', arrivals: 'bag', checkpoint: 'users', release: 'check',
-};
-const GUEST_ICON: Record<string, IconName> = {
-  register: 'user', 'check-in': 'key', unlock: 'door', issue: 'wrench', request: 'box', green: 'leaf',
-};
-
-interface Entry {
-  key: string;
-  icon: IconName;
-  tone: string;
-  title: string;
-  line?: string;
-  when: string;
-  order: number;
-}
-
-const ago = (at: number) => {
-  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
-  if (s < 45) return 'just now';
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  const d = new Date(at);
-  return fmtTime(d.getHours() * 60 + d.getMinutes());
-};
-
-/**
- * The hotel log, in plain words: the day's big moments as the replay passes them, and what real guests
- * are doing in the guest app right now. Newest first.
- */
-function HotelLog({ state }: { state: SimState }) {
-  const { items } = useActivity();
-  // When each of the day's moments appeared, so they interleave with guest activity in the order they happened.
-  // Moments this screen catches up on all at once (opened mid-day, or joining the shared day) didn't happen just
-  // now, so they go below what guests did in the app; moments that pass while it's open appear as they happen.
-  const seenAt = useRef(new Map<string, number>());
-  const mounted = useRef(false);
-  useEffect(() => void (mounted.current = true), []);
-  const passed = state.events.slice(0, state.nextEventIndex);
-  const ids = new Set(passed.map((e) => e.id));
-  for (const id of seenAt.current.keys()) if (!ids.has(id)) seenAt.current.delete(id);
-  const fresh = passed.filter((e) => !seenAt.current.has(e.id));
-  const caughtUp = !mounted.current || fresh.length > 1;
-  for (const e of fresh) seenAt.current.set(e.id, (caughtUp ? 0 : Date.now()) + passed.indexOf(e));
-  const ai = state.mode === 'ai';
-  const moment = (e: ScenarioEvent): Entry => ({
-    key: e.id,
-    icon: MOMENT_ICON[e.id] ?? 'info',
-    tone: ai ? 'ai' : 'today',
-    title: e.title,
-    line: ai ? e.ai : e.today,
-    when: fmtTime(e.at),
-    order: seenAt.current.get(e.id)!,
-  });
-  const guest = (a: ActivityItem): Entry => ({ key: `g${a.id}`, icon: GUEST_ICON[a.kind] ?? 'phoneDevice', tone: 'guest', title: a.text, line: 'Guest app', when: ago(a.at), order: a.at });
-  const entries = [...passed.map(moment), ...items.map(guest)].sort((a, b) => b.order - a.order).slice(0, 12);
-
-  return (
-    <section className="hotel-log glass" aria-label="Hotel log">
-      <h2>Hotel log</h2>
-      {entries.length === 0 ? (
-        <p className="hl-empty">
-          <Icon name="play" size={14} /> Press <b>30-sec demo</b> to play Friday, October 16.
-        </p>
-      ) : (
-        <ul aria-live="polite">
-          {entries.map((e, i) => (
-            <li key={e.key} className={`hl ${e.tone} ${i === 0 ? 'latest' : ''}`}>
-              <span className="hl-ic">
-                <Icon name={e.icon} size={14} />
-              </span>
-              <span className="hl-text">
-                <b>{e.title}</b>
-                {e.line && <span>{e.line}</span>}
-              </span>
-              <span className="hl-when">{e.when}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/** Where the shared day stands, in a few words: the same on every hotel screen. */
-function DayStatus({ state }: { state: SimState }) {
-  const waiting = state.proposals.some((p) => p.status === 'pending');
-  const [icon, text, tone]: [IconName, string, string] = state.finished
-    ? ['check', 'Shift complete', 'done']
-    : state.autopilot
-      ? ['play', '30-second demo playing', 'on']
-      : waiting
-        ? ['alert', 'Waiting for the supervisor', 'wait']
-        : state.playing
-          ? ['play', 'Day in progress', 'on']
-          : ['pause', `Paused at ${fmtTime(state.now)}`, 'idle'];
-  return (
-    <span className={`sim-chip day-${tone}`} aria-live="polite">
-      <Icon name={icon} size={12} />
-      <span key={tone} className="sim-chip-text">{text}</span>
-    </span>
   );
 }

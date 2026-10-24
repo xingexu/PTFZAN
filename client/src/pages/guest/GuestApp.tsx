@@ -88,8 +88,8 @@ export default function GuestApp() {
   const goTab = (next: Tab) => {
     if (next === tab) return;
     withTransition(TAB_ORDER.indexOf(next) > TAB_ORDER.indexOf(tab) ? 'fwd' : 'back', () => setTab(next));
-    document.querySelector('.gx-scroll')?.scrollTo({ top: 0 });
-    window.scrollTo({ top: 0 });
+    document.querySelector('.gx-scroll')?.scrollTo({ top: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
   const closeSheet = () => {
     setClosing(true);
@@ -244,6 +244,7 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
       </header>
 
       <div className="gx-body">
+        <RoomStatusCard v={v} go={go} act={act} />
         <section className="gx-card stay-strip" aria-label="Your stay">
           <div>
             <span>Check-in</span>
@@ -258,8 +259,6 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
             <b>{v.room.id ?? '—'}</b>
           </div>
         </section>
-
-        <RoomStatusCard v={v} go={go} act={act} />
 
         {v.elevatorNotice && (
           <div className="notice" role="status">
@@ -304,8 +303,8 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
                 <Icon name="sparkles" size={16} />
               </span>
               <span className="gx-row-label">
-                See FHN AI run the hotel
-                <small>The same live day the hotel team sees</small>
+                See the hotel’s day
+                <small>Explore the operations demo</small>
               </span>
               <Icon name="right" size={15} className="gx-row-go" />
             </a>

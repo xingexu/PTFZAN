@@ -49,7 +49,7 @@ That opens two separate sites:
 | **Hotel view** | http://localhost:8787 | The hotel team and the judges: the live day, rooms, team, building |
 | **Guest view** | http://localhost:8788 | Guests: the hotel's app — register, check in, ready time, mobile key, requests, messages |
 
-The mint **Guest app** button in the hotel view's top bar opens the guest app; the QR code on the Live screen does the same for phones. The two tabs have different icons and each links to the other.
+The mint **Guest app** button in the hotel view's top bar opens the guest app; the QR code on the Compare the day screen does the same for phones. The two tabs have different icons and each links to the other.
 
 `npm start` does the same without opening tabs. For development with hot reload: `npm run dev` (web on http://localhost:5173, guest app at `/guest`, API proxied to :8787).
 
@@ -70,15 +70,17 @@ The start-up log prints the addresses phones on the same Wi-Fi can use, and wher
 
 ## Screens
 
-Both apps are light: a white page with soft light-blue light behind it, dark text and one blue accent (FHN AI, primary buttons, links), in the manner of Apple and Google; status colours (green ready, indigo cleaning, yellow final check, orange needs cleaning) appear only on rooms, and the previous method is shown in grey. Every panel and button is liquid glass: translucent white that blurs what is behind it, a bright rim that catches the light where the pointer or finger is, a slow shimmer and a soft blue glow; everything fades in as it appears. The top bar and the player float above the page. On a laptop or projector every screen fits exactly — long lists scroll inside their own panel — and switching screens, modes or layers cross-fades. The day's moments are written into the Hotel log; a supervisor decision appears just above the player. On a phone the screens stack and scroll normally.
+The hotel workspace uses a dark navy sidebar on desktop, warm editorial headings, and translucent glass panels over a softly lit architectural background. Phones use a persistent bottom navigation bar and place decisions before the room grid. The simulation controls remain available at the bottom of the document on phones. Status is communicated with labels and icons as well as colour. Guests share the same photographic backdrop, glass cards, mobile key, and service controls. Reduced-motion and reduced-transparency preferences are supported.
 
 | Route | Screen | What it shows |
 |---|---|---|
-| `/` | **Live** | Labelled as a simulation. The previous method vs the new AI, side by side, each drawn as a 2D cross-section of the hotel: four guest floors over the lobby, every room a window that changes colour as it's prepared and turns green when ready; wedding rooms ready out of 20 with a progress bar; and the 40 wedding guests in the lobby, shown in colour while they wait. Below, the four challenges as simple two-bar comparisons. On the right, the guest app QR code and the **Hotel log**: the day's big moments in plain words, plus what real guests are doing in the app |
+| `/comparison` | **Compare the day** | Labelled as a simulation. The previous method vs the new AI, side by side, each drawn as a 2D cross-section of the hotel: four guest floors over the lobby, every room a window that changes colour as it's prepared and turns green when ready; wedding rooms ready out of 20 with a progress bar; and the 40 wedding guests in the lobby, shown in colour while they wait. Below, the four challenges as simple two-bar comparisons. On the right, the guest app QR code and the **Hotel log**: the day's big moments in plain words, plus what real guests are doing in the app |
+| `/` | **Overview** | Room readiness, attention items, next arrivals and current housekeeping queues; room search and arrival/risk filters |
 | `/front-desk` | **Rooms** | Room grid with expected ready time, how sure, "why this time", a temperature layer, arrivals, report a problem |
-| `/supervisor` | **Team** · Supervisor | Plan to approve, attendant lists, tomorrow's staffing forecast, decision history |
-| `/attendant` | **Team** · Attendant phone | Every attendant at a glance; tap one to see their phone (current room, what's next, one-tap problem reports); and what changes for attendants, today's way vs FHN AI |
-| `/engineering` | **Building** | Repairs with who has them and when, repeat problems in old repair notes, live room-temperature map |
+| `/supervisor` | **Housekeeping** · Supervisor | Plan to approve, attendant lists, tomorrow's staffing forecast, decision history |
+| `/attendant` | **Housekeeping** · Attendant phone | Every attendant at a glance; tap one to see their phone (current room, what's next, one-tap problem reports); and what changes for attendants, today's way vs FHN AI |
+| `/engineering` | **Maintenance** | Repairs with who has them and when, plus recurring problems in old repair notes |
+| `/energy` | **Energy** | Energy savings and a live room-temperature map |
 | `/` (guest view) | Guests (QR code target) | Welcome: register with name, optional email and party size |
 | `/stay` (guest view) | Guests | The guest app: online check-in, FHN AI's calculated ready time with a countdown, mobile key, temperature, housekeeping (skip cleaning), report a problem, request items, messages — with in-phone notification banners, and a link to the hotel's FHN AI view. Phones and tablets get the app full screen, laid out like an iOS app (large titles, grouped lists, safe areas for the notch and home indicator); a laptop shows it in a phone frame |
 | `/stage` | Projector (local server only) | **Live SMS moment**: Mike's phone, behind-the-scenes steps, live delivery status |
@@ -88,7 +90,7 @@ Both apps are light: a white page with soft light-blue light behind it, dark tex
 
 ## The 30-second demo
 
-Press **30-sec demo** (gold button in the player bar). It replays the whole shift with FHN AI hands-free in about **28 seconds**:
+Open **Compare the day** and press **30-sec demo** in the player bar. It replays the whole shift with FHN AI hands-free in about **28 seconds**:
 
 - races through the morning (sick call, late checkouts, elevator failure) at 30 sim-min/s,
 - holds for 2 seconds at **1:15 PM** while the supervisor approves the wedding re-plan,
