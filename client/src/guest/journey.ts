@@ -2,8 +2,8 @@
 // The phone keeps only the stay's secret id; the stay itself comes from the server. Actions show at once
 // (worked out here with the same rules the server uses) and are then confirmed by the server — except
 // check-in, where the server chooses the room, so the phone waits for its answer.
-import { useCallback, useEffect, useState } from 'react';
-import { apply, viewOf, type Stay } from '../../../shared/guest/stay';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { apply, timeline, viewOf, type Stay } from '../../../shared/guest/stay';
 import { api, ApiError } from '../api';
 
 const ID_KEY = 'fhn.guest.id';
@@ -47,11 +47,24 @@ export function useJourney() {
   const [stay, setStay] = useState<Stay | null>(null);
   const [status, setStatus] = useState<StayStatus>(() => (savedStayId() ? 'loading' : 'none'));
   const [now, setNow] = useState(serverNow);
-  const sync = (r: { now: number }) => (skewMs = r.now - Date.now());
+  /** The server's clock, corrected for the trip there and back (`sent` = when the request left). */
+  const sync = (r: { now: number }, sent: number) => (skewMs = r.now + (Date.now() - sent) / 2 - Date.now());
+  // The moment the room timer counts to, so the screen can update exactly when its seconds change.
+  const countTo = useRef<number | undefined>(undefined);
+  countTo.current = stay ? timeline(stay)?.high : undefined;
 
   useEffect(() => {
-    const t = window.setInterval(() => setNow(serverNow()), 1000);
-    return () => window.clearInterval(t);
+    let t = 0;
+    const tick = () => {
+      const n = serverNow();
+      setNow(n);
+      // Next update when the shown seconds change: on the timer's own second boundary (the hotel screen shows
+      // the same timer), otherwise on the clock's.
+      const until = countTo.current !== undefined ? (countTo.current - n) % 1000 : 1000 - (n % 1000);
+      t = window.setTimeout(tick, (until <= 0 ? until + 1000 : until) + 4);
+    };
+    tick();
+    return () => window.clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -59,11 +72,12 @@ export function useJourney() {
     if (!id) return;
     let stop = false;
     let retry: number | undefined;
-    const load = () =>
-      api<Reply>(`/api/guest?id=${encodeURIComponent(id)}`)
+    const load = () => {
+      const sent = Date.now();
+      return api<Reply>(`/api/guest?id=${encodeURIComponent(id)}`)
         .then((r) => {
           if (stop) return;
-          sync(r);
+          sync(r, sent);
           setStay(r.stay);
           setStatus('ready');
         })
@@ -77,6 +91,7 @@ export function useJourney() {
             retry = window.setTimeout(load, 4000);
           }
         });
+    };
     void load();
     // Stay in step with the hotel's records: re-read every so often and whenever the app comes back into view.
     const every = window.setInterval(() => void (document.hidden || load()), SYNC_MS);
@@ -95,8 +110,11 @@ export function useJourney() {
     async (action: string, body: Record<string, unknown> = {}) => {
       if (!stay) throw new Error('Please register first.');
       if (action === 'check-in') {
-        const [r] = await Promise.all([api<Reply>('/api/guest', { action, id: stay.id }), new Promise((ok) => setTimeout(ok, CHOOSING_MS))]);
-        sync(r);
+        const sent = Date.now();
+        const [r] = await Promise.all([
+          api<Reply>('/api/guest', { action, id: stay.id }).then((x) => (sync(x, sent), x)),
+          new Promise((ok) => setTimeout(ok, CHOOSING_MS)),
+        ]);
         setStay(r.stay);
         setNow(serverNow());
         return r.stay.plan ? `Room ${r.stay.plan.roomId}` : 'Checked in';
@@ -105,8 +123,9 @@ export function useJourney() {
       const message = apply(draft, action, body, serverNow());
       setStay(draft);
       try {
+        const sent = Date.now();
         const r = await api<Reply>('/api/guest', { ...body, action, id: stay.id });
-        sync(r);
+        sync(r, sent);
         setStay(r.stay);
       } catch (e) {
         setStay(stay);
