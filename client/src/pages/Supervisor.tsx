@@ -63,12 +63,12 @@ export default function Supervisor() {
                       );
                     })}
                     {items.length > 9 && <div className="muted" style={{ fontSize: 12 }}>+{items.length - 9} more</div>}
-                    {a.present && items.length === 0 && <div className="queue-complete"><Icon name="check" size={14} />All caught up</div>}
+                    {a.present && items.length === 0 && <div className="queue-complete"><Icon name="check" size={14} />Queue complete</div>}
                   </div>
                 );
               })}
             </div>
-            <div className="team-progress"><div><span className="page-eyebrow">A SHARED SENSE OF PROGRESS</span><b>{state.rooms.filter((r) => r.status === 'ready').length} rooms ready for their next guest</b><span>Room progress, never individual performance.</span></div><Icon name="shield" size={28} /></div>
+            <div className="team-progress"><div><span className="page-eyebrow">ROOM READINESS</span><b>{state.rooms.filter((r) => r.status === 'ready').length} rooms ready for their next guest</b><span>Room progress, never individual performance.</span></div><Icon name="shield" size={28} /></div>
           </section>
         </div>
 
@@ -181,9 +181,9 @@ function NoPending({ s }: { s: SimState }) {
         <Icon name="check" size={16} />
       </span>
       <div>
-        <h2>You’re all caught up</h2>
+        <h2>No decisions waiting</h2>
         <p className="muted" style={{ margin: '4px 0 0' }}>
-          {last ? `Last change: “${last.trigger}” at ${fmtTime(last.createdAt)} (${DECIDED[last.status].toLowerCase()}).` : 'FHN AI is watching room status, checkouts, absences and repairs.'}
+          {last ? `Last change: “${last.trigger}” at ${fmtTime(last.createdAt)} (${DECIDED[last.status].toLowerCase()}).` : 'Plan updates appear here when they need approval.'}
         </p>
       </div>
     </section>
@@ -199,7 +199,7 @@ function ProposalCard({ p, s }: { p: PlanProposal; s: SimState }) {
       await hotel(kind, { id: p.id });
       toast(
         kind === 'approve'
-          ? { title: 'Plan approved', body: 'Attendant phones updated. Guests are receiving realistic ETAs.', tone: 'good' }
+          ? { title: 'Plan approved', body: 'Room assignments and guest ready times have been updated.', tone: 'good' }
           : { title: 'Current plan kept', body: 'No changes were sent.' },
       );
     } catch (e) {

@@ -1,11 +1,11 @@
 /* FHN liquid glass — a shared material, with quieter light and clearer hierarchy.
    Existing simulation, guest, and stage primitives keep their behavioral styles. */
 :root {
-  --bg: #eaf0f8;
+  --bg: #adbec6;
   --ink: #202d41;
   --ink-2: #46546a;
-  --muted: #65738a;
-  --faint: #7e8aa0;
+  --muted: #485b6e;
+  --faint: #516476;
   --line: rgba(68, 91, 127, .11);
   --line-2: rgba(68, 91, 127, .2);
   --accent: #3979d6;
@@ -45,18 +45,18 @@ body {
 }
 
 .backdrop {
-  background:#eaf0f8
+  background:#adbec6
 }
 
 .backdrop::before {
   inset:0;
-  background:url('/liquid-wallpaper.svg') center/cover no-repeat;
+  background:url('/architectural-glass.svg') center/cover no-repeat;
   animation:none
 }
 
 .backdrop::after {
   inset:0;
-  background:radial-gradient(70% 65% at 0 0,rgba(255,255,255,.6),transparent 70%);
+  background:linear-gradient(180deg,rgba(223,232,232,.08),rgba(86,111,129,.04));
   animation:none
 }
 
@@ -206,26 +206,31 @@ body {
   margin-bottom:33px
 }
 
-.rail-brand svg {
-  width:30px;
-  height:37px;
-  flex-shrink:0
-}
-
 .rail-brand>span {
-  font-size:26px;
-  letter-spacing:2px;
-  font-weight:700;
-  line-height:1.1
+  font-size:22px;
+  letter-spacing:-.65px;
+  font-weight:600;
+  line-height:1.15
 }
 
-.rail-brand small {
-  display:block;
-  font-size:8px;
-  font-weight:500;
-  letter-spacing:.1px;
-  margin-top:6px;
-  color:#68768c
+.brand-name {
+  font-size:17px;
+  font-weight:600;
+  line-height:1.2;
+  letter-spacing:-.4px
+}
+
+.brand-sub {
+  font-size:11px;
+  line-height:1.3;
+  letter-spacing:.05px;
+  text-transform:none;
+  color:var(--ink-2);
+  margin-top:5px
+}
+
+.gx-top .brand {
+  max-width:220px
 }
 
 .rail-property {
@@ -268,7 +273,7 @@ body {
   font-size:9px;
   font-weight:600;
   letter-spacing:1.6px;
-  color:#7c8ba2;
+  color:var(--muted);
   margin:0 12px 12px
 }
 
@@ -296,7 +301,7 @@ body {
   font-size:12px;
   font-weight:550;
   border-radius:14px;
-  color:#63738c;
+  color:var(--muted);
   white-space:nowrap;
   background:none;
   box-shadow:none;
@@ -362,7 +367,7 @@ body {
   justify-content:space-between;
   padding:12px 10px;
   font-size:10px;
-  color:#617693;
+  color:var(--muted);
   text-decoration:none
 }
 
@@ -389,7 +394,7 @@ body {
   box-shadow:var(--btn-shadow);
   display:grid;
   place-items:center;
-  color:#6a83a6
+  color:var(--muted)
 }
 
 .rail-footer b {
@@ -430,7 +435,7 @@ body {
   align-items:center;
   gap:12px;
   font-size:11px;
-  color:#60728d
+  color:var(--muted)
 }
 
 .hq-breadcrumb b {
@@ -440,7 +445,7 @@ body {
 
 .hq-date {
   font-size:10px;
-  color:#74849a;
+  color:var(--muted);
   margin-right:6px
 }
 
@@ -449,7 +454,7 @@ body {
   align-items:center;
   gap:5px;
   font-size:9px;
-  color:#6c809c;
+  color:var(--muted);
   border:1px solid rgba(255,255,255,.7);
   border-radius:7px;
   padding:4px 7px;
@@ -525,7 +530,7 @@ body {
   font-size:9px;
   letter-spacing:1.55px;
   font-weight:600;
-  color:#61758f;
+  color:var(--muted);
   display:block;
   margin-bottom:7px
 }
@@ -540,7 +545,7 @@ body {
 
 .page-subtitle,.sim-head .page-subtitle {
   font-size:11px;
-  color:#5e718c;
+  color:var(--muted);
   margin:7px 0 0;
   white-space:normal;
   line-height:1.5
@@ -624,7 +629,7 @@ body {
 
 .summary-metric div>span {
   font-size:10px;
-  color:#6d7e97;
+  color:var(--muted);
   display:block
 }
 
@@ -638,7 +643,7 @@ body {
 
 .summary-metric b small {
   font-size:11px;
-  color:#7d8aa0;
+  color:var(--muted);
   font-weight:400;
   letter-spacing:0
 }
@@ -646,7 +651,7 @@ body {
 .summary-metric-note {
   margin-left:auto;
   font-size:9px;
-  color:#607695
+  color:var(--muted)
 }
 
 .versus {
@@ -670,13 +675,13 @@ body {
   font-size:8px;
   letter-spacing:1.15px;
   font-weight:600;
-  color:#64758d;
+  color:var(--muted);
   display:block;
   margin-bottom:6px
 }
 
 .board.ai .board-eyebrow {
-  color:#6e8fbc
+  color:#405f85
 }
 
 .bd-head {
@@ -742,7 +747,7 @@ body {
 
 .fl-n {
   font-size:9px;
-  color:#8594aa
+  color:var(--muted)
 }
 
 .rm {
@@ -755,25 +760,25 @@ body {
 
 .rm.s-ready {
   background:linear-gradient(155deg,rgba(104,185,153,.23),rgba(130,201,175,.08));
-  color:#407d69;
+  color:#2c654f;
   box-shadow:inset 0 1px 1px rgba(255,255,255,.7),inset 0 0 0 .7px rgba(99,165,144,.27)
 }
 
 .rm.s-cleaning {
   background:linear-gradient(155deg,rgba(160,151,210,.24),rgba(160,151,210,.09));
-  color:#7665a9;
+  color:#62518f;
   box-shadow:inset 0 1px 1px rgba(255,255,255,.7),inset 0 0 0 .7px rgba(146,132,195,.27)
 }
 
 .rm.s-dirty {
   background:linear-gradient(155deg,rgba(223,179,114,.22),rgba(241,207,163,.1));
-  color:#9e7843;
+  color:#805a2d;
   box-shadow:inset 0 1px 1px rgba(255,255,255,.7),inset 0 0 0 .7px rgba(209,168,112,.28)
 }
 
 .rm.s-occupied {
   background:rgba(255,255,255,.27);
-  color:#667992
+  color:var(--muted)
 }
 
 .rm.s-inspection {
@@ -826,7 +831,7 @@ body {
 .versus .legend {
   font-size:9px;
   gap:6px 10px;
-  color:#72829b;
+  color:var(--muted);
   justify-content:flex-start;
   padding-left:4px
 }
@@ -995,16 +1000,16 @@ body {
 .hl-text span {
   font-size:10px;
   line-height:1.5;
-  color:#73859e
+  color:var(--muted)
 }
 
 .hl.ai .hl-text span {
-  color:#6482ab
+  color:#405f85
 }
 
 .hl-when {
   font-size:9px;
-  color:#8392aa
+  color:var(--muted)
 }
 
 .hl-empty {
@@ -1216,7 +1221,7 @@ body {
 
 .floor-label {
   font-size:10px;
-  color:#7d8fa8
+  color:var(--muted)
 }
 
 .tile {
@@ -1275,30 +1280,30 @@ body {
 .tile.s-ready {
   background:linear-gradient(145deg,rgba(117,196,167,.29),rgba(181,227,211,.13));
   --tile-accent:#68b197;
-  color:#3d7c67
+  color:#2c654f
 }
 
 .tile.s-dirty {
   background:linear-gradient(145deg,rgba(231,198,152,.28),rgba(247,221,187,.12));
   --tile-accent:#ceaa72;
-  color:#997441
+  color:#805a2d
 }
 
 .tile.s-cleaning {
   background:linear-gradient(145deg,rgba(175,168,219,.29),rgba(206,199,233,.1));
   --tile-accent:#9a8dc8;
-  color:#7765a6
+  color:#62518f
 }
 
 .tile.s-inspection {
   background:linear-gradient(145deg,rgba(224,212,156,.35),rgba(240,227,183,.12));
   --tile-accent:#baaa69;
-  color:#897731
+  color:#6e5c26
 }
 
 .tile.s-stayover {
   background:linear-gradient(145deg,rgba(255,255,255,.46),rgba(255,255,255,.18));
-  color:#8293a8
+  color:var(--muted)
 }
 
 .tile.s-occupied {
@@ -1427,7 +1432,7 @@ body {
   font-size:11px;
   line-height:1.6;
   min-height:36px;
-  color:#778ba5;
+  color:var(--muted);
   margin-bottom:10px
 }
 
@@ -1701,12 +1706,12 @@ body {
   font-size:17px;
   font-weight:400;
   letter-spacing:0;
-  color:#7691ae
+  color:var(--muted)
 }
 
 .energy-hero p {
   font-size:10px;
-  color:#8091a8;
+  color:var(--muted);
   margin:8px 0 0
 }
 
@@ -1866,7 +1871,7 @@ body {
 }
 
 .phone-top .pt-k,.phone-top .pt-sub {
-  color:#758ca8
+  color:var(--muted)
 }
 
 .task {
@@ -1877,7 +1882,7 @@ body {
 
 /* The same material on guests' phones; controls retain native-sized touch targets. */
 .gx-device::before {
-  background:url('/liquid-wallpaper.svg') 60% 60%/auto 100% no-repeat
+  background:url('/architectural-glass.svg') 60% 60%/auto 100% no-repeat
 }
 
 .gx-aside h1 {
@@ -1889,7 +1894,7 @@ body {
 }
 
 .gx-aside p {
-  color:#687c97;
+  color:#40586b;
   font-size:14px;
   line-height:1.75
 }
@@ -1901,7 +1906,7 @@ body {
 .gx-aside li {
   font-size:12px;
   line-height:1.6;
-  color:#5e738f
+  color:#40586b
 }
 
 .gx-aside li .icon {
@@ -1925,7 +1930,7 @@ body {
 
 .gx-sub {
   font-size:14px;
-  color:#778ba4
+  color:#4b6175
 }
 
 .gx-hero {
@@ -1968,7 +1973,7 @@ body {
 
 .gx-row-label small {
   font-size:12px;
-  color:#7a8da7
+  color:var(--muted)
 }
 
 .gx-row-ic {
@@ -2023,7 +2028,7 @@ body {
 .onboard-hero p {
   font-size:14px;
   line-height:1.7;
-  color:#6d819d
+  color:#40586b
 }
 
 .onboard-hero .gx-mark {
@@ -2089,7 +2094,7 @@ body {
 }
 
 .stage {
-  background:url('/liquid-wallpaper.svg') center/cover no-repeat,#ecf2fa
+  background:url('/architectural-glass.svg') center/cover no-repeat,#ecf2fa
 }
 
 .stage-step {
@@ -2236,8 +2241,8 @@ body {
   .rail-brand {
     padding:0 5px
   }
-  .rail-brand small {
-    font-size:7px
+  .rail-brand>span {
+    font-size:20px
   }
   .rail-note {
     padding:13px 10px
@@ -2429,11 +2434,20 @@ body {
     border-radius:21px
   }
   .rail-brand {
-    padding:0;
-    margin-bottom:34px
+    display:none
   }
-  .rail-brand svg {
-    width:28px
+  .hq-mobile-brand {
+    display:block;
+    font-size:15px;
+    font-weight:600;
+    line-height:1.12;
+    letter-spacing:-.4px;
+    text-decoration:none;
+    color:var(--ink);
+    flex-shrink:0
+  }
+  .hq-breadcrumb {
+    display:none
   }
   .rail-brand>span,.rail-property,.rail-label,.rail-note,.rail-guest,.rail-footer>div,.rail-footer>.rail-avatar {
     display:none
@@ -2920,11 +2934,12 @@ body {
   }
   .hq-mobile-brand {
     display:block;
-    font-size:19px;
-    font-weight:700;
-    letter-spacing:2px;
+    font-size:14px;
+    font-weight:600;
+    line-height:1.1;
+    letter-spacing:-.35px;
     text-decoration:none;
-    color:#3c5776
+    color:var(--ink)
   }
   .hq-breadcrumb {
     display:none
@@ -2933,9 +2948,7 @@ body {
     gap:7px
   }
   .hq-demo-label {
-    font-size:9px;
-    padding:4px 6px;
-    margin-right:3px
+    display:none
   }
   .hq-guest {
     height:31px;
@@ -3811,7 +3824,7 @@ body {
     background-color:#f5f8fd
   }
   .backdrop {
-    background:#eaf0f8
+    background:#adbec6
   }
   .backdrop::before,.backdrop::after {
     opacity:.2

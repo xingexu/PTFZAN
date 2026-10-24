@@ -6,7 +6,6 @@ import { SimContext, ToastContext, useToast, type Toast } from './api';
 import { ActivityContext, useActivityFeed } from './hotel/activity';
 import { hotel, useHotel } from './hotel/host';
 import { Icon, type IconName } from './components/Icon';
-import { Logo } from './components/Logo';
 import { fade } from './components/fade';
 import { useSlide } from './components/slide';
 import { GUEST_TAB, guestUrl, hasServer, HOTEL_TAB, isGuestView, separateSites } from './links';
@@ -112,7 +111,7 @@ function HotelShell() {
   const current = NAV.find((n) => n.to === pathname || n.also === pathname)?.label ?? 'Live overview';
 
   useEffect(() => {
-    document.title = 'FHN · Hotel view';
+    document.title = 'Founders Hotel Network · Operations';
     document.body.classList.add('hq-body');
     return () => document.body.classList.remove('hq-body');
   }, []);
@@ -124,10 +123,10 @@ function HotelShell() {
           <div className="backdrop" aria-hidden="true" />
           <a className="skip-nav" href="#hotel-content">Skip to content</a>
           <aside className="hq-rail glass" aria-label="Hotel workspace">
-            <NavLink to="/" className="rail-brand" aria-label="FHN · hotel view home" viewTransition>
-              <Logo /><span>FHN<small>Founders Hotel Network</small></span>
+            <NavLink to="/" className="rail-brand" aria-label="Founders Hotel Network · hotel view home" viewTransition>
+              <span>Founders<br />Hotel Network</span>
             </NavLink>
-            <div className="rail-property"><span className="rail-property-icon"><Icon name="building" size={19} /></span><div><b>Toronto Downtown</b><span>48 rooms · One connected team</span></div></div>
+            <div className="rail-property"><span className="rail-property-icon"><Icon name="building" size={19} /></span><div><b>Toronto Downtown</b><span>48 rooms · Floors 3–6</span></div></div>
             <span className="rail-label">WORKSPACE</span>
             <nav className="hq-nav slide" aria-label="Screens" ref={navRef}>
               {NAV.map((n) => (
@@ -138,14 +137,13 @@ function HotelShell() {
               ))}
             </nav>
             <div className="rail-bottom">
-              <div className="rail-note"><Icon name="sparkles" size={19} /><b>A little more in sync.</b><p>Rooms, people, and guest comfort.<br />One shared view of the day.</p></div>
-              <a className="rail-guest" href={guestUrl('/')} target={GUEST_TAB}><span><Icon name="phoneDevice" size={17} />Guest experience</span><Icon name="external" size={14} /></a>
-              <div className="rail-footer"><span className="rail-avatar"><Icon name="shield" size={17} /></span><div><b>FHN Operations</b><span>Pitch the Future · 2026</span></div></div>
+              <a className="rail-guest" href={guestUrl('/')} target={GUEST_TAB}><span><Icon name="phoneDevice" size={17} />Guest app</span><Icon name="external" size={14} /></a>
+              <div className="rail-footer"><span className="rail-avatar"><Icon name="shield" size={17} /></span><div><b>Hotel operations</b><span>Pitch the Future · 2026</span></div></div>
             </div>
           </aside>
           <header className="hq-top">
             <div className="hq-bar glass">
-              <NavLink to="/" className="hq-mobile-brand" aria-label="FHN home">FHN</NavLink>
+              <NavLink to="/" className="hq-mobile-brand" aria-label="Founders Hotel Network home">Founders<br />Hotel Network</NavLink>
               <div className="hq-breadcrumb"><span>Hotel workspace</span><Icon name="right" size={13} /><b>{current}</b></div>
               <div className="hq-actions">
                 <span className="hq-date">Friday, October 16</span>

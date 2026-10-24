@@ -37,7 +37,7 @@ export default function Overview() {
   return (
     <main className="page live">
       <header className="sim-head">
-        <div><span className="page-eyebrow">TORONTO DOWNTOWN</span><h1>Your hotel, in sync.</h1><p className="page-subtitle">A clearer view of the day. A better stay for every guest.</p></div>
+        <div><span className="page-eyebrow">TORONTO DOWNTOWN</span><h1>Today’s overview</h1><p className="page-subtitle">Room readiness and guest arrivals for Friday, October 16.</p></div>
         <span className="sim-chip"><Icon name={state.finished ? 'check' : 'clock'} size={13} />{state.finished ? 'Shift complete' : 'Friday, October 16 · Live simulation'}</span>
       </header>
       <section className="live-summary" aria-label="Shift at a glance">
@@ -86,9 +86,9 @@ function Board({ kind, rooms, m }: { kind: 'today' | 'ai'; rooms: BoardRoom[]; m
     <div className={`board glass ${kind}`}>
       <header className="bd-head">
         <div className="bd-title">
-          <span className="board-eyebrow">{kind === 'ai' ? 'CONNECTED & COORDINATED' : 'THE SAME DAY, BEFORE'}</span>
-          <h2>{kind === 'ai' ? 'The FHN way' : 'The previous way'}</h2>
-          <p>{kind === 'ai' ? 'One shared plan. Always up to date.' : 'Paper lists. Phone calls. Catching up.'}</p>
+          <span className="board-eyebrow">{kind === 'ai' ? 'AI-ASSISTED PLAN' : 'MANUAL PLAN'}</span>
+          <h2>{kind === 'ai' ? 'With FHN AI' : 'Previous method'}</h2>
+          <p>{kind === 'ai' ? 'Live room status and updated assignments.' : 'Paper lists and phone updates.'}</p>
         </div>
         <div className="bd-stat" aria-label={`${ready} of ${total} wedding rooms ready`}>
           <span className="bd-stat-label">Wedding rooms ready</span>

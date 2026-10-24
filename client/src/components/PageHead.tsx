@@ -4,9 +4,9 @@ import { useSlide } from './slide';
 
 /** One-line page header for the hotel view: a title and the page's own controls. */
 const SUBTITLES: Record<string, string> = {
-  Rooms: 'Every room. Every arrival. A clear next step.',
-  Team: 'A balanced day for the people who make it happen.',
-  Building: 'Behind every comfortable stay.',
+  Rooms: 'Room status, ready times and arrivals.',
+  Team: 'Housekeeping assignments and staffing.',
+  Building: 'Repairs, maintenance and room temperature.',
 };
 
 export function PageHead({ title, children }: { title: string; children?: ReactNode }) {
