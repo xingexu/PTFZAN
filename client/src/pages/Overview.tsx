@@ -32,7 +32,7 @@ export default function Overview() {
   return (
     <main className="page overview-page">
       <section className="overview-hero" aria-label="Today at a glance">
-        <div className="overview-greeting"><span className="page-eyebrow">FRIDAY, OCTOBER 16</span><h1>Today at<br className="mobile-break" /> Toronto Downtown</h1><p>{ready} rooms ready <span>·</span> {nextHour} arrivals in the next hour</p></div>
+        <div className="overview-greeting"><span className="page-eyebrow">TORONTO DOWNTOWN · FRIDAY, OCTOBER 16</span><h1>Good Evening<br />Felix Qin</h1><p>{ready} rooms ready <span>·</span> {nextHour} arrivals in the next hour</p></div>
         <div className="overview-metrics">
           <Link to="/front-desk" className="overview-metric"><span className="metric-icon green"><Icon name="bed" size={21} /></span><div><span>Ready for arrival</span><strong>{ready}<small> / 48</small></strong></div></Link>
           <Link to="/front-desk" className="overview-metric"><span className="metric-icon blue"><Icon name="users" size={21} /></span><div><span>Guests waiting</span><strong>{s.metrics.lobbyWaiting}</strong></div></Link>
