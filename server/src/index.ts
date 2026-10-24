@@ -1,6 +1,7 @@
 import { loadMessagingConfig, PUBLIC_URL, STAGE } from './env.js'; // loads .env first
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { existsSync } from 'node:fs';
+import { networkInterfaces } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { GuestView, Mode } from '../../shared/types.js';
@@ -255,17 +256,48 @@ app.use('/api', (_req, res) => bad(res, 404, 'Not found'));
 // ───────────── Static client (production) ─────────────
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.resolve(here, '../../dist');
-if (existsSync(dist)) {
+if (existsSync(path.join(dist, 'index.html'))) {
   app.use(express.static(dist, { index: false, maxAge: '1h' }));
   app.get('*', (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(dist, 'index.html'));
   });
+} else {
+  // API only (e.g. `npm run dev`, where Vite serves the UI on :5173). Explain instead of a bare "Cannot GET /".
+  app.get('*', (_req, res) =>
+    res
+      .status(503)
+      .type('html')
+      .send(
+        '<!doctype html><meta charset="utf-8"><title>ReadyPath</title>' +
+          '<body style="font-family:system-ui;padding:40px;max-width:640px;line-height:1.5">' +
+          '<h1>ReadyPath API is running</h1><p>The web app hasn’t been built yet. Run <code>npm run build</code>, then restart ' +
+          '<code>npm start</code> — or use <code>npm run dev</code> and open <a href="http://localhost:5173">localhost:5173</a>.</p></body>',
+      ),
+  );
 }
 
-app.listen(PORT, () => {
+/** Addresses phones on the same Wi-Fi can use (for /stage/remote and guest pages). */
+const lanUrls = () =>
+  Object.values(networkInterfaces())
+    .flat()
+    .filter((n): n is NonNullable<typeof n> => !!n && n.family === 'IPv4' && !n.internal)
+    .map((n) => `http://${n.address}:${PORT}`);
+
+const server = app.listen(PORT, () => {
   const m = messenger.status;
-  console.log(`ReadyPath listening on http://localhost:${PORT}`);
+  console.log(`\nReadyPath is running → http://localhost:${PORT}`);
+  for (const u of lanUrls()) console.log(`  phones on the same Wi-Fi: ${u}`);
+  console.log(`  live demo: /stage · phone remote: /stage/remote · Mike's guest page: /guest/MIKE`);
   console.log(`Messaging: ${m.provider} — ${m.note}`);
   console.log(`Stage guest "${STAGE.name}" · room ${STAGE.room} · phone ${STAGE.phone ? maskPhone(normalizePhone(STAGE.phone)) || 'invalid' : 'not set'}${STAGE.pin ? ' · PIN on' : ''}`);
+  console.log('Press Ctrl+C to stop.\n');
+});
+
+server.on('error', (e: NodeJS.ErrnoException) => {
+  if (e.code === 'EADDRINUSE') {
+    console.error(`\nPort ${PORT} is already in use (another copy of ReadyPath or another dev server).\nStop it, or start on a different port:  PORT=8790 npm start\n`);
+    process.exit(1);
+  }
+  throw e;
 });

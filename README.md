@@ -30,6 +30,8 @@ npm start          # serves the app and API on http://localhost:8787
 
 Other scripts: `npm test` (simulation tests), `npm run typecheck`.
 
+The start-up log prints the addresses phones on the same Wi-Fi can use (for `/stage/remote` and guest pages). If macOS asks whether **node** may accept incoming connections, allow it so phones can reach your laptop. If port 8787 is busy, run `PORT=8790 npm start`.
+
 ---
 
 ## Screens
