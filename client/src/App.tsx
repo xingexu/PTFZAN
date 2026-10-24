@@ -201,11 +201,11 @@ function Player({ state }: { state: SimState }) {
   return (
     <footer className="player">
       <div className="seg mode" role="group" aria-label="How the hotel runs the day">
-        <button className={state.mode === 'baseline' ? 'on today-on' : ''} disabled={busy} onClick={() => call('reset', { mode: 'baseline' })} title="The way the hotel runs today">
-          Today
+        <button className={state.mode === 'baseline' ? 'on today-on' : ''} disabled={busy} onClick={() => call('reset', { mode: 'baseline' })} title="The previous method">
+          Previous
         </button>
-        <button className={state.mode === 'ai' ? 'on ai-on' : ''} disabled={busy} onClick={() => call('reset', { mode: 'ai' })} title="With FHN AI">
-          <Icon name="sparkles" size={13} /> FHN AI
+        <button className={state.mode === 'ai' ? 'on ai-on' : ''} disabled={busy} onClick={() => call('reset', { mode: 'ai' })} title="The new AI method">
+          New AI
         </button>
       </div>
       <div className="pl-buttons">
@@ -229,7 +229,7 @@ function Player({ state }: { state: SimState }) {
         {clock[0]}
         <small>{clock[1]}</small>
       </div>
-      <button className={`pl-demo ${auto ? 'running' : ''}`} disabled={busy} onClick={() => (auto ? call('play', { playing: false }) : call('demo'))} title="The whole day with FHN AI in about 30 seconds">
+      <button className={`pl-demo ${auto ? 'running' : ''}`} disabled={busy} onClick={() => (auto ? call('play', { playing: false }) : call('demo'))} title="The whole day with the new AI in about 30 seconds">
         <Icon name={auto ? 'pause' : state.finished ? 'reset' : 'play'} size={13} /> {auto ? 'Stop' : state.finished ? 'Play again' : '30-sec demo'}
       </button>
       <select className="pl-speed" aria-label="Playback speed" value={auto ? 'auto' : state.speed} onChange={(e) => call('speed', { speed: Number(e.target.value) })}>

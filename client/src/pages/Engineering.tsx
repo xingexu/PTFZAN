@@ -143,12 +143,12 @@ function Energy({ s }: { s: SimState }) {
           <Icon name="leaf" size={16} />
           <h2>Room temperature · live</h2>
         </div>
-        <span className={`pill ${s.mode === 'ai' ? 'teal' : 'red'}`}>{s.mode === 'ai' ? 'Saves energy when empty' : 'Today: always on'}</span>
+        <span className={`pill ${s.mode === 'ai' ? 'teal' : 'red'}`}>{s.mode === 'ai' ? 'Saves energy when empty' : 'Previous method: always on'}</span>
       </div>
       <div className="estats">
         <div className="fstat">
           <b>{ai?.kwhSaved ?? 0} kWh</b>
-          <span>saved today · today&rsquo;s way {today?.kwhSaved ?? 0}</span>
+          <span>saved today · previous method {today?.kwhSaved ?? 0}</span>
         </div>
         <div className="fstat">
           <b>{s.mode === 'ai' ? count('eco') : count('running')}</b>

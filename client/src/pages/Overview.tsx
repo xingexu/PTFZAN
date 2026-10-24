@@ -41,7 +41,6 @@ export default function Overview() {
           <Icon name="play" size={11} /> Simulation
         </span>
         <h1>FHN Toronto Downtown · Friday, October 16</h1>
-        <p>A 2D cross-section of the hotel — every room, replayed minute by minute, today&rsquo;s way and with FHN AI.</p>
       </header>
       <section className="versus" aria-label="Every room, side by side">
         <Board kind="today" rooms={todayRooms} m={today} />
@@ -84,10 +83,7 @@ function Board({ kind, rooms, m }: { kind: 'today' | 'ai'; rooms: BoardRoom[]; m
     <div className={`board glass ${kind}`}>
       <header className="bd-head">
         <div className="bd-title">
-          <h2>
-            {kind === 'ai' && <Icon name="sparkles" size={15} />}
-            {kind === 'ai' ? 'With FHN AI' : 'Today’s way'}
-          </h2>
+          <h2>{kind === 'ai' ? 'New AI' : 'Previous method'}</h2>
           <p>{kind === 'ai' ? 'One live plan for every room' : 'Paper lists and phone calls'}</p>
         </div>
         <div className="bd-stat" aria-label={`${ready} of ${total} wedding rooms ready`}>

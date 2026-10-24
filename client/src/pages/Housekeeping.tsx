@@ -86,7 +86,7 @@ function AttendantPhone({ s, a }: { s: SimState; a: Attendant }) {
       <div className="phone-screen">
         <div className={`phone-top ${ai ? '' : 'today'}`}>
           <div className="pt-k">
-            {fmtTime(s.now)} · {ai ? 'FHN AI' : 'Paper list'}
+            {fmtTime(s.now)} · {ai ? 'New AI' : 'Previous method'}
           </div>
           <h3>{a.label}</h3>
           <div className="pt-sub">{a.present ? a.activity : 'Absent today'}</div>

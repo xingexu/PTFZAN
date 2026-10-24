@@ -31,14 +31,14 @@ export function Num({ value }: { value: number }) {
 }
 
 /**
- * Today's way and FHN AI as two bars on the same scale. A side with no number yet shows `open`
+ * The previous method and the new AI as two bars on the same scale. A side with no number yet shows `open`
  * (e.g. "still broken").
  */
 export function CompareBars({ today, ai, unit = '', open = '—' }: { today?: number | null; ai?: number | null; unit?: string; open?: string }) {
   const max = Math.max(1, today ?? 0, ai ?? 0);
   const row = (v: number | null | undefined, who: 'today' | 'ai') => (
     <div className={`cb ${who} ${v == null ? 'open' : ''}`}>
-      <span className="cb-who">{who === 'ai' ? 'FHN AI' : 'Today'}</span>
+      <span className="cb-who">{who === 'ai' ? 'New AI' : 'Previous'}</span>
       <span className="cb-track">
         <i style={{ width: `${v == null ? 100 : Math.max(2, (v / max) * 100)}%` }} />
       </span>
