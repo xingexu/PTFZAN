@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StageState } from '../../../shared/types';
 import { fmtTime } from '../../../shared/types';
 import { ApiError, setStagePin, stageApi, useEventStream, useToast } from '../api';
-import { Logo } from '../components/Logo';
 import { latestFor, PinDialog } from '../components/stageShared';
 
 /** Phone remote for a teammate: one big button for the next step of the live demo. */
@@ -50,9 +49,8 @@ export default function StageRemote() {
   return (
     <div className="remote">
       <header className="remote-top">
-        <Logo className="brand-mark" />
         <div>
-          <div style={{ fontWeight: 800 }}>Stage remote</div>
+          <div style={{ fontWeight: 700 }}>Stage remote</div>
           <div className="muted" style={{ fontSize: 12 }}>
             {s.sendReal ? (s.messaging.provider === 'simulated' ? 'Simulated messages' : `Live · ${s.messaging.provider}`) : 'Rehearsal — nothing sent'}
           </div>

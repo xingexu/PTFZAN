@@ -71,7 +71,7 @@ export default function Welcome() {
             </div>
           </div>
           {err && (
-            <p role="alert" style={{ color: 'var(--red-ink)', fontWeight: 650, margin: '12px 0 0', fontSize: 13.5 }}>
+            <p role="alert" style={{ color: 'var(--red-ink)', fontWeight: 600, margin: '12px 0 0', fontSize: 13.5 }}>
               {err}
             </p>
           )}

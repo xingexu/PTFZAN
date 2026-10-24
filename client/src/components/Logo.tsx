@@ -27,11 +27,10 @@ export function Logo({ className, tone = 'ink' }: { className?: string; tone?: '
   );
 }
 
-/** Mark + wordmark, as on the case cover: "FHN" over "Founders Hotel Network". */
+/** The wordmark, as on the case cover: "FHN" over "Founders Hotel Network". */
 export function Brand({ sub, tone = 'ink' }: { sub?: string; tone?: 'light' | 'ink' }) {
   return (
     <span className={`brand ${tone}`}>
-      <Logo className="brand-mark" tone={tone} />
       <span className="brand-text">
         <span className="brand-name">FHN</span>
         <span className="brand-sub">{sub ?? 'Founders Hotel Network'}</span>

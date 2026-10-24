@@ -7,7 +7,6 @@ import { ActivityContext, useActivityFeed } from './hotel/activity';
 import { hotel, useHotel } from './hotel/host';
 import { Icon, type IconName } from './components/Icon';
 import { fade } from './components/fade';
-import { Logo } from './components/Logo';
 import { GUEST_TAB, guestUrl, hasServer, HOTEL_TAB, isGuestView, separateSites } from './links';
 import Engineering from './pages/Engineering';
 import FrontDesk from './pages/FrontDesk';
@@ -122,8 +121,7 @@ function HotelShell() {
           <header className="hq-top">
             <div className="hq-bar glass">
               <NavLink to="/" className="hq-brand" aria-label="FHN · hotel view home" viewTransition>
-                <Logo className="brand-mark" />
-                <span>FHN</span>
+                FHN
               </NavLink>
               <nav className="hq-nav" aria-label="Screens">
                 {NAV.map((n) => (

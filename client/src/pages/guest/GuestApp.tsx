@@ -103,7 +103,7 @@ export default function GuestApp() {
       <GuestFrame>
         <div className="gx-pad gx-top-pad">
           <div className="gx-card pad gx-wait" role="status">
-            <Logo className="brand-mark" />
+            <span className="spinner" aria-hidden="true" />
             <b>{status === 'offline' ? 'Can’t reach the hotel right now' : 'Opening your stay…'}</b>
             {status === 'offline' && <span className="gx-muted">We’ll keep trying — check your connection.</span>}
           </div>
@@ -229,10 +229,7 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
     <>
       <header className="gx-hero">
         <div className="gx-top">
-          <span className="gx-mark">
-            <Logo className="brand-mark" />
-            <b>FHN</b>
-          </span>
+          <span className="gx-mark">FHN</span>
           <button className="gx-iconbtn" onClick={() => go('chat')} aria-label={`Messages${unread ? `, ${unread} new` : ''}`}>
             <Icon name="bell" size={19} />
             {unread > 0 && <span className="badge" />}
@@ -542,7 +539,7 @@ function KeyTab({ v, act }: { v: GuestView; act: Act }) {
         ) : (
           <div className="gx-card pad" style={{ width: '100%' }}>
             <span className="gx-label">Activates</span>
-            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2 }}>
+            <div style={{ fontSize: 22, fontWeight: 700, marginTop: 2 }}>
               {v.room.eta ? fmtRange(v.room.eta.low, v.room.eta.high) : v.guest.canCheckIn ? 'After online check-in' : 'When your room is ready'}
             </div>
             <p className="gx-muted" style={{ margin: '4px 0 0', fontSize: 13 }}>
@@ -858,11 +855,11 @@ function WifiSheet({ onClose }: { onClose: () => void }) {
       <SheetHead title="Wi-Fi" sub="Free for every guest, on every floor." onClose={onClose} />
       <div className="gx-card pad">
         <span className="gx-label">Network</span>
-        <div style={{ fontSize: 20, fontWeight: 800 }}>FHN-Guest</div>
+        <div style={{ fontSize: 20, fontWeight: 700 }}>FHN-Guest</div>
         <span className="gx-label" style={{ display: 'block', marginTop: 10 }}>
           Password
         </span>
-        <div style={{ fontSize: 20, fontWeight: 800 }}>founders2026</div>
+        <div style={{ fontSize: 20, fontWeight: 700 }}>founders2026</div>
       </div>
       <button
         className="gbtn soft"

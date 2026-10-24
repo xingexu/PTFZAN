@@ -160,7 +160,7 @@ function StaffingCard({ f }: { f: StaffingForecast }) {
 function AutoApprove({ s }: { s: SimState }) {
   const toast = useToast();
   return (
-    <label className="row" style={{ fontWeight: 650, fontSize: 13.5, gap: 8 }}>
+    <label className="row" style={{ fontWeight: 600, fontSize: 13.5, gap: 8 }}>
       <input
         type="checkbox"
         checked={s.autoApprove}

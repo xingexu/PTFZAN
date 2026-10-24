@@ -330,7 +330,7 @@ function Arrivals({ s, onPick }: { s: SimState; onPick: (id: string) => void }) 
           <span className="pill slate">{list.length}</span>
         </div>
         {list.length === 0 ? (
-          <div className="empty row" style={{ justifyContent: 'center', color: 'var(--green-ink)', fontWeight: 650 }}>
+          <div className="empty row" style={{ justifyContent: 'center', color: 'var(--green-ink)', fontWeight: 600 }}>
             <Icon name="check" size={16} /> Everyone who has arrived is in their room.
           </div>
         ) : (
