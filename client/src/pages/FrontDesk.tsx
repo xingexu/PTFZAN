@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import type { Guest, Hvac, Room, SimState } from '../../../shared/types';
 import { fmtRange, fmtTime } from '../../../shared/types';
@@ -18,7 +19,8 @@ type Layer = 'readiness' | 'climate';
 
 export default function FrontDesk() {
   const { state } = useSim();
-  const [sel, setSel] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const [sel, setSel] = useState<string | null>(params.get('room'));
   const [layer, setLayer] = useState<Layer>('readiness');
   const [highlight, setHighlight] = useState<'all' | 'wedding' | 'attention'>('all');
   const [query, setQuery] = useState('');
@@ -116,7 +118,7 @@ function Legend({ layer, ai }: { layer: Layer; ai: boolean }) {
   );
 }
 
-function RoomTile({ s, r, layer, selected, dimmed, onClick }: { s: SimState; r: Room; layer: Layer; selected: boolean; dimmed: boolean; onClick: () => void }) {
+export function RoomTile({ s, r, layer, selected, dimmed, onClick }: { s: SimState; r: Room; layer: Layer; selected: boolean; dimmed: boolean; onClick: () => void }) {
   const st = visibleStatus(s, r);
   const ai = s.mode === 'ai';
   const risk = layer === 'readiness' && atRisk(s, r);
@@ -142,6 +144,7 @@ function RoomTile({ s, r, layer, selected, dimmed, onClick }: { s: SimState; r: 
         {r.id}
         {r.groupBlock && <span className="grp" />}
       </span>
+      <span className="tile-icon"><Icon name={layer === 'climate' ? 'thermo' : st === 'ready' ? 'bed' : st === 'cleaning' ? 'sparkles' : st === 'ooo' ? 'wrench' : st === 'inspection' ? 'check' : st === 'dirty' ? 'clock' : 'user'} size={14} /></span>
       <span className="st">{label}</span>
       {etaText && <span className="eta">{etaText}</span>}
       {layer === 'readiness' && ai && r.eta && st !== 'stayover' && (

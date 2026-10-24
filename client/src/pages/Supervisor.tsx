@@ -17,7 +17,7 @@ export default function Supervisor() {
 
   return (
     <main className="page fit">
-      <PageHead title="Team">
+      <PageHead title="Housekeeping">
         {ai && <AutoApprove s={state} />}
         <TeamTabs />
       </PageHead>

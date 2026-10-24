@@ -19,7 +19,7 @@ export default function Housekeeping() {
 
   return (
     <main className="page fit">
-      <PageHead title="Team">
+      <PageHead title="Housekeeping">
         <TeamTabs />
       </PageHead>
 

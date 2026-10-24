@@ -6,6 +6,9 @@ import { useSlide } from './slide';
 const SUBTITLES: Record<string, string> = {
   Rooms: 'Room status, ready times and arrivals.',
   Team: 'Housekeeping assignments and staffing.',
+  Housekeeping: 'The right rooms, in the right order.',
+  Maintenance: 'Open repairs and recurring issues.',
+  Energy: 'Comfort for guests. Less energy in empty rooms.',
   Building: 'Repairs, maintenance and room temperature.',
 };
 

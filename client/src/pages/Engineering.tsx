@@ -11,13 +11,10 @@ export default function Engineering() {
 
   return (
     <main className="page fit">
-      <PageHead title="Building" />
-      <div className="grid eng">
-        <div className="col">
-          <Tickets s={state} />
-          <Insights insights={state.insights} />
-        </div>
-        <Energy s={state} />
+      <PageHead title="Maintenance" />
+      <div className="grid maintenance-layout">
+        <Tickets s={state} />
+        <Insights insights={state.insights} />
       </div>
     </main>
   );
@@ -183,4 +180,10 @@ function Energy({ s }: { s: SimState }) {
       <div className="energy-comfort-note"><Icon name="shield" size={16} /><span>{s.mode === 'ai' ? 'Empty rooms use energy-saving settings until guests arrive.' : 'Heating and cooling remain on, even when rooms are empty.'}</span></div>
     </section>
   );
+}
+
+export function EnergyPage() {
+  const { state } = useSim();
+  if (!state) return null;
+  return <main className="page energy-page"><PageHead title="Energy" /><Energy s={state} /></main>;
 }
