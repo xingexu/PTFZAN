@@ -193,7 +193,7 @@ function Header({ hotel }: { hotel?: string }) {
     <div className="guest-top">
       <Logo className="brand-mark" />
       <div>
-        <div className="h">{hotel ?? 'Founders Hotel Network'}</div>
+        <div className="h">{hotel ?? 'FHN Toronto Downtown'}</div>
         <div className="s">Founders Hotel Network</div>
       </div>
     </div>

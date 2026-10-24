@@ -469,3 +469,24 @@ a { color: var(--teal-2); }
 .msg .dl { margin-top: 6px; font-size: 12px; font-weight: 700; display: flex; gap: 6px; align-items: center; color: var(--muted); }
 .msg .dl.ok { color: var(--green); }
 .msg .dl.bad { color: var(--red); }
+
+/* ───────── Fit fixes (projector 1280×720 and small laptops) ───────── */
+@media (min-width: 1001px) {
+  /* Live demo fits one screen exactly — no scrolling mid-pitch. */
+  .stage { height: 100vh; height: 100dvh; min-height: 600px; overflow: hidden; }
+  .stage-main { min-height: 0; align-items: stretch; padding: 20px 36px 12px; }
+  .stage-phone-col { min-height: 0; }
+  .stage-phone { flex: 1; min-height: 0; width: 100%; max-width: min(400px, calc((100vh - 250px) * 0.6)); display: flex; flex-direction: column; }
+  .stage-phone .phone-screen.sms { flex: 1; min-height: 0; }
+  .stage-steps { min-height: 0; overflow: auto; }
+}
+@media (max-width: 1360px) {
+  /* Give the room grid the full width so tile labels never truncate. */
+  .fd { grid-template-columns: 1fr; }
+  .fd .side { position: static; max-height: none; overflow: visible; display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr); align-items: start; }
+  .fd .side > .detail { grid-column: 1 / -1; }
+  .fd .arrivals { max-height: 60vh; overflow: auto; }
+}
+@media (max-width: 900px) {
+  .fd .side { grid-template-columns: 1fr; }
+}

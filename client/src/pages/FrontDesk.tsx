@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Guest, Room, SimState } from '../../../shared/types';
 import { fmtRange, fmtTime } from '../../../shared/types';
 import { api, useSim, useToast } from '../api';
@@ -110,6 +110,12 @@ function RoomTile({ s, r, selected, onClick }: { s: SimState; r: Room; selected:
 
 function RoomDetail({ s, r, onClose }: { s: SimState; r: Room; onClose: () => void }) {
   const toast = useToast();
+  const ref = useRef<HTMLElement>(null);
+  // When the panel sits below the grid (narrow screens), bring it into view on selection.
+  useEffect(() => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    ref.current?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  }, [r.id]);
   const [issue, setIssue] = useState(ISSUES[0]);
   const [busy, setBusy] = useState(false);
   const rp = s.mode === 'readypath';
@@ -131,7 +137,7 @@ function RoomDetail({ s, r, onClose }: { s: SimState; r: Room; onClose: () => vo
   };
 
   return (
-    <section className="card detail" aria-label={`Room ${r.id} details`}>
+    <section className="card detail" aria-label={`Room ${r.id} details`} ref={ref}>
       <div className="card-head">
         <h2>
           Room {r.id} <span className="muted" style={{ fontWeight: 600 }}>· {r.type}</span>
