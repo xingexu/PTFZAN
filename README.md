@@ -55,7 +55,7 @@ The **Guest app** link in the hotel sidebar opens the guest app; the QR code on 
 
 Set `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH` and `ADMIN_SESSION_SECRET` in the local `.env`, and as server-only variables on the hotel Vercel project. Missing configuration locks the hotel APIs; the guest app remains available. Never prefix these variables with `VITE_` or commit their values. Use `node scripts/hash-admin-password.mjs` with the password on stdin to produce the salted scrypt hash; generate a random session secret of at least 32 characters separately.
 
-`/login` opens the admin sign-in screen and `/logout` clears the browser's session. Staff pages, hotel/activity APIs and local stage APIs require authentication. Sessions use [iron-session](https://github.com/vvo/iron-session) encrypted HttpOnly cookies with SameSite=Strict, Secure on Vercel, an explicit one-hour expiry and same-origin checks for mutations. Changing the admin credentials invalidates earlier sessions. Logout removes this browser's cookie; stateless cookies cannot revoke an already copied cookie before expiry. The bounded login throttle is per server instance, not a distributed rate limiter.
+`/login` opens the admin sign-in screen and `/logout` clears the browser's session. Staff pages, hotel/activity APIs and local stage APIs require authentication. Sessions use [iron-session](https://github.com/vvo/iron-session) encrypted HttpOnly cookies with SameSite=Strict, Secure on Vercel, an explicit one-hour expiry and same-origin checks for mutations. Changing the admin credentials invalidates earlier sessions. Logout removes this browser's cookie; stateless sessions cannot revoke already copied session credentials before expiry. The bounded login throttle is per server instance, not a distributed rate limiter. Admin sessions also require a random key held only in the current tab’s sessionStorage; a browser cookie by itself cannot open staff APIs. A fresh tab starts signed out, while refreshing the current tab keeps access until logout or expiry. Signing in in another tab replaces the browser’s earlier admin session.
 
 `npm start` does the same without opening tabs. For development with hot reload: `npm run dev` (web on http://localhost:5173, guest app at `/guest`, API proxied to :8787).
 
@@ -358,3 +358,7 @@ The live SMS moment (`/stage`) needs the long-running local server, so it is hid
 Browser system notifications require **HTTPS** (Vercel has it). Over plain HTTP the guest app still alerts in-app with a chime and vibration.
 
 **Always keep a fallback:** run `npm run build && npm start` on the presenting laptop, and record a screen capture of the 30-second demo in case the venue Wi-Fi fails.
+
+### Guest access and logout
+
+New visits open Guest access without automatically restoring an old stay. Active access is kept in sessionStorage for the current tab only. Guests can log out from every guest screen, save their private access code, and use Returning guest to reopen the same stay. Logout clears device access without deleting the stay, room assignment, or requests; End this stay remains the separate action that deletes demo data. Legacy saved stays require an explicit “Use this device’s saved stay” action and then move out of localStorage.

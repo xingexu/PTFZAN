@@ -7,6 +7,7 @@ import type { ServerResponse } from 'node:http';
 
 export const testUsername = 'test-admin';
 export const testPassword = 'test-only-password';
+export const testTabKey = 'a'.repeat(64);
 export async function configureTestAdmin() {
   const salt = randomBytes(16).toString('hex');
   const hash = await derivePassword(testPassword, salt);
@@ -23,7 +24,7 @@ export function mockResponse() {
 }
 let sequence = 0;
 export function mockRequest(method: string, url: string, body?: object, cookie = '', extra: Record<string, string> = {}, ip = `test-${++sequence}`): Req {
-  return { method, url, body, headers: { host: 'hotel.test', origin: 'http://hotel.test', 'content-type': 'application/json', cookie, ...extra }, socket: { remoteAddress: ip } } as Req;
+  return { method, url, body, headers: { host: 'hotel.test', origin: 'http://hotel.test', 'content-type': 'application/json', 'x-fhn-session': testTabKey, cookie, ...extra }, socket: { remoteAddress: ip } } as unknown as Req;
 }
 export async function testLogin() {
   const res = mockResponse();

@@ -4,7 +4,11 @@ import { getIronSession, type IronSession } from 'iron-session';
 import { send, type Req } from './http.js';
 
 export const SESSION_SECONDS = 3600;
-export interface AdminSession { username?: string; expiresAt?: number; credentialVersion?: string }
+export interface AdminSession { username?: string; expiresAt?: number; credentialVersion?: string; tabHash?: string }
+export function tabHash(req: Req) {
+  const key = String(req.headers['x-fhn-session'] ?? '');
+  return /^[a-f0-9]{64}$/.test(key) ? createHash('sha256').update(key).digest('hex') : '';
+}
 
 export function adminConfig() {
   const username = process.env.ADMIN_USERNAME?.trim();
@@ -36,9 +40,9 @@ export async function adminSession(req: Req, res: ServerResponse) {
   });
 }
 
-export function isAdmin(session: AdminSession) {
+export function isAdmin(session: AdminSession, req: Req) {
   const config = adminConfig();
-  return !!config && session.username === config.username && session.credentialVersion === config.version && typeof session.expiresAt === 'number' && session.expiresAt > Date.now();
+  return !!config && !!session.tabHash && session.tabHash === tabHash(req) && session.username === config.username && session.credentialVersion === config.version && typeof session.expiresAt === 'number' && session.expiresAt > Date.now();
 }
 
 /** JSON mutations must originate on this exact host. Cookies alone are not a CSRF check. */
@@ -57,7 +61,7 @@ export async function requireAdmin(req: Req, res: ServerResponse): Promise<IronS
     return null;
   }
   const session = await adminSession(req, res);
-  if (!isAdmin(session)) {
+  if (!isAdmin(session, req)) {
     send(res, 401, { ok: false, code: 'ADMIN_SESSION_REQUIRED', message: 'Please sign in to the hotel view.' });
     return null;
   }

@@ -20,6 +20,7 @@ import Stage from './pages/Stage';
 import StageRemote from './pages/StageRemote';
 import Supervisor from './pages/Supervisor';
 import { RequireAdmin, SignIn, SignOut } from './pages/AdminAccess';
+import { GuestSignedOut } from './pages/guest/GuestAccess';
 
 const TOAST_MS = 3800;
 const TOAST_EXIT_MS = 200;
@@ -49,6 +50,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Welcome />} />
           <Route path="/stay" element={<GuestApp />} />
+          <Route path="/logout" element={<GuestSignedOut />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       ) : (
@@ -59,6 +61,7 @@ export default function App() {
             <>
               <Route path="/guest" element={<Welcome />} />
               <Route path="/guest/stay" element={<GuestApp />} />
+              <Route path="/guest/logout" element={<GuestSignedOut />} />
               <Route path="/guest/*" element={<Navigate to="/guest" replace />} />
             </>
           )}

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { SimState } from '../../shared/types';
+import { adminHeaders } from './session';
 
 export class ApiError extends Error {
   constructor(
@@ -15,7 +16,7 @@ export async function api<T = { ok: boolean; message?: string }>(path: string, b
   try {
     res = await fetch(path, {
       method: body === undefined ? 'GET' : 'POST',
-      headers: body === undefined ? headers : { 'Content-Type': 'application/json', ...headers },
+      headers: { ...(path.startsWith('/api/guest') ? {} : adminHeaders()), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout?.(12_000),
     });
@@ -65,47 +66,52 @@ export function useEventStream<T>(url: string | null): { data: T | null; conn: C
 
   useEffect(() => {
     if (!url) return;
-    let es: EventSource | null = null;
+    let controller: AbortController | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let closed = false;
-
-    const open = () => {
-      es = new EventSource(url);
-      es.onopen = () => {
+    const open = async () => {
+      controller?.abort();
+      const active = new AbortController();
+      controller = active;
+      try {
+        const response = await fetch(url, { headers: adminHeaders(), signal: active.signal });
+        if (response.status === 401) {
+          window.dispatchEvent(new Event('fhn:session-expired'));
+          return;
+        }
+        if (!response.ok || !response.body) throw new Error('Stream unavailable');
         retry.current = 0;
         setConn('live');
-      };
-      es.onmessage = (e) => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
         try {
-          setData(JSON.parse(e.data) as T);
-        } catch {
-          /* ignore malformed frame */
-        }
-      };
-      es.onerror = () => {
-        es?.close();
-        if (closed) return;
-        setConn('reconnecting');
-        const delay = Math.min(10000, 500 * 2 ** retry.current++);
-        timer = setTimeout(() => !closed && open(), delay);
-      };
+          while (!active.signal.aborted) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true }).replace(/\r/g, '');
+            let boundary: number;
+            while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+              const frame = buffer.slice(0, boundary);
+              buffer = buffer.slice(boundary + 2);
+              const data = frame.split('\n').filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trimStart()).join('\n');
+              if (data) try { setData(JSON.parse(data) as T); } catch { /* ignore malformed frame */ }
+            }
+          }
+        } finally { reader.releaseLock(); }
+      } catch { /* reconnect unless the page deliberately closed this stream */ }
+      if (closed || active.signal.aborted) return;
+      setConn('reconnecting');
+      timer = setTimeout(() => void open(), Math.min(10000, 500 * 2 ** retry.current++));
     };
-    // A page that is left (or parked in the back/forward cache) must let go of its stream: browsers allow
-    // only six connections per site, so leaked streams would eventually block every new page load.
-    const onHide = () => {
-      es?.close();
-      if (timer) clearTimeout(timer);
-    };
-    const onShow = (e: PageTransitionEvent) => {
-      if (e.persisted && !closed) open();
-    };
+    const onHide = () => { controller?.abort(); if (timer) clearTimeout(timer); };
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted && !closed) void open(); };
     window.addEventListener('pagehide', onHide);
     window.addEventListener('pageshow', onShow);
-    open();
+    void open();
     return () => {
       closed = true;
-      es?.close();
-      if (timer) clearTimeout(timer);
+      onHide();
       window.removeEventListener('pagehide', onHide);
       window.removeEventListener('pageshow', onShow);
     };
