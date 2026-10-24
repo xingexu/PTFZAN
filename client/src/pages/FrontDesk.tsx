@@ -34,7 +34,7 @@ export default function FrontDesk() {
   const matching = state.rooms.filter(matches).length;
 
   return (
-    <main className="page fit">
+    <main className="page rooms-page">
       <PageHead title="Rooms">
         <div className="layer-seg slide" role="tablist" aria-label="Map layer" ref={layerRef}>
           <button role="tab" aria-selected={layer === 'readiness'} className={layer === 'readiness' ? 'on' : ''} onClick={() => fade(() => setLayer('readiness'))}>
@@ -54,7 +54,7 @@ export default function FrontDesk() {
             </div>
             <label className="room-search"><Icon name="bed" size={14} /><input type="search" inputMode="numeric" placeholder="Find a room" aria-label="Find a room by number" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
           </div>
-          <span className="sr-only" role="status">{matching} matching rooms highlighted</span>
+          <span className="sr-only" role="status">{matching} matching {matching === 1 ? 'room' : 'rooms'} highlighted</span>
           <div className="card-head">
             <Legend layer={layer} ai={ai} />
             {!ai && layer === 'readiness' && <span className="pill red">Last phone update · {fmtTime(state.frontDeskSnapshotAt)}</span>}
@@ -147,7 +147,7 @@ export function RoomTile({ s, r, layer, selected, dimmed, onClick }: { s: SimSta
       </span>
       <span className="tile-icon"><Icon name={layer === 'climate' ? 'thermo' : st === 'ready' ? 'bed' : st === 'cleaning' ? 'sparkles' : st === 'ooo' ? 'wrench' : st === 'inspection' ? 'check' : st === 'dirty' ? 'clock' : 'user'} size={14} /></span>
       <span className="st">{label}</span>
-      {etaText && <span className="eta">{etaText}</span>}
+      {etaText && <span className="eta">{etaText.startsWith('by ') ? <><span className="eta-prefix">by </span>{etaText.slice(3)}</> : etaText}</span>}
       {layer === 'readiness' && ai && r.eta && st !== 'stayover' && (
         <span className="conf" title={`How sure: ${SURE[r.eta.confidence]}`}>
           <i style={{ width: CONF_WIDTH[r.eta.confidence], background: CONF_COLOR[r.eta.confidence] }} />
@@ -357,6 +357,7 @@ function Arrivals({ s, onPick }: { s: SimState; onPick: (id: string) => void }) 
           <h2>Guests not in their rooms yet</h2>
           <span className="pill slate">{list.length + app.length}</span>
         </div>
+        <div className="room-arrival-scroll" tabIndex={0} role="region" aria-label="Guest arrivals">
         {app.length > 0 && (
           <ul className="arrivals app-arrivals" aria-label="Checked in on the guest app">
             {app.map((a) => {
@@ -416,6 +417,7 @@ function Arrivals({ s, onPick }: { s: SimState; onPick: (id: string) => void }) 
             })}
           </ul>
         )}
+        </div>
       </section>
       {evening.length > 0 && (
         <section className="card" aria-label="Arriving this evening">

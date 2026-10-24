@@ -487,3 +487,79 @@ body { background: #30414a; }
   .room-search input,.gx .input { font-size: 16px; }
   .room-highlights button { min-height: 44px; }
 }
+
+/* Compact room map: floor height follows its tiles, never the height of an adjacent panel. */
+.rooms-page { align-self: flex-start; width: 100%; }
+.rooms-page .hq-head { min-height: 60px; margin-bottom: 20px; }
+.rooms-page .fd { align-items: start; }
+.rooms-page .fd-map { align-self: start; }
+.rooms-page .card .floors.fd-floors { flex: none; grid-template-rows: repeat(4,104px); gap: 9px; padding: 14px; }
+.rooms-page .fd-floors .floor { grid-template-rows: 104px; align-content: start; }
+.rooms-page .fd-floors .tile { height: 104px; min-height: 0; padding: 9px 6px; gap: 3px; }
+.rooms-page .tile .tile-icon { margin: 1px 0; }
+.rooms-page .tile .conf { display: none; }
+.rooms-page .room-tools { padding: 14px 16px 10px; }
+.rooms-page .fd-map .card-head { padding: 0 16px 12px; }
+.rooms-page .fd-map .legend { font-size: 10px; }
+.rooms-page .side { position: sticky; top: 20px; }
+.room-arrival-scroll { max-height: 320px; overflow-y: auto; scroll-behavior: smooth; overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: rgba(54,78,94,.32) transparent; }
+.room-arrival-scroll:focus-visible { outline: 2px solid #377ca4; outline-offset: -3px; border-radius: 0 0 22px 22px; }
+.hq-signout { display: inline-flex; gap: 8px; align-items: center; justify-content: center; min-height: 40px; padding: 0 15px; border-radius: 20px; background: rgba(255,255,255,.15); color: #fff; text-decoration: none; font-size: 12px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: inset 0 1px 1px rgba(255,255,255,.65),inset 0 0 0 1px rgba(255,255,255,.3); transition: background .25s; }
+.hq-signout:hover { background: rgba(255,255,255,.28); }
+.admin-access { position: relative; isolation: isolate; min-height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: center; gap: 30px; padding: 32px 24px; }
+.admin-brand { justify-self: start; color: white; text-decoration: none; }
+.admin-brand .brand-name { color: white; font-size: 27px; }
+.admin-access-card { width: min(100%,440px); padding: 38px; border-radius: 30px; }
+.admin-access-icon { display: grid; place-items: center; width: 52px; height: 52px; background: rgba(255,255,255,.4); border-radius: 17px; box-shadow: var(--glass-rim); color: #2d617b; margin-bottom: 26px; }
+.admin-access-card .eyebrow { font-size: 10px; letter-spacing: 1.5px; color: #415968; }
+.admin-access-card h1 { font: 38px/1.1 Georgia,serif; letter-spacing: -1.1px; margin: 8px 0 12px; color: var(--ink); }
+.admin-access-card>p { font-size: 14px; line-height: 1.6; color: #3a4d5c; margin: 0 0 27px; }
+.admin-form { display: grid; gap: 20px; }
+.admin-form .field { display: grid; gap: 8px; }
+.admin-form .field label { font-size: 12px; font-weight: 600; }
+.admin-form .input { width: 100%; height: 49px; font-size: 16px; }
+.admin-password { position: relative; }
+.admin-password .input { padding-right: 64px; }
+.admin-password>button { position: absolute; right: 5px; top: 3px; min-height: 43px; width: 55px; border: 0; border-radius: 10px; box-shadow: none; color: #365a74; font-size: 12px; background: transparent; cursor: pointer; }
+.admin-form .admin-error { color: #8c2832; font-size: 13px; line-height: 1.5; margin: 0; }
+.admin-access-card .gbtn { text-decoration: none; min-height: 50px; }
+.admin-access-foot { color: #f0f5f7; font-size: 12px; text-shadow: 0 1px 8px rgba(0,0,0,.5); text-align: center; }
+
+/* Native scrolling with soft arrivals and discreet scrollbars. */
+html { scroll-behavior: smooth; scroll-padding-top: 24px; scroll-padding-bottom: 112px; }
+body { overscroll-behavior-y: none; }
+.card-scroll,.gx-scroll,.drawer,.sheet-scroll { scroll-behavior: smooth; overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: rgba(54,78,94,.32) transparent; }
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { border-radius: 10px; background: rgba(83,104,117,.3); border: 1px solid rgba(255,255,255,.2); }
+*::-webkit-scrollbar-thumb:hover { background: rgba(83,104,117,.5); }
+.card { scroll-margin-top: 24px; }
+@keyframes workspace-enter { from { transform: translateY(9px); } to { transform: translateY(0); } }
+.page,.admin-access-card { animation: workspace-enter .6s cubic-bezier(.22,1,.36,1); }
+@media(min-width:761px) and (max-width:1250px) {
+  .rooms-page .card .floors.fd-floors { grid-template-rows: repeat(4,177px); }
+  .rooms-page .fd-floors .floor { grid-template-rows: repeat(2,86px); }
+  .rooms-page .fd-floors .tile { height: 86px; padding: 7px 5px; }
+}
+@media(max-width:980px) { .rooms-page .side { position: static; } }
+@media(max-width:760px) {
+  .rooms-page .card .floors.fd-floors { grid-template-rows: repeat(4,167px); gap: 11px; padding: 13px 10px; }
+  .rooms-page .fd-floors .floor { grid-template-rows: repeat(2,81px); }
+  .rooms-page .fd-floors .tile { height: 81px; padding: 7px 4px; gap: 2px; }
+  .rooms-page .fd-floors .tile-icon { display: none; }
+  .rooms-page .tile .st { font-size: 9px; }
+  .rooms-page .tile .eta { font-size: 9px; }
+  .rooms-page .tile .eta-prefix { display: none; }
+  .rooms-page .fd-map .legend { font-size: 9px; gap: 7px 9px; }
+  .hq-signout { padding: 0 12px; font-size: 11px; gap: 6px; }
+  .hq-actions { gap: 7px; }
+  .hq-mobile-brand { font-size: 22px; }
+  .admin-access { padding: 25px 18px; gap: 28px; }
+  .admin-brand .brand-name { font-size: 25px; }
+  .admin-access-card { padding: 29px 24px; }
+  .admin-access-card h1 { font-size: 35px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  html,.card-scroll,.gx-scroll,.drawer,.sheet-scroll,.room-arrival-scroll { scroll-behavior: auto; }
+  .page,.admin-access-card { animation: none; }
+}

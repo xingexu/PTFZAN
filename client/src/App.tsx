@@ -4,7 +4,7 @@ import type { SimState } from '../../shared/types';
 import { fmtTime } from '../../shared/types';
 import { SimContext, ToastContext, useToast, type Toast } from './api';
 import { ActivityContext, useActivityFeed } from './hotel/activity';
-import { hotel, onRemoteChange, useHotel, useHotelSync, type SyncInfo } from './hotel/host';
+import { hotel, onRemoteChange, useHotel, useHotelSync } from './hotel/host';
 import { Icon, type IconName } from './components/Icon';
 import { fade } from './components/fade';
 import { useSlide } from './components/slide';
@@ -19,6 +19,7 @@ import Overview from './pages/Overview';
 import Stage from './pages/Stage';
 import StageRemote from './pages/StageRemote';
 import Supervisor from './pages/Supervisor';
+import { RequireAdmin, SignIn, SignOut } from './pages/AdminAccess';
 
 const TOAST_MS = 3800;
 const TOAST_EXIT_MS = 200;
@@ -61,6 +62,9 @@ export default function App() {
               <Route path="/guest/*" element={<Navigate to="/guest" replace />} />
             </>
           )}
+          <Route path="/login" element={<SignIn />} />
+          <Route path="/logout" element={<SignOut />} />
+          <Route element={<RequireAdmin />}>
           {hasServer && <Route path="/stage" element={<Stage />} />}
           {hasServer && <Route path="/stage/remote" element={<StageRemote />} />}
           <Route element={<HotelShell />}>
@@ -72,8 +76,8 @@ export default function App() {
             <Route path="energy" element={<EnergyPage />} />
             <Route path="comparison" element={<Comparison />} />
             <Route path="housekeeping" element={<Navigate to="/attendant" replace />} />
-            <Route path="login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
           </Route>
         </Routes>
       )}
@@ -149,6 +153,7 @@ function HotelShell() {
             <div className="rail-bottom">
               <NavLink className="rail-guest" to="/comparison"><span><Icon name="gauge" size={17} />Compare the day</span><Icon name="right" size={14} /></NavLink>
               <a className="rail-guest" href={guestUrl('/')} target={GUEST_TAB}><span><Icon name="phoneDevice" size={17} />Guest app</span><Icon name="external" size={14} /></a>
+              {hasServer && <NavLink className="rail-guest" to="/stage"><span><Icon name="monitor" size={17} />Message demo</span><Icon name="right" size={14} /></NavLink>}
               <div className="rail-footer"><span className="rail-avatar"><Icon name="shield" size={17} /></span><div><b>Hotel operations</b><span>Pitch the Future · 2026</span></div></div>
             </div>
           </aside>
@@ -158,18 +163,7 @@ function HotelShell() {
               <div className="hq-breadcrumb"><span>Operations</span><Icon name="right" size={13} /><b>{current}</b></div>
               <div className="hq-actions">
                 <NavLink className="hq-compare" to="/comparison">Compare</NavLink>
-                <span className="hq-date">Friday, October 16</span>
-                <SyncChip sync={sync} />
-                {hasServer && (
-                  <NavLink className="hq-icon" to="/stage" title="Live text-message demo" aria-label="Live text-message demo">
-                    <Icon name="monitor" size={16} />
-                  </NavLink>
-                )}
-                <a className="hq-guest" href={guestUrl('/')} target={GUEST_TAB} title="Open the guest app in its own tab">
-                  <Icon name="phoneDevice" size={15} />
-                  <span>Guest app</span>
-                  {!!activity.counts?.registered && <span className="hq-count">{activity.counts.registered}</span>}
-                </a>
+                <NavLink className="hq-signout" to="/logout"><Icon name="logout" size={16} /><span>Log out</span></NavLink>
               </div>
             </div>
           </header>
@@ -179,23 +173,6 @@ function HotelShell() {
         </div>
       </ActivityContext.Provider>
     </SimContext.Provider>
-  );
-}
-
-/** Says that the day is a simulation, and whether this screen is in step with the hotel's other screens. */
-function SyncChip({ sync }: { sync: SyncInfo }) {
-  const text = sync.status === 'live' ? (sync.viewers > 1 ? `Synced · ${sync.viewers} screens` : 'Synced') : sync.status === 'offline' ? 'This screen only' : 'Connecting';
-  const tip =
-    sync.status === 'offline'
-      ? 'The hotel’s database can’t be reached, so the day is running on this screen only. It reconnects on its own.'
-      : 'A simulation of Friday, October 16. Every open hotel screen shows the same day, kept in the hotel’s database.';
-  return (
-    <span className={`hq-demo-label sync-${sync.status}`} title={tip}>
-      <i />
-      Simulation
-      <span className="sync-sep" aria-hidden="true" />
-      <span key={text} className="sync-text">{text}</span>
-    </span>
   );
 }
 

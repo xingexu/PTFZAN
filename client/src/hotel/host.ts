@@ -60,6 +60,9 @@ class HotelHost {
   private localSeq = 0;
   private viewer = viewerId();
   private pollTimer = 0;
+  private frameTimer = 0;
+  private stopped = false;
+  private onVisibility = () => { if (!document.hidden) void this.poll(); };
   private listeners = new Set<() => void>();
   private syncListeners = new Set<() => void>();
   private remoteListeners = new Set<(text: string) => void>();
@@ -69,8 +72,8 @@ class HotelHost {
   constructor() {
     this.replay.sync(this.control, this.events, this.now());
     this.snap = this.snapshot();
-    window.setInterval(() => this.frame(), FRAME_MS);
-    document.addEventListener('visibilitychange', () => !document.hidden && void this.poll());
+    this.frameTimer = window.setInterval(() => this.frame(), FRAME_MS);
+    document.addEventListener('visibilitychange', this.onVisibility);
     void this.poll();
   }
 
@@ -145,6 +148,7 @@ class HotelHost {
   }
 
   private async poll() {
+    if (this.stopped) return;
     window.clearTimeout(this.pollTimer);
     const sentAt = Date.now();
     const run = this.control.run;
@@ -158,12 +162,22 @@ class HotelHost {
       // Joining the shared day, or a new day started on another screen, cross-fades rather than jumps.
       if (wasOffline || this.control.run !== run) fade(() => this.frame());
       else this.frame();
-    } catch {
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) { this.dispose(); return; }
       this.setSync('offline', 1);
     }
+    if (this.stopped) return;
     const busy = this.control.playing || this.control.autopilot;
     const wait = this.sync.status === 'offline' ? RETRY_OFFLINE_MS : document.hidden ? POLL_HIDDEN_MS : busy ? POLL_PLAYING_MS : POLL_IDLE_MS;
     this.pollTimer = window.setTimeout(() => void this.poll(), wait);
+  }
+
+  dispose() {
+    this.stopped = true;
+    window.clearTimeout(this.pollTimer);
+    window.clearInterval(this.frameTimer);
+    document.removeEventListener('visibilitychange', this.onVisibility);
+    this.listeners.clear(); this.syncListeners.clear(); this.remoteListeners.clear();
   }
 
   /** The hotel's controls. Throws with a readable message when an action isn't possible right now. */
@@ -213,6 +227,7 @@ class HotelHost {
 }
 
 let host: HotelHost | null = null;
+export function stopHotel() { host?.dispose(); host = null; }
 const getHost = () => (host ??= new HotelHost());
 
 /** The live hotel day for React. */

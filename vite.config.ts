@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5173,
     host: true,
     fs: { allow: ['..'] },
-    proxy: { '/api': { target: 'http://localhost:8787', changeOrigin: true } },
+    proxy: { '/api': { target: 'http://localhost:8787', changeOrigin: false } },
   },
   build: { outDir: '../dist', emptyOutDir: true, sourcemap: false },
   test: { root: '.', include: ['server/test/**/*.test.ts'] },

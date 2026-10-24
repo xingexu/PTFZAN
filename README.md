@@ -49,7 +49,13 @@ That opens two separate sites:
 | **Hotel view** | http://localhost:8787 | The hotel team and the judges: the live day, rooms, team, building |
 | **Guest view** | http://localhost:8788 | Guests: the hotel's app — register, check in, ready time, mobile key, requests, messages |
 
-The mint **Guest app** button in the hotel view's top bar opens the guest app; the QR code on the Compare the day screen does the same for phones. The two tabs have different icons and each links to the other.
+The **Guest app** link in the hotel sidebar opens the guest app; the QR code on the Compare the day screen does the same for phones. The two tabs have different icons and each links to the other.
+
+### Hotel admin sign-in
+
+Set `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH` and `ADMIN_SESSION_SECRET` in the local `.env`, and as server-only variables on the hotel Vercel project. Missing configuration locks the hotel APIs; the guest app remains available. Never prefix these variables with `VITE_` or commit their values. Use `node scripts/hash-admin-password.mjs` with the password on stdin to produce the salted scrypt hash; generate a random session secret of at least 32 characters separately.
+
+`/login` opens the admin sign-in screen and `/logout` clears the browser's session. Staff pages, hotel/activity APIs and local stage APIs require authentication. Sessions use [iron-session](https://github.com/vvo/iron-session) encrypted HttpOnly cookies with SameSite=Strict, Secure on Vercel, an explicit one-hour expiry and same-origin checks for mutations. Changing the admin credentials invalidates earlier sessions. Logout removes this browser's cookie; stateless cookies cannot revoke an already copied cookie before expiry. The bounded login throttle is per server instance, not a distributed rate limiter.
 
 `npm start` does the same without opening tabs. For development with hot reload: `npm run dev` (web on http://localhost:5173, guest app at `/guest`, API proxied to :8787).
 
@@ -342,7 +348,7 @@ See `.env.example`. Everything is optional locally; with nothing set, the shared
 
 | Project | Environment variables |
 |---|---|
-| **Hotel view** (e.g. `fhn-hotel`) | `VITE_VIEW=hotel`, `VITE_GUEST_URL=https://<guest project>.vercel.app`, `DATABASE_URL` |
+| **Hotel view** (e.g. `fhn-hotel`) | `VITE_VIEW=hotel`, `VITE_GUEST_URL=https://<guest project>.vercel.app`, `DATABASE_URL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET` |
 | **Guest view** (e.g. `fhn-guest`) | `VITE_VIEW=guest`, `VITE_HOTEL_URL=https://<hotel project>.vercel.app`, `DATABASE_URL` |
 
 Set the variables for Production (and Preview if you use it), then redeploy so the build picks them up. Never put the database password in the repository — only in Vercel and in your local `.env`. With a single project and no `VITE_GUEST_URL`, the guest app lives at `/guest` on the same site.
