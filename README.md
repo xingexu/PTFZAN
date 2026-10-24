@@ -38,7 +38,7 @@ Requires **Node 20+**.
 
 ```bash
 npm install
-cp .env.example .env   # then set DATABASE_URL (optional locally — without it, guest stays are kept in memory)
+cp .env.example .env   # then set DATABASE_URL (optional locally — without it, the shared day and guest stays are kept in memory)
 npm run demo           # builds, starts, and opens both views in their own tabs
 ```
 
@@ -59,7 +59,7 @@ The start-up log prints the addresses phones on the same Wi-Fi can use, and wher
 
 ### How it fits together
 
-- **The hotel day runs in the browser.** The hotel view replays October 16 on the presenter's screen, with a shadow run of the same day in the other mode for the side-by-side comparison.
+- **One hotel day, shared by every screen, kept in PostgreSQL.** The database holds the day's clock (method, play/pause, speed, the 30-second demo) and a log of every decision (plan approvals, problem reports). The simulation is deterministic, so each open hotel screen rebuilds exactly the same October 16 from those two things and follows it as time passes — the laptop, the projector and a phone all show the same rooms at the same minute, and any of them can drive. Changes made on one screen appear on the others within about a second, with a short note. The top bar shows **Synced · N screens**; if the database can't be reached, the day keeps running on that screen only and rejoins on its own. While anyone is watching, the server also writes the live hotel to `fhn.rooms` and `fhn.hotel_snapshot`, so the current state of every room can be read straight from the database.
 - **Guest stays are saved in PostgreSQL** (a Supabase project in Canada, `ca-central-1`). Registering, checking in and everything a guest does in the app goes through two small API functions (`api/guest.ts`, `api/activity.ts`) — Vercel serverless functions in production, mounted by the local server on a laptop.
 - **The calculated wait.** At check-in the server works out the wait the same way the hotel forecast does — the attendant's current room, the room type's clean time (King 35, Double Queen 39, Suite 52 min) and the 6-minute final check — and promises the late end of a window that widens with the room's place in the list. Messages then arrive when each moment comes: checked in with the ready time, cleaning started, final check, room ready (with the key active). The guest app runs at demo speed — one hotel minute every 2 seconds — so a wait is about 1½–2 minutes.
 - **Both views stay linked.** The hotel view reads the guests' activity every few seconds: new registrations, check-ins, phone-key unlocks and problem reports pop up on the hotel screen and in its **Hotel log**, and the Guest app button shows how many people have registered.
@@ -243,11 +243,12 @@ How today's process reproduces the log (modelling choices, all from the case tex
 
 ```
 api/                 serverless functions (Vercel); the local server mounts the same handlers
+  hotel.ts           the shared hotel day: its clock and decision log; refreshes the live room tables
   guest.ts           a guest's stay: register, read, every action in the app, end (delete)
   activity.ts        what guests are doing, for the hotel screen
   _lib/store.ts      PostgreSQL (DATABASE_URL) or memory; _lib/http.ts small request helpers
 client/  React + Vite + TypeScript
-  hotel/host.ts      runs the hotel day in the browser (main run + shadow run, 30-second autopilot)
+  hotel/host.ts      follows the shared day: polls the clock and decisions, corrects for clock drift, runs it locally if offline
   hotel/activity.ts  reads guest activity for the hotel view every few seconds
   guest/journey.ts   the guest app's link to its stay (optimistic actions, server clock)
   pages/             Overview (Live), FrontDesk, Supervisor, Housekeeping (attendant), Engineering, Stage, StageRemote
@@ -260,35 +261,43 @@ shared/
   sim/model.ts       forecast + planner + plan diff + staffing forecast + recurring faults
   sim/engine.ts      minute-by-minute simulation (readiness, labour, maintenance, climate)
   sim/demo.ts        30-second autopilot speed profile
+  sim/timeline.ts    the shared day: controls → clock + decision log, and Replay, which rebuilds the hotel from them
   types.ts           domain types used everywhere
 server/  Express + TypeScript (run with tsx), local only
   src/index.ts       serves both views on two ports, the API, the live SMS moment
   src/messaging.ts   Twilio SMS / your own phone / ntfy push / simulated, with delivery tracking
   src/stage.ts       the on-cue "Mike" scene
-  test/              Vitest: simulation, four challenges, demo timing, guest stay, API, messaging, stage
+  test/              Vitest: simulation, four challenges, demo timing, shared day, guest stay, APIs, messaging
 ```
 
 ### Database
 
-Three tables in their own `fhn` schema (not exposed through Supabase's public Data API):
+Everything lives in its own `fhn` schema (not exposed through Supabase's public Data API):
 
 | Table | What's in it |
 |---|---|
+| `fhn.hotel_control` | The shared day's clock — one row: run, method, playing, speed, 30-second demo, where the clock was set and when, version |
+| `fhn.hotel_events` | Every decision made on any screen, in order: plan approved or kept, auto-approve on/off, problem reported (with the minute of the day) |
+| `fhn.rooms` | Live status of all 48 rooms in the shared day: status, wedding block, expected ready time and range, temperature mode, attendant |
+| `fhn.hotel_snapshot` | The day at a glance: clock, both methods' numbers, the latest hotel log |
+| `fhn.hotel_viewers` | Hotel screens open right now (for "Synced · N screens") |
 | `fhn.guests` | One row per registration: name, optional email, party size, check-in time, the room and calculated wait (`plan`), preferences |
 | `fhn.requests` | Problems reported and items requested, per guest |
 | `fhn.activity` | The lines shown in the hotel's log (first names only) |
 
-The app connects as `fhn_app`, a login that can only read and write these three tables, through Supabase's connection pooler (port 6543). Browse the data in the Supabase dashboard → project **fhn-ai** → Table Editor → schema `fhn`. The schema is in `supabase/migrations/` (the login's password is set separately and never stored in the repository).
+Two screens pressing a control at the same moment can't overwrite each other: the clock row carries a version, and the server re-reads and re-applies on a clash.
 
-The guest app re-reads its stay every 15 seconds and whenever it comes back into view; the hotel view reads guest activity every 4 seconds.
+The app connects as `fhn_app`, a login that can only read and write these tables, through Supabase's connection pooler (port 6543). Browse the data in the Supabase dashboard → project **fhn-ai** → Table Editor → schema `fhn`. The schema is in `supabase/migrations/` (the login's password is set separately and never stored in the repository).
+
+Hotel screens check the shared day every second while it plays (every few seconds when paused, less often in a background tab); the guest app re-reads its stay every 15 seconds and whenever it comes back into view; the hotel view reads guest activity every 4 seconds.
 
 ### Environment variables
 
-See `.env.example`. Everything is optional locally; with nothing set, guest stays live in memory and messages are simulated on screen.
+See `.env.example`. Everything is optional locally; with nothing set, the shared day and guest stays live in memory and messages are simulated on screen.
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection string for guest stays (Supabase transaction pooler, `fhn_app` login) |
+| `DATABASE_URL` | PostgreSQL connection string for the shared hotel day and guest stays (Supabase transaction pooler, `fhn_app` login) |
 | `VITE_VIEW`, `VITE_HOTEL_URL`, `VITE_GUEST_URL` | Vercel builds: which view this site is, and where the other one lives |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (or `TWILIO_MESSAGING_SERVICE_SID`) | Real SMS |
 | `TWILIO_TRIAL_TEMPLATE` | Trial accounts: send a Twilio template instead of custom text |
@@ -305,6 +314,8 @@ See `.env.example`. Everything is optional locally; with nothing set, guest stay
 
 | Method | Path | Body |
 |---|---|---|
+| GET | `/api/hotel?run=&after=<event id>&viewer=` | — → `{ control, events, serverNow, viewers }` (only decisions this screen hasn't seen) |
+| POST | `/api/hotel` | `{ action: "reset" \| "demo" \| "play" \| "speed" \| "next-event" \| "approve" \| "dismiss" \| "auto-approve" \| "issue", minute, … }` → `{ control, events, serverNow }` |
 | POST | `/api/guest` | `{ action: "register", name, email?, party }` → `{ stay }` |
 | GET | `/api/guest?id=…` | — → `{ stay }` |
 | POST | `/api/guest` | `{ action: "check-in" \| "unlock" \| "issue" \| "request" \| "climate" \| "housekeeping" \| "prefs", id, … }` → `{ stay }` |

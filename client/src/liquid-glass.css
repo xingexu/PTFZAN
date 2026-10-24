@@ -3856,3 +3856,93 @@ body {
   .building { min-height: 0; }
   .board { padding: 14px 16px 12px; gap: 10px; }
 }
+
+/* ── The shared day: status chips ─────────────────────────────────────────── */
+.hq-demo-label {
+  gap:7px;
+  height:30px;
+  padding:0 12px 0 11px;
+  border:0;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:-.005em;
+  color:var(--muted);
+  white-space:nowrap;
+  background:var(--btn-glass);
+  box-shadow:var(--btn-shadow);
+  -webkit-backdrop-filter:blur(16px) saturate(1.5);
+  backdrop-filter:blur(16px) saturate(1.5);
+}
+.hq-demo-label i {
+  width:7px;
+  height:7px;
+  flex:none;
+  background:#9aa7b8;
+  box-shadow:0 0 0 3px rgba(154,167,184,.16);
+  transition:background-color .3s ease,box-shadow .3s ease;
+}
+.hq-demo-label.sync-live i {
+  background:#30b26b;
+  animation:sync-pulse 2.6s ease-in-out infinite;
+}
+.hq-demo-label.sync-offline i {
+  background:#e09a2e;
+  box-shadow:0 0 0 3px rgba(224,154,46,.18);
+}
+.sync-sep {
+  width:1px;
+  height:12px;
+  background:rgba(60,72,92,.16);
+}
+.sync-text,.sim-chip-text {
+  color:var(--ink);
+  font-variant-numeric:tabular-nums;
+  animation:chip-in .32s cubic-bezier(.2,.8,.2,1) both;
+}
+.hq-demo-label.sync-offline .sync-text {
+  color:var(--amber-ink);
+}
+@keyframes sync-pulse {
+  0%,100% { box-shadow:0 0 0 3px rgba(48,178,107,.2) }
+  50% { box-shadow:0 0 0 5.5px rgba(48,178,107,.05) }
+}
+@keyframes chip-in {
+  from { opacity:0; transform:translateY(3px); filter:blur(2px) }
+  to { opacity:1; transform:none; filter:none }
+}
+
+.sim-chip {
+  height:30px;
+  padding:0 13px 0 11px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:500;
+  color:var(--muted);
+  background:var(--btn-glass);
+  box-shadow:var(--btn-shadow);
+  transition:color .3s ease,box-shadow .3s ease;
+}
+.sim-chip svg {
+  color:var(--accent);
+}
+.sim-chip.day-wait svg {
+  color:var(--amber-ink);
+}
+.sim-chip.day-done svg {
+  color:var(--green-ink);
+}
+.sim-chip.day-on {
+  box-shadow:var(--btn-glow);
+}
+
+/* Numbers that change while the day plays keep their width, so nothing around them shifts. */
+.summary-metric b,.pl-clock,.hq-count {
+  font-variant-numeric:tabular-nums;
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .hq-demo-label.sync-live i,.sync-text,.sim-chip-text {
+    animation:none;
+  }
+}

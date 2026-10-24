@@ -38,7 +38,7 @@ export default function Overview() {
     <main className="page live">
       <header className="sim-head">
         <div><span className="page-eyebrow">TORONTO DOWNTOWN</span><h1>Today’s overview</h1><p className="page-subtitle">Room readiness and guest arrivals for Friday, October 16.</p></div>
-        <span className="sim-chip"><Icon name={state.finished ? 'check' : 'clock'} size={13} />{state.finished ? 'Shift complete' : 'Friday, October 16 · Live simulation'}</span>
+        <DayStatus state={state} />
       </header>
       <section className="live-summary" aria-label="Shift at a glance">
         <div className="summary-metric glass"><span className="summary-metric-icon"><Icon name="bed" size={20} /></span><div><span>Rooms ready</span><b><Num value={aiRooms.filter((r) => r.status === 'ready').length} /><small> / 48</small></b></div><span className="summary-metric-note">FHN AI</span></div>
@@ -276,5 +276,25 @@ function HotelLog({ state }: { state: SimState }) {
         </ul>
       )}
     </section>
+  );
+}
+
+/** Where the shared day stands, in a few words: the same on every hotel screen. */
+function DayStatus({ state }: { state: SimState }) {
+  const waiting = state.proposals.some((p) => p.status === 'pending');
+  const [icon, text, tone]: [IconName, string, string] = state.finished
+    ? ['check', 'Shift complete', 'done']
+    : state.autopilot
+      ? ['play', '30-second demo playing', 'on']
+      : waiting
+        ? ['alert', 'Waiting for the supervisor', 'wait']
+        : state.playing
+          ? ['play', 'Day in progress', 'on']
+          : ['pause', `Paused at ${fmtTime(state.now)}`, 'idle'];
+  return (
+    <span className={`sim-chip day-${tone}`} aria-live="polite">
+      <Icon name={icon} size={12} />
+      <span key={tone} className="sim-chip-text">{text}</span>
+    </span>
   );
 }
