@@ -1,44 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { Eta, GuestNotification, GuestState, Mode, RoomStatus, RoomType } from '../../../shared/types';
+import type { GuestView, RoomStatus } from '../../../shared/types';
 import { fmtRange, fmtTime } from '../../../shared/types';
 import { api, useEventStream, useToast } from '../api';
+import { chime } from '../components/chime';
 import { Logo } from '../components/Logo';
 
-interface GuestView {
-  mode: Mode;
-  now: number;
-  hotel: string;
-  guest: { code: string; name: string; partySize: number; group?: string; state: GuestState; consentSms: boolean; notifyBrowser: boolean; phoneMasked: string; isDemoGuest: boolean };
-  room: { id: string | null; type: RoomType; status: RoomStatus; eta: Eta | null; readyAt: number | null; floor: number };
-  elevatorNotice: string | null;
-  ticket: { id: string; owner: string; issue: string } | null;
-  notifications: GuestNotification[];
-}
-
 const canNotify = () => typeof window !== 'undefined' && 'Notification' in window && window.isSecureContext;
-
-function chime() {
-  try {
-    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new Ctx();
-    [880, 1320].forEach((f, i) => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.frequency.value = f;
-      o.type = 'sine';
-      g.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.16);
-      g.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + i * 0.16 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.16 + 0.3);
-      o.connect(g).connect(ctx.destination);
-      o.start(ctx.currentTime + i * 0.16);
-      o.stop(ctx.currentTime + i * 0.16 + 0.32);
-    });
-    setTimeout(() => ctx.close().catch(() => undefined), 1000);
-  } catch {
-    /* audio not available */
-  }
-}
 
 export default function GuestPortal() {
   const { code = '' } = useParams();
@@ -65,7 +33,8 @@ export default function GuestPortal() {
           /* some mobile browsers require a service worker */
         }
       }
-      if ('vibrate' in navigator) navigator.vibrate?.(n.kind === 'ready' ? [120, 60, 120] : 80);
+      // Browsers only allow vibration after the user has interacted with the page.
+      if ('vibrate' in navigator && navigator.userActivation?.hasBeenActive) navigator.vibrate(n.kind === 'ready' ? [120, 60, 120] : 80);
       chime();
     }
   }, [v, perm, toast]);
@@ -196,6 +165,7 @@ export default function GuestPortal() {
                       <span className="mono">{fmtTime(n.at)}</span>
                     </div>
                     <div style={{ fontSize: 14.5 }}>{n.body}</div>
+                    <DeliveryChip d={v.delivery[n.id]} phone={v.guest.phoneMasked} />
                   </div>
                 ))}
               </div>
@@ -247,4 +217,13 @@ function Steps({ status }: { status: RoomStatus }) {
       })}
     </div>
   );
+}
+
+function DeliveryChip({ d, phone }: { d?: GuestView['delivery'][string]; phone: string }) {
+  if (!d) return null;
+  if (d.provider === 'simulated') return <div className="dl">Text simulated (demo has no SMS credentials)</div>;
+  if (d.status === 'failed' || d.status === 'undelivered') return <div className="dl bad">✕ Text not delivered{d.error ? ` — ${d.error}` : ''}</div>;
+  if (d.status === 'delivered') return <div className="dl ok">✓ Delivered by text to {phone}</div>;
+  if (d.status === 'sent') return <div className="dl ok">✓ {d.provider === 'ntfy' ? 'Pushed to your phone' : `Texted to ${phone}`}</div>;
+  return <div className="dl">Sending text…</div>;
 }

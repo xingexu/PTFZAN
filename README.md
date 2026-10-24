@@ -43,8 +43,10 @@ Other scripts: `npm test` (simulation tests), `npm run typecheck`.
 | `/guest/:code` | Guests | Mobile page with live ETA, progress, messages, browser notifications, mobile key |
 | `/join` | Judges / audience | Create a demo wedding guest and get notified on your own phone |
 | `/how-it-works` | Everyone | Data → AI → outputs, guardrails, pilot budget, success measures |
+| `/stage` | Projector during the pitch | **Live SMS moment**: Mike's phone, behind-the-scenes steps, live delivery status |
+| `/stage/remote` | Teammate's phone | One big button that triggers the next step of the live moment |
 
-Example guest codes: `WED602`, `WED505`, `RES306`.
+Example guest codes: `WED602`, `WED505`, `RES306`, `MIKE` (stage guest).
 
 ---
 
@@ -57,6 +59,61 @@ Example guest codes: `WED602`, `WED505`, `RES306`.
 5. Press **Play** (10–20 min/s). Judges' phones buzz *"Room 504 is ready"*. Overview at 3:45 PM: lobby nearly empty, guests informed and away, ETA promises kept.
 
 Tip: tick **Auto-approve** on the Supervisor screen for an unattended loop.
+
+---
+
+## Live SMS moment ("Mike")
+
+A real text message lands on a real phone, on cue, while you're on stage.
+
+**On stage**
+
+> "My name is Mike. Last time I stayed at an FHN hotel, I stood in the lobby for 45 minutes and got three different answers about my room. Today I checked in online — from the FHN app I already have."
+> *(teammate presses ① — Mike's phone buzzes with a realistic ETA)*
+> "Instead of waiting in the lobby, I went to grab lunch. Behind the scenes, ReadyPath is predicting when room 504 will be ready. The moment the attendant taps *Done*…"
+> *(teammate presses ② — **ding**)*
+> "…there it is. That's the live system telling me my room is ready."
+
+Say **"ReadyPath predicts"**, not "AI tracking system" — "tracking" is exactly what the housekeeping union is worried about.
+
+**Setup**
+
+1. Projector laptop: open **`/stage`**. It shows Mike's phone (mirrors the SMS thread), the three behind-the-scenes steps and live delivery status (Queued → Sent to carrier → Delivered).
+2. Teammate's phone: open **`/stage/remote`** — one big button. Or use the laptop: **Space / → / PageDown** = next step, **Shift+R** = reset.
+3. Mike's phone receives the SMS. Optionally also open `/guest/MIKE` on it for the live page.
+4. **⚙ Setup** on `/stage`: set the name, the phone number and the room, then press **Send test text**.
+5. **Rehearsal (no texts)** toggle: run the whole thing without spending credit. Switch back to **Live messages** before you go on.
+
+Double presses within 1.5 s are ignored, so a nervous double-tap never sends two texts.
+
+### Making it a real SMS (Twilio)
+
+Twilio's free trial **cannot send custom text** — trial accounts can only send Twilio's canned templates to verified numbers ([trial limits](https://www.twilio.com/docs/usage/trials/try-out-sms)). For "room 504 is ready" you need an upgraded account:
+
+1. Create a Twilio account and **upgrade** it (you choose a starting prepaid balance; a few dollars covers hundreds of texts).
+2. Buy a **Canadian local number** with SMS capability. Canadian long codes sending to Canadian mobiles need no registration, though carriers filter aggressively — keep the text plain and link-free, as this project does ([Canada SMS guidelines](https://www.twilio.com/en-us/guidelines/ca/sms)).
+3. Copy `.env.example` to `.env` and fill in `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` and `STAGE_PHONE`. On Render, add the same keys as environment variables.
+4. Restart, open `/stage`, check the badge says **Real SMS via Twilio**, and press **Send test text**.
+
+Want to test the pipeline for free first? Set `TWILIO_TRIAL_TEMPLATE=sms_appointment_reminders` with a trial account: a real text arrives on a verified number, but with Twilio's template wording.
+
+### Free fallback: push notification (ntfy)
+
+Not an SMS, but a real notification with sound on the phone, no account or cost. Install the **ntfy** app, subscribe to a hard-to-guess topic, and set `NTFY_TOPIC` to the same name. Used only for the stage guest, never for audience members.
+
+### Guests who join with their number
+
+When Twilio is configured, `/join` offers an optional mobile number with an explicit consent checkbox. Those guests get a real ETA text and a real "room ready" text from the simulation; each message on their page shows whether the text was delivered. Numbers are kept in server memory only, never sent to any browser (everything shown is masked), and are gone when the server restarts. Caps (`SMS_MAX_PER_HOUR`, `SMS_MAX_PER_GUEST_PER_HOUR`) protect your credit.
+
+### Day-of checklist
+
+- [ ] `STAGE_PIN` set if the app is on a public URL (stops audience members from triggering texts)
+- [ ] **Send test text** 30 minutes before; confirm it arrives
+- [ ] Mike's phone: volume up, **Do Not Disturb / Focus off**, the FHN number saved as a contact named "FHN Toronto"
+- [ ] `/stage` badge green, **Live messages** on, scene reset
+- [ ] Backup: the in-page alert on `/guest/MIKE`, and a screen recording of a successful run
+
+Honest limits: SMS usually lands in 2–10 seconds but carriers give no guarantee; venue reception matters. Rehearse the timing of your line against real delivery.
 
 ---
 
@@ -110,15 +167,35 @@ Honest notes: the case reports 40 guests waiting; our conservative model produce
 ## Architecture
 
 ```
-client/ (React + Vite + TypeScript)           server/ (Express + TypeScript via tsx)
-  pages/ Overview, FrontDesk, Supervisor,       src/seed.ts    Oct 16 scenario data
-         Housekeeping, GuestPortal, Join,       src/model.ts   forecast + planner + plan diff
-         HowItWorks                             src/engine.ts  minute-by-minute simulation
-  api.ts  SSE hook with reconnect/backoff       src/index.ts   REST + Server-Sent Events
-shared/types.ts  domain types used by both      test/          Vitest scenario tests
+client/  React + Vite + TypeScript
+  pages/        Overview, FrontDesk, Supervisor, Housekeeping, HowItWorks,
+                GuestPortal, Join, Stage, StageRemote
+  api.ts        fetch helper + SSE hook with reconnect/backoff
+server/  Express + TypeScript (run with tsx)
+  src/seed.ts       Oct 16 scenario data
+  src/model.ts      forecast + planner + plan diff
+  src/engine.ts     minute-by-minute simulation
+  src/messaging.ts  Twilio SMS / ntfy push / simulated, with delivery tracking
+  src/stage.ts      the on-cue "Mike" scene
+  src/index.ts      REST + Server-Sent Events
+  test/             Vitest: simulation, messaging (mock Twilio server), stage
+shared/types.ts     domain types used by both sides
 ```
 
-Real-time updates use Server-Sent Events: `/api/stream` (staff, full state) and `/api/guest/:code/stream` (one guest only). State is in memory; a pilot would persist to PostgreSQL and integrate with the PMS through a read-only adapter.
+Real-time updates use Server-Sent Events: `/api/stream` (staff, full state), `/api/stage/stream` (stage scene) and `/api/guest/:code/stream` (one guest only). State is in memory; a pilot would persist to PostgreSQL and integrate with the PMS through a read-only adapter.
+
+### Environment variables
+
+See `.env.example`. Everything is optional; with nothing set, messages are simulated on screen.
+
+| Variable | Purpose |
+|---|---|
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (or `TWILIO_MESSAGING_SERVICE_SID`) | Real SMS |
+| `TWILIO_TRIAL_TEMPLATE` | Trial accounts: send a Twilio template instead of custom text |
+| `NTFY_TOPIC`, `NTFY_SERVER` | Free push-notification fallback for the stage guest |
+| `STAGE_NAME`, `STAGE_ROOM`, `STAGE_PHONE`, `STAGE_PIN` | Stage guest and control lock |
+| `SMS_MAX_PER_HOUR`, `SMS_MAX_PER_GUEST_PER_HOUR` | Spending caps |
+| `HOTEL_TIME_ZONE`, `PUBLIC_URL`, `PORT` | Misc |
 
 ### API
 
@@ -135,6 +212,11 @@ Real-time updates use Server-Sent Events: `/api/stream` (staff, full state) and 
 | POST | `/api/rooms/:id/issue` | `{ issue }` |
 | POST | `/api/guests/demo` | `{ name }` |
 | GET | `/api/guest/:code`, `/api/guest/:code/stream` | — |
+| GET | `/api/messaging/status` | — |
+| GET | `/api/stage/state`, `/api/stage/stream` | — |
+| POST | `/api/stage/next` · `check-in` · `ready` · `reset` · `test` | header `x-stage-pin` when `STAGE_PIN` is set |
+| POST | `/api/stage/config` | `{ name?, phone?, room? }` |
+| POST | `/api/stage/send-real` | `{ value: boolean }` |
 
 ---
 

@@ -38,7 +38,7 @@ export default function HowItWorks() {
             <li>Front desk: same ETA on every screen</li>
             <li>Supervisor: proposed plan + one-tap approval</li>
             <li>Attendants: next room is always actually vacant</li>
-            <li>Guests: realistic ETA, then &ldquo;your room is ready&rdquo;</li>
+            <li>Guests: realistic ETA, then &ldquo;your room is ready&rdquo; — by SMS, only with consent</li>
           </ul>
         </div>
       </section>

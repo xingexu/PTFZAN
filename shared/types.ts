@@ -209,6 +209,90 @@ export interface SimState {
   finished: boolean;
 }
 
+// ───────────────────────── Real guest messaging (SMS / push) ─────────────────────────
+
+/** twilio = real SMS · ntfy = real push notification to a phone app · simulated = nothing leaves the server */
+export type MessagingProvider = 'twilio' | 'ntfy' | 'simulated';
+
+export type DeliveryStatus = 'simulated' | 'queued' | 'sending' | 'sent' | 'delivered' | 'undelivered' | 'failed';
+
+export interface DeliveryRecord {
+  id: string;
+  guestCode: string;
+  notificationId?: string;
+  kind: NotificationKind | 'test';
+  provider: MessagingProvider;
+  /** Masked destination, e.g. "+1 (416) •••-0123" — full numbers never leave the server. */
+  toMasked: string;
+  status: DeliveryStatus;
+  error?: string;
+  body: string;
+  createdAt: number; // epoch ms
+  updatedAt: number;
+  /** Time from request to first "sent"/"delivered" confirmation. */
+  latencyMs?: number;
+  history: { status: DeliveryStatus; at: number }[];
+}
+
+export interface MessagingStatus {
+  provider: MessagingProvider;
+  /** Real SMS can be sent to guest phone numbers (Twilio configured). */
+  smsEnabled: boolean;
+  /** Human-readable sender, e.g. "+1 (647) •••-0199" or "ntfy topic" */
+  sender: string | null;
+  trialTemplate: string | null;
+  note: string;
+}
+
+// ───────────────────────── Stage mode ("Mike") ─────────────────────────
+
+export type StageStep = 'booked' | 'checked-in' | 'ready';
+
+export interface StageState {
+  guestCode: string;
+  name: string;
+  roomId: string;
+  roomType: RoomType;
+  floor: number;
+  step: StageStep;
+  roomStatus: 'cleaning' | 'ready';
+  eta: { low: number; high: number } | null;
+  checkedInAt: number | null; // minutes of day (hotel time zone)
+  readyAt: number | null;
+  now: number; // minutes of day (hotel time zone)
+  phoneMasked: string | null;
+  sendReal: boolean;
+  pinRequired: boolean;
+  messages: GuestNotification[];
+  deliveries: DeliveryRecord[];
+  messaging: MessagingStatus;
+  lastCueAt: number | null; // epoch ms
+}
+
+/** Privacy-scoped payload for one guest's portal. */
+export interface GuestView {
+  mode: Mode;
+  now: number;
+  hotel: string;
+  guest: {
+    code: string;
+    name: string;
+    partySize: number;
+    group?: string;
+    state: GuestState;
+    consentSms: boolean;
+    notifyBrowser: boolean;
+    phoneMasked: string;
+    isDemoGuest: boolean;
+  };
+  room: { id: string | null; type: RoomType; status: RoomStatus; eta: Eta | null; readyAt: number | null; floor: number };
+  elevatorNotice: string | null;
+  ticket: { id: string; owner: string; issue: string } | null;
+  notifications: GuestNotification[];
+  /** Real-world delivery status of each notification (by notification id). */
+  delivery: Record<string, { status: DeliveryStatus; provider: MessagingProvider; error?: string }>;
+}
+
 export const fmtTime = (minutes: number): string => {
   const t = Math.round(minutes);
   const h = Math.floor(t / 60);

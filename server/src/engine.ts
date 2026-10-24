@@ -3,7 +3,7 @@
 //   baseline  = today's process (manual reassignment, phone calls, no shared ETA)
 //   readypath = predicted ETAs, instant re-planning, supervisor approval, guest notifications
 import type {
-  Attendant, Guest, GuestNotification, LogEntry, MaintenanceTicket, Metrics, Mode, NotificationKind,
+  Attendant, Guest, GuestNotification, GuestView, LogEntry, MaintenanceTicket, Metrics, Mode, NotificationKind,
   PlanProposal, Room, RoomStatus, SimState,
 } from '../../shared/types.js';
 import { fmtRange, fmtTime } from '../../shared/types.js';
@@ -19,6 +19,8 @@ const CHECKIN_MIN: Record<Mode, number> = { baseline: 6, readypath: 3 };
 
 export class Simulation {
   state!: SimState;
+  /** Called for every guest notification so real SMS can be sent outside the engine. */
+  onNotify?: (n: GuestNotification, g: Guest, smsText: string) => void;
   private condition: Record<string, number> = {};
   private scheduled: Scheduled[] = [];
   private seq = 0;
@@ -447,12 +449,15 @@ export class Simulation {
   }
 
   // ───────────────────────────────── guests ─────────────────────────────────
-  private notify(g: Guest, kind: NotificationKind, title: string, body: string) {
+  private notify(g: Guest, kind: NotificationKind, title: string, body: string, sms?: string) {
     const channel: GuestNotification['channel'] | null = g.consentSms ? 'sms' : g.notifyBrowser || g.isDemoGuest ? 'push' : null;
     if (!channel) return;
-    this.state.notifications.unshift({ id: this.id('N'), guestCode: g.code, at: this.state.now, kind, channel, title, body });
+    const n: GuestNotification = { id: this.id('N'), guestCode: g.code, at: this.state.now, kind, channel, title, body };
+    this.state.notifications.unshift(n);
     if (this.state.notifications.length > 400) this.state.notifications.pop();
     this.state.metrics.notificationsSent++;
+    // Real delivery (SMS) happens outside the engine; only demo guests who opted in have a real number.
+    this.onNotify?.(n, g, sms ?? `FHN Toronto: ${body}`);
   }
 
   private shouldInform(g: Guest) {
@@ -473,11 +478,13 @@ export class Simulation {
       const first = g.name.split(' ')[0];
       if (!g.lastEtaSent) {
         this.notify(g, 'eta', 'Your room is being prepared',
-          `Hi ${first}, welcome to FHN Toronto. Your room is expected ready ${fmtRange(low, high)}. We'll message you the moment it's ready — bags can wait at the bell desk.`);
+          `Hi ${first}, welcome to FHN Toronto. Your room is expected ready ${fmtRange(low, high)}. We'll message you the moment it's ready — bags can wait at the bell desk.`,
+          `FHN Toronto: Hi ${first}, your room is being prepared - expected ready ${fmtRange(low, high)}. We'll text you the second it's ready.`);
         g.lastEtaSent = { low, high };
         if (r.promisedBy === undefined) r.promisedBy = high;
       } else if (Math.abs(high - g.lastEtaSent.high) >= 15) {
-        this.notify(g, 'eta-update', 'Updated room estimate', `Quick update: your room is now expected ${fmtRange(low, high)}. Sorry for the change — we'll message you when it's ready.`);
+        this.notify(g, 'eta-update', 'Updated room estimate', `Quick update: your room is now expected ${fmtRange(low, high)}. Sorry for the change — we'll message you when it's ready.`,
+          `FHN Toronto: Update - your room is now expected ${fmtRange(low, high)}. We'll text you the second it's ready.`);
         g.lastEtaSent = { low, high };
       }
     }
@@ -489,7 +496,8 @@ export class Simulation {
     for (const g of s.guests.filter((x) => x.roomId === r.id && x.state !== 'checked-in')) {
       const first = g.name.split(' ')[0];
       if (!g.lastEtaSent && !g.isDemoGuest && !this.shouldInform(g)) continue;
-      this.notify(g, 'ready', `Room ${r.id} is ready`, `${first}, your room ${r.id} is ready! Skip the line with your mobile key or visit the express desk.`);
+      this.notify(g, 'ready', `Room ${r.id} is ready`, `${first}, your room ${r.id} is ready! Skip the line with your mobile key or visit the express desk.`,
+        `FHN Toronto: ${first}, your room ${r.id} is ready! Skip the line with your mobile key or the express desk.`);
       if (g.state === 'informed-away') g.returnAt = s.now + 8;
     }
   }
@@ -634,11 +642,13 @@ export class Simulation {
     for (const g of affected) {
       const first = g.name.split(' ')[0];
       if (pick.status === 'ready') {
-        this.notify(g, 'room-change', `Moved to room ${pick.id}`, `${first}, we found an issue with your original room (${issue.toLowerCase()}). Ticket ${ticket.id} is with our maintenance team. Your new room ${pick.id} is ready now.`);
+        this.notify(g, 'room-change', `Moved to room ${pick.id}`, `${first}, we found an issue with your original room (${issue.toLowerCase()}). Ticket ${ticket.id} is with our maintenance team. Your new room ${pick.id} is ready now.`,
+          `FHN Toronto: ${first}, we moved you to room ${pick.id} because of a maintenance issue (ticket ${ticket.id}). Your new room is ready now.`);
         g.lastEtaSent = { low: s.now, high: s.now };
       } else {
         const e = pick.eta;
-        this.notify(g, 'room-change', `Moved to room ${pick.id}`, `${first}, we found an issue with your original room (${issue.toLowerCase()}). Ticket ${ticket.id} is with maintenance. Your new room ${pick.id} is expected ${e ? fmtRange(e.low, e.high) : 'shortly'}.`);
+        this.notify(g, 'room-change', `Moved to room ${pick.id}`, `${first}, we found an issue with your original room (${issue.toLowerCase()}). Ticket ${ticket.id} is with maintenance. Your new room ${pick.id} is expected ${e ? fmtRange(e.low, e.high) : 'shortly'}.`,
+          `FHN Toronto: ${first}, we moved you to room ${pick.id} because of a maintenance issue (ticket ${ticket.id}). Expected ready ${e ? fmtRange(e.low, e.high) : 'shortly'}.`);
         if (e) g.lastEtaSent = { low: e.low, high: e.high };
       }
     }
@@ -646,29 +656,40 @@ export class Simulation {
     return { ok: true, message: `Ticket ${ticket.id} opened. Guest moved to ${pick.id} and notified.` };
   }
 
-  addDemoGuest(name: string): Guest {
+  addDemoGuest(name: string, opts: { phoneMasked?: string; code?: string } = {}): Guest {
     const s = this.state;
     const etas = predictEtas(s);
     const candidates = s.rooms
       .filter((r) => r.groupBlock && r.status !== 'ready' && r.status !== 'ooo')
       .sort((a, b) => (etas.get(a.id)?.high ?? 9999) - (etas.get(b.id)?.high ?? 9999));
     const target = candidates[Math.floor(candidates.length / 3)] ?? s.rooms.find((r) => r.groupBlock)!;
-    const code = 'DEMO' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    const code = opts.code ?? Simulation.newDemoCode((c) => s.guests.some((x) => x.code === c));
     const g: Guest = {
       code, name: name.trim().slice(0, 30) || 'Guest', partySize: 1, roomId: target.id, group: GROUP,
-      arrivalTime: s.now, expectedArrival: s.now, arrivedAt: s.now, state: 'informed-away', consentSms: false,
-      phoneMasked: 'Browser notifications', notifyBrowser: true, isDemoGuest: true, lobbyMinutes: 0,
+      arrivalTime: s.now, expectedArrival: s.now, arrivedAt: s.now, state: 'informed-away', consentSms: !!opts.phoneMasked,
+      phoneMasked: opts.phoneMasked ?? 'Browser notifications', notifyBrowser: true, isDemoGuest: true, lobbyMinutes: 0,
     };
     if (target.status === 'ready') g.returnAt = s.now;
     this.demoGuests.push(g);
     s.guests.push(g);
     if (this.rp) {
       this.updateEtas();
-      if (target.status === 'ready') this.notify(g, 'ready', `Room ${target.id} is ready`, `${g.name}, your room ${target.id} is ready! Use your mobile key.`);
+      if (target.status === 'ready')
+        this.notify(g, 'ready', `Room ${target.id} is ready`, `${g.name}, your room ${target.id} is ready! Use your mobile key.`, `FHN Toronto: ${g.name}, your room ${target.id} is ready! Use your mobile key.`);
       else this.sendEtaNotifications();
     }
     this.log('Guest', `${g.name} joined the demo as a wedding guest (room ${target.id}).`, 'neutral');
     return g;
+  }
+
+  /** Short, unambiguous demo code (no 0/O/1/I). */
+  static newDemoCode(taken: (c: string) => boolean): string {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (;;) {
+      let c = 'DEMO';
+      for (let i = 0; i < 4; i++) c += alphabet[Math.floor(Math.random() * alphabet.length)];
+      if (!taken(c)) return c;
+    }
   }
 
   // ───────────────────────────────── metrics ─────────────────────────────────
@@ -708,7 +729,7 @@ export class Simulation {
 
   // ───────────────────────────────── views ─────────────────────────────────
   /** Privacy-scoped view for a single guest's portal — no other guests' data leaves the server. */
-  guestView(code: string) {
+  guestView(code: string): GuestView | null {
     const s = this.state;
     const g = s.guests.find((x) => x.code.toUpperCase() === code.toUpperCase());
     if (!g) return null;
@@ -730,6 +751,7 @@ export class Simulation {
       elevatorNotice: s.elevatorDown && r.floor >= 5 ? 'Elevator B is temporarily out of service; Elevator A serves all floors.' : null,
       ticket: ticket ? { id: ticket.id, owner: ticket.owner, issue: ticket.issue } : null,
       notifications: s.notifications.filter((n) => n.guestCode === g.code),
+      delivery: {},
     };
   }
 

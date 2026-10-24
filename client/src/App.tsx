@@ -10,6 +10,8 @@ import Housekeeping from './pages/Housekeeping';
 import HowItWorks from './pages/HowItWorks';
 import Join from './pages/Join';
 import Overview from './pages/Overview';
+import Stage from './pages/Stage';
+import StageRemote from './pages/StageRemote';
 import Supervisor from './pages/Supervisor';
 
 export default function App() {
@@ -26,6 +28,8 @@ export default function App() {
       <Routes>
         <Route path="/guest/:code" element={<GuestPortal />} />
         <Route path="/join" element={<Join />} />
+        <Route path="/stage" element={<Stage />} />
+        <Route path="/stage/remote" element={<StageRemote />} />
         <Route element={<StaffShell />}>
           <Route index element={<Overview />} />
           <Route path="front-desk" element={<FrontDesk />} />
@@ -81,6 +85,7 @@ function StaffShell() {
             </NavLink>
             <NavLink to="/housekeeping">Housekeeping</NavLink>
             <NavLink to="/how-it-works">How it works</NavLink>
+            <NavLink to="/stage">Live demo</NavLink>
           </nav>
           <Controls />
         </header>
