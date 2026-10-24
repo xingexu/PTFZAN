@@ -207,13 +207,29 @@ function postgresHotel(sql: postgres.Sql): HotelStore {
   };
 }
 
+/**
+ * Makes every method of `o` wait its turn, so the connection carries one database call at a time. Supabase's
+ * transaction pooler can stall for good when one connection has two queries in flight (two screens polling the
+ * same function instance at once), so calls queue here instead of overlapping on the wire.
+ */
+function oneAtATime<T extends object>(o: T, turn: <R>(f: () => Promise<R>) => Promise<R>): T {
+  return Object.fromEntries(
+    Object.entries(o).map(([k, v]) => [k, typeof v === 'function' ? (...a: unknown[]) => turn(() => v(...a)) : v]),
+  ) as T;
+}
+
 function postgresStore(url: string): Store {
   // One connection per function instance, through Supabase's transaction pooler (no prepared statements).
   const sql = postgres(url, { prepare: false, max: 1, idle_timeout: 10, connect_timeout: 8 });
-  return {
+  let last: Promise<unknown> = Promise.resolve();
+  const turn = <R,>(f: () => Promise<R>): Promise<R> => {
+    const run = last.then(f, f);
+    last = run.catch(() => undefined);
+    return run;
+  };
+  const db = oneAtATime<Omit<Store, 'close'>>({
     kind: 'postgres',
-    hotel: postgresHotel(sql),
-    close: () => sql.end({ timeout: 3 }),
+    hotel: oneAtATime(postgresHotel(sql), turn),
     async create(s) {
       const [g] = await sql<GuestRow[]>`
         insert into fhn.guests (code, name, email, party, created_at, housekeeping, setpoint)
@@ -257,7 +273,9 @@ function postgresStore(url: string): Store {
         select count(*)::int as registered, count(checked_in_at)::int as checked_in from fhn.guests where created_at > ${new Date(since)}`;
       return { registered: c.registered, checkedIn: c.checked_in };
     },
-  };
+  }, turn);
+  // Closing doesn't wait its turn: it's how a connection stuck behind an unanswered query is let go.
+  return { ...db, close: () => sql.end({ timeout: 3 }) };
 }
 
 // ───────── Memory (local runs without a database) ─────────

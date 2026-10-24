@@ -20,6 +20,9 @@ const PORT = Number(process.env.PORT ?? 8787);
 const messenger = new Messenger(loadMessagingConfig(), () => broadcast());
 const stage = new Stage(messenger, STAGE, () => broadcast());
 
+// A database hiccup during the pitch is logged, never allowed to stop the server.
+process.on('unhandledRejection', (e) => console.error('unhandled', e));
+
 const app = express();
 app.set('trust proxy', true);
 app.use(express.json({ limit: '10kb' }));
