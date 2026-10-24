@@ -3836,3 +3836,23 @@ body {
     background:rgba(245,249,255,.96)
   }
 }
+
+/* Short screens (a 1280×720 projector, smaller laptops): every screen still fits without scrolling.
+   The summary strip steps aside there; the boards and challenge cards below show the same numbers. */
+@media (min-width: 1101px) and (max-height: 820px) {
+  .hq-top { height: 64px; padding-top: 10px; }
+  .page { padding-top: 10px; padding-bottom: 92px; }
+  .page.live, .page.fit { height: calc(100dvh - 64px); min-height: 0; }
+  .page.live { grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px 16px; }
+  .live-summary { display: none; }
+  .versus { grid-row: 2; }
+  .wins { grid-row: 3; }
+  .live-side { grid-row: 2 / span 2; }
+  .sim-head, .hq-head { min-height: 0; }
+  .hq-head { margin-bottom: 12px; }
+  .sim-head .page-subtitle, .hq-head .page-subtitle { display: none; }
+  .page-eyebrow { margin-bottom: 3px; }
+  .hq-head h1, .sim-head h1 { font-size: 24px; }
+  .building { min-height: 0; }
+  .board { padding: 14px 16px 12px; gap: 10px; }
+}
