@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useSlide } from './slide';
 
 /** One-line page header for the hotel view: a title and the page's own controls. */
 export function PageHead({ title, children }: { title: string; children?: ReactNode }) {
@@ -13,8 +14,9 @@ export function PageHead({ title, children }: { title: string; children?: ReactN
 
 /** Team = the supervisor's board and an attendant's phone. */
 export function TeamTabs() {
+  const ref = useSlide<HTMLElement>(useLocation().pathname);
   return (
-    <nav className="layer-seg" aria-label="Team views">
+    <nav className="layer-seg slide" aria-label="Team views" ref={ref}>
       <NavLink to="/supervisor" viewTransition className={({ isActive }) => (isActive ? 'on' : '')}>
         Supervisor
       </NavLink>

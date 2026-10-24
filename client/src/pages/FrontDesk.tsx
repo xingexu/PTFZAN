@@ -5,6 +5,7 @@ import { useSim, useToast } from '../api';
 import { hotel } from '../hotel/host';
 import { Icon } from '../components/Icon';
 import { fade } from '../components/fade';
+import { useSlide } from '../components/slide';
 import { PageHead } from '../components/PageHead';
 import { atRisk, CONF_COLOR, CONF_WIDTH, HVAC_COLOR, HVAC_LABEL, HVAC_TILE, STATUS_COLOR, STATUS_LABEL, TILE_LABEL, visibleStatus } from '../components/rooms';
 
@@ -19,6 +20,7 @@ export default function FrontDesk() {
   const { state } = useSim();
   const [sel, setSel] = useState<string | null>(null);
   const [layer, setLayer] = useState<Layer>('readiness');
+  const layerRef = useSlide<HTMLDivElement>(layer);
   if (!state) return null;
   const ai = state.mode === 'ai';
   const floors = [6, 5, 4, 3];
@@ -27,7 +29,7 @@ export default function FrontDesk() {
   return (
     <main className="page fit">
       <PageHead title="Rooms">
-        <div className="layer-seg" role="tablist" aria-label="Map layer">
+        <div className="layer-seg slide" role="tablist" aria-label="Map layer" ref={layerRef}>
           <button role="tab" aria-selected={layer === 'readiness'} className={layer === 'readiness' ? 'on' : ''} onClick={() => fade(() => setLayer('readiness'))}>
             <Icon name="bed" size={14} /> Room status
           </button>

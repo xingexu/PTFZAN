@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+<defs>
+<linearGradient id="base" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f2f6ff"/></linearGradient>
+<linearGradient id="g0" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#9ccaff"/><stop offset="0.55" stop-color="#a9b8ff"/><stop offset="1" stop-color="#c7b8ff"/></linearGradient><linearGradient id="g1" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#bfe7ff"/><stop offset="0.5" stop-color="#a6d4ff"/><stop offset="1" stop-color="#b9c6ff"/></linearGradient><linearGradient id="g2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#b7f0ea"/><stop offset="0.6" stop-color="#a9dcff"/><stop offset="1" stop-color="#c9c2ff"/></linearGradient>
+<filter id="soft" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="22"/></filter>
+<filter id="glint" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="5"/></filter>
+<filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.028 0"/></filter>
+</defs>
+<rect width="1600" height="1000" fill="url(#base)"/>
+<path d="M-200 820 C 220 640 560 900 940 640 S 1460 300 1820 360 L1820 600 C 1500 560 1260 820 960 900 S 300 1060 -200 1080 Z" fill="url(#g0)" opacity="0.62" filter="url(#soft)"/><path d="M-200 820 C 220 640 560 900 940 640 S 1460 300 1820 360" fill="none" stroke="#ffffff" stroke-width="10" opacity="0.75" filter="url(#glint)"/><path d="M-200 560 C 160 420 520 640 860 470 S 1380 160 1820 200 L1820 330 C 1460 300 1200 560 900 620 S 260 700 -200 760 Z" fill="url(#g1)" opacity="0.5" filter="url(#soft)"/><path d="M-200 560 C 160 420 520 640 860 470 S 1380 160 1820 200" fill="none" stroke="#ffffff" stroke-width="10" opacity="0.75" filter="url(#glint)"/><path d="M-200 1000 C 300 860 760 1080 1140 900 S 1560 760 1820 820 L1820 1100 L-200 1100 Z" fill="url(#g2)" opacity="0.5" filter="url(#soft)"/><path d="M-200 1000 C 300 860 760 1080 1140 900 S 1560 760 1820 820" fill="none" stroke="#ffffff" stroke-width="10" opacity="0.75" filter="url(#glint)"/>
+<rect width="1600" height="1000" filter="url(#grain)"/>
+</svg>

@@ -7,6 +7,7 @@ import { ToastContext, useToast, type Toast } from '../../api';
 import { chime } from '../../components/chime';
 import { Icon, type IconName } from '../../components/Icon';
 import { Brand, Logo } from '../../components/Logo';
+import { useSlide } from '../../components/slide';
 import { useJourney } from '../../guest/journey';
 import { guestPath, HOTEL_TAB, hotelUrl } from '../../links';
 import { GuestFrame } from './GuestFrame';
@@ -44,6 +45,7 @@ export default function GuestApp() {
   const [banners, toast] = usePhoneBanners();
   const { view: v, status, act: run, end } = useJourney();
   const [tab, setTab] = useState<Tab>('home');
+  const tabsRef = useSlide<HTMLElement>(tab);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [closing, setClosing] = useState(false);
   const [readCount, setReadCount] = useState<number | null>(null);
@@ -140,7 +142,7 @@ export default function GuestApp() {
   const unread = Math.max(0, v.notifications.length - (readCount ?? v.notifications.length));
   const tabs = (
     <>
-      <nav className="gx-tabs" aria-label="App sections">
+      <nav className="gx-tabs slide" aria-label="App sections" ref={tabsRef}>
         {(
           [
             ['home', 'home', 'Home'],

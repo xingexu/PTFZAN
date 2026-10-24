@@ -7,6 +7,7 @@ import { ActivityContext, useActivityFeed } from './hotel/activity';
 import { hotel, useHotel } from './hotel/host';
 import { Icon, type IconName } from './components/Icon';
 import { fade } from './components/fade';
+import { useSlide } from './components/slide';
 import { GUEST_TAB, guestUrl, hasServer, HOTEL_TAB, isGuestView, separateSites } from './links';
 import Engineering from './pages/Engineering';
 import FrontDesk from './pages/FrontDesk';
@@ -105,6 +106,7 @@ function HotelShell() {
   const state = useHotel();
   const activity = useActivityFeed();
   const { pathname } = useLocation();
+  const navRef = useSlide<HTMLElement>(pathname);
   const pending = state.proposals.some((p) => p.status === 'pending');
 
   useEffect(() => {
@@ -123,7 +125,7 @@ function HotelShell() {
               <NavLink to="/" className="hq-brand" aria-label="FHN · hotel view home" viewTransition>
                 FHN
               </NavLink>
-              <nav className="hq-nav" aria-label="Screens">
+              <nav className="hq-nav slide" aria-label="Screens" ref={navRef}>
                 {NAV.map((n) => (
                   <NavLink key={n.to} to={n.to} end={n.to === '/'} viewTransition className={({ isActive }) => (isActive || pathname === n.also ? 'active' : '')}>
                     <Icon name={n.icon} size={16} />
@@ -191,6 +193,7 @@ const SPEEDS: [number, string][] = [
 
 /** The day as a film: mode, playback, the day's moments on a scrubber, and the clock. */
 function Player({ state }: { state: SimState }) {
+  const modeRef = useSlide<HTMLDivElement>(state.mode);
   const { busy, call } = useAction();
   const pending = state.proposals.some((p) => p.status === 'pending');
   const auto = state.autopilot;
@@ -198,7 +201,7 @@ function Player({ state }: { state: SimState }) {
 
   return (
     <footer className="player">
-      <div className="seg mode" role="group" aria-label="How the hotel runs the day">
+      <div className="seg mode slide" role="group" aria-label="How the hotel runs the day" ref={modeRef}>
         <button className={state.mode === 'baseline' ? 'on today-on' : ''} disabled={busy} onClick={() => call('reset', { mode: 'baseline' })} title="The previous method">
           Previous
         </button>
