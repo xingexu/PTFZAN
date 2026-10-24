@@ -211,8 +211,14 @@ export interface SimState {
 
 // ───────────────────────── Real guest messaging (SMS / push) ─────────────────────────
 
-/** twilio = real SMS · ntfy = real push notification to a phone app · simulated = nothing leaves the server */
-export type MessagingProvider = 'twilio' | 'ntfy' | 'simulated';
+/**
+ * twilio    = real SMS from a Twilio number
+ * httpsms   = real SMS sent by your own Android phone (from your own number) via the httpSMS app
+ * mac       = real iMessage/SMS sent by the Messages app on the Mac running the server (your Apple ID / number)
+ * ntfy      = real push notification to the ntfy app on one phone (not SMS)
+ * simulated = nothing leaves the server
+ */
+export type MessagingProvider = 'twilio' | 'httpsms' | 'mac' | 'ntfy' | 'simulated';
 
 export type DeliveryStatus = 'simulated' | 'queued' | 'sending' | 'sent' | 'delivered' | 'undelivered' | 'failed';
 
@@ -224,6 +230,8 @@ export interface DeliveryRecord {
   provider: MessagingProvider;
   /** Masked destination, e.g. "+1 (416) •••-0123" — full numbers never leave the server. */
   toMasked: string;
+  /** Masked sender when it's the presenter's own number / Messages app. */
+  from?: string;
   status: DeliveryStatus;
   error?: string;
   body: string;
@@ -236,8 +244,10 @@ export interface DeliveryRecord {
 
 export interface MessagingStatus {
   provider: MessagingProvider;
-  /** Real SMS can be sent to guest phone numbers (Twilio configured). */
+  /** Audience guests may opt in to real texts on /join (off for personal numbers unless explicitly allowed). */
   smsEnabled: boolean;
+  /** Messages come from the presenter's own phone number / Apple ID. */
+  personalNumber: boolean;
   /** Human-readable sender, e.g. "+1 (647) •••-0199" or "ntfy topic" */
   sender: string | null;
   trialTemplate: string | null;

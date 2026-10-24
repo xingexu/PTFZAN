@@ -22,11 +22,12 @@ export default function Stage() {
   }, []);
 
   const run = useCallback(
-    async (fn: () => Promise<{ message?: string } | unknown>, success?: string) => {
+    async (fn: () => Promise<unknown>, success?: string) => {
       setBusy(true);
       try {
-        const r = (await fn()) as { message?: string } | undefined;
-        if (success || r?.message) toast({ title: success ?? 'Done', body: r?.message, tone: 'good' });
+        await fn();
+        // The phone mirror and step cards already show success; only explicit actions get a toast.
+        if (success) toast({ title: success, tone: 'good' });
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
           pending.current = fn;
@@ -200,8 +201,11 @@ function ProviderBadge({ s }: { s: StageState }) {
   if (live && m.provider === 'twilio' && s.phoneMasked) {
     text = m.trialTemplate ? `Twilio trial · template text → ${s.phoneMasked}` : `Real SMS via Twilio → ${s.phoneMasked}`;
     tone = 'green';
-  } else if (live && m.provider === 'twilio') {
-    text = 'Twilio ready — set Mike’s phone number in Setup';
+  } else if (live && (m.provider === 'httpsms' || m.provider === 'mac') && s.phoneMasked) {
+    text = m.provider === 'httpsms' ? `Real SMS from your phone ${m.sender} → ${s.phoneMasked}` : `Real message from your Messages app → ${s.phoneMasked}`;
+    tone = m.note.includes('not running on a Mac') ? 'amber' : 'green';
+  } else if (live && (m.provider === 'twilio' || m.provider === 'httpsms' || m.provider === 'mac')) {
+    text = `Ready — set ${s.name}’s phone number in Setup`;
     tone = 'amber';
   } else if (live && m.provider === 'ntfy') {
     text = 'Real push notification via ntfy';
@@ -330,7 +334,7 @@ function statusLabel(d: DeliveryRecord) {
     case 'sending':
       return 'Sending…';
     case 'sent':
-      return d.provider === 'ntfy' ? 'Pushed' : 'Sent';
+      return d.provider === 'ntfy' ? 'Pushed' : d.provider === 'httpsms' ? 'Sent from your phone' : 'Sent';
     case 'delivered':
       return 'Delivered';
     default:
@@ -364,7 +368,14 @@ function Pipeline({ rec }: { rec?: DeliveryRecord }) {
   if (rec.provider === 'simulated') return <span className="pill slate">Simulated — shown on screen only</span>;
   const at = (st: DeliveryStatus) => rec.history.find((h) => h.status === st)?.at;
   const failed = rec.status === 'failed' || rec.status === 'undelivered';
-  const steps = rec.provider === 'ntfy' ? [PIPE[0], { key: 'sent' as DeliveryStatus, label: 'Pushed to phone' }] : PIPE;
+  const steps =
+    rec.provider === 'ntfy'
+      ? [PIPE[0], { key: 'sent' as DeliveryStatus, label: 'Pushed to phone' }]
+      : rec.provider === 'httpsms'
+        ? [PIPE[0], { key: 'sent' as DeliveryStatus, label: `Sent from your phone ${rec.from ?? ''}`.trim() }]
+        : rec.provider === 'mac'
+          ? [PIPE[0], { key: 'sent' as DeliveryStatus, label: 'Sent by Messages' }]
+          : PIPE;
   return (
     <div>
       <div className="pipe">
@@ -410,6 +421,7 @@ function SettingsDrawer({ s, onClose, run }: { s: StageState; onClose: () => voi
   const [phone, setPhone] = useState('');
   const [room, setRoom] = useState(s.roomId);
   const [pin, setPin] = useState(getStagePin());
+  const toast = useToast();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -455,7 +467,18 @@ function SettingsDrawer({ s, onClose, run }: { s: StageState; onClose: () => voi
           )}
           <div className="row wrap">
             <button className="btn primary" type="submit">Save</button>
-            <button className="btn" type="button" onClick={() => run(() => stageApi('test'))}>Send test text</button>
+            <button
+              className="btn"
+              type="button"
+              onClick={() =>
+                run(async () => {
+                  const r = await stageApi('test');
+                  toast({ title: 'Test text', body: r.message, tone: 'good' });
+                })
+              }
+            >
+              Send test text
+            </button>
           </div>
         </form>
         <div className="card card-pad" style={{ marginTop: 18, background: 'var(--slate-soft)', boxShadow: 'none' }}>
@@ -463,7 +486,7 @@ function SettingsDrawer({ s, onClose, run }: { s: StageState; onClose: () => voi
           <p className="muted" style={{ margin: '4px 0 0', fontSize: 13.5 }}>{s.messaging.note}</p>
           {s.messaging.provider === 'simulated' && (
             <p style={{ margin: '8px 0 0', fontSize: 13.5 }}>
-              For a real text, add <span className="kbd">TWILIO_ACCOUNT_SID</span>, <span className="kbd">TWILIO_AUTH_TOKEN</span> and <span className="kbd">TWILIO_FROM</span> to <span className="kbd">.env</span> and restart. Free alternative: <span className="kbd">NTFY_TOPIC</span> (push notification). See README.
+              For a real text from <b>your own number</b>: Android phone → <span className="kbd">HTTPSMS_API_KEY</span> + <span className="kbd">HTTPSMS_FROM</span>; Mac + iPhone → <span className="kbd">MAC_MESSAGES=sms</span>. From a Twilio number → <span className="kbd">TWILIO_*</span>. Add to <span className="kbd">.env</span> and restart. See README.
             </p>
           )}
         </div>

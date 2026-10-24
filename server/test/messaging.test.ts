@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { MessagingConfig } from '../src/env.js';
 import { Messenger } from '../src/messaging.js';
+import type { DeliveryRecord } from '../../shared/types.js';
 import { maskPhone, normalizePhone, smsSegments, toSmsText } from '../src/phone.js';
 import { Stage } from '../src/stage.js';
 
@@ -29,6 +30,12 @@ beforeAll(async () => {
         res.end(JSON.stringify(obj));
       };
       if (req.url?.startsWith('/ntfy/')) return json(200, { id: 'n1' });
+      if (req.url === '/httpsms/v1/messages/send' && req.method === 'POST') {
+        if (req.headers['x-api-key'] !== 'key123') return json(401, { message: 'Unauthorized' });
+        const b = JSON.parse(body || '{}');
+        if (b.from !== '+16475550188') return json(422, { message: 'from is not a registered phone' });
+        return json(200, { data: { id: 'm1', status: 'pending' }, status: 'success' });
+      }
       const create = req.url === '/2010-04-01/Accounts/AC123/Messages.json';
       if (create && req.method === 'POST') {
         const expected = 'Basic ' + Buffer.from('AC123:secret').toString('base64');
@@ -55,6 +62,7 @@ afterAll(() => new Promise<void>((r) => server.close(() => r())));
 
 const cfg = (over: Partial<MessagingConfig> = {}): MessagingConfig => ({
   twilio: { accountSid: 'AC123', authToken: 'secret', from: '+16475550199', apiBase: base },
+  allowGuestTextsFromPersonalNumber: false,
   maxPerHour: 50,
   maxPerGuestPerHour: 5,
   pollIntervalMs: 10,
@@ -234,5 +242,105 @@ describe('Stage mode', () => {
     const s = stage.state();
     expect(s.step).toBe('booked');
     expect(s.messages).toHaveLength(0);
+  });
+});
+
+describe('sending from your own number', () => {
+  const personal = (over: Partial<MessagingConfig> = {}) =>
+    cfg({ twilio: undefined, httpsms: { apiKey: 'key123', from: '+16475550188', apiBase: `${base}/httpsms` }, ...over });
+
+  it('Android (httpSMS): your phone sends it, with your number as sender', async () => {
+    const m = new Messenger(personal());
+    expect(m.status.provider).toBe('httpsms');
+    expect(m.status.personalNumber).toBe(true);
+    expect(m.status.sender).toBe('+1 (647) •••-0188');
+    const before = captured.length;
+    const rec = m.send({ guestCode: 'MIKE', kind: 'ready', to: '+14165550123', title: 't', body: 'FHN Toronto: Mike, your room 504 is ready — welcome!', audience: 'stage' });
+    expect(rec.from).toBe('+1 (647) •••-0188');
+    const done = await m.settle(rec.id);
+    expect(done.status).toBe('sent');
+    const c = captured.slice(before).find((x) => x.url === '/httpsms/v1/messages/send')!;
+    expect(c.headers['x-api-key']).toBe('key123');
+    expect(JSON.parse(c.body)).toEqual({ from: '+16475550188', to: '+14165550123', content: 'FHN Toronto: Mike, your room 504 is ready - welcome!' });
+  });
+
+  it('httpSMS errors are explained', async () => {
+    const bad = new Messenger(personal({ httpsms: { apiKey: 'nope', from: '+16475550188', apiBase: `${base}/httpsms` } }));
+    const r1 = await bad.settle(bad.send({ guestCode: 'MIKE', kind: 'ready', to: '+14165550123', title: 't', body: 'b', audience: 'stage' }).id);
+    expect(r1.status).toBe('failed');
+    expect(r1.error).toMatch(/API key/);
+    const wrongFrom = new Messenger(personal({ httpsms: { apiKey: 'key123', from: '+15195550100', apiBase: `${base}/httpsms` } }));
+    const r2 = await wrongFrom.settle(wrongFrom.send({ guestCode: 'MIKE', kind: 'ready', to: '+14165550123', title: 't', body: 'b', audience: 'stage' }).id);
+    expect(r2.error).toMatch(/HTTPSMS_FROM/);
+  });
+
+  it('never texts audience guests from your personal number unless you allow it', () => {
+    const msg = { guestCode: 'DEMOAB12', kind: 'eta' as const, to: '+14165550123', title: '', body: '', audience: 'guest' as const };
+    expect(new Messenger(personal()).resolve(msg)).toBe('simulated');
+    expect(new Messenger(personal()).status.smsEnabled).toBe(false);
+    expect(new Messenger(personal({ allowGuestTextsFromPersonalNumber: true })).resolve(msg)).toBe('httpsms');
+  });
+
+  it('SMS_PROVIDER picks between configured providers', () => {
+    const both = cfg({ httpsms: { apiKey: 'key123', from: '+16475550188', apiBase: `${base}/httpsms` }, preferred: 'httpsms' });
+    const msg = { guestCode: 'MIKE', kind: 'ready' as const, to: '+14165550123', title: '', body: '', audience: 'stage' as const };
+    expect(new Messenger(both).resolve(msg)).toBe('httpsms');
+    expect(new Messenger({ ...both, preferred: undefined }).resolve(msg)).toBe('twilio');
+  });
+
+  describe('Mac Messages', () => {
+    const macCfg = (service: 'imessage' | 'sms' = 'imessage') => cfg({ twilio: undefined, mac: { service } });
+    const calls: { script: string; args: string[] }[] = [];
+    const ok = async (script: string, args: string[]) => {
+      calls.push({ script, args });
+    };
+
+    it('sends through the Messages app with arguments, not string interpolation', async () => {
+      calls.length = 0;
+      const m = new Messenger(macCfg('sms'), undefined, { platform: 'darwin', runAppleScript: ok });
+      expect(m.status.provider).toBe('mac');
+      const text = 'Room 504 is ready"; do shell script "rm -rf ~';
+      const rec = m.send({ guestCode: 'MIKE', kind: 'ready', to: '+14165550123', title: 't', body: text, audience: 'stage' });
+      const done = await m.settle(rec.id);
+      expect(done.status).toBe('sent');
+      expect(calls).toHaveLength(1);
+      expect(calls[0].args).toEqual(['+14165550123', text, 'sms']);
+      expect(calls[0].script).not.toContain('rm -rf');
+      expect(calls[0].script).toContain('participant targetPhone');
+    });
+
+    it('falls back to the older Messages dictionary', async () => {
+      calls.length = 0;
+      let first = true;
+      const flaky = async (script: string, args: string[]) => {
+        calls.push({ script, args });
+        if (first) {
+          first = false;
+          throw new Error("syntax error: Expected class name but found identifier. (-2741)");
+        }
+      };
+      const m = new Messenger(macCfg(), undefined, { platform: 'darwin', runAppleScript: flaky });
+      const done = await m.settle(m.send({ guestCode: 'MIKE', kind: 'ready', to: '+14165550123', title: 't', body: 'b', audience: 'stage' }).id);
+      expect(done.status).toBe('sent');
+      expect(calls[1].script).toContain('buddy targetPhone');
+    });
+
+    it('explains the macOS Automation permission prompt', async () => {
+      const denied = async () => {
+        throw new Error('execution error: Not authorized to send Apple events to Messages. (-1743)');
+      };
+      const m = new Messenger(macCfg(), undefined, { platform: 'darwin', runAppleScript: denied });
+      const done: DeliveryRecord = await m.settle(m.send({ guestCode: 'MIKE', kind: 'ready', to: '+14165550123', title: 't', body: 'b', audience: 'stage' }).id);
+      expect(done.status).toBe('failed');
+      expect(done.error).toMatch(/Automation/);
+    });
+
+    it('refuses politely when the server is not on a Mac', async () => {
+      const m = new Messenger(macCfg(), undefined, { platform: 'linux', runAppleScript: ok });
+      expect(m.status.note).toMatch(/not running on a Mac/);
+      const done = await m.settle(m.send({ guestCode: 'MIKE', kind: 'ready', to: '+14165550123', title: 't', body: 'b', audience: 'stage' }).id);
+      expect(done.status).toBe('failed');
+      expect(done.error).toMatch(/Mac/);
+    });
   });
 });

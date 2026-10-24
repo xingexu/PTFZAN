@@ -183,6 +183,8 @@ export class Stage {
     });
     this.onChange();
     if (rec.provider === 'twilio') return `SMS to ${rec.toMasked}`;
+    if (rec.provider === 'httpsms') return `SMS from your phone ${rec.from} to ${rec.toMasked}`;
+    if (rec.provider === 'mac') return `Messages app to ${rec.toMasked}`;
     if (rec.provider === 'ntfy') return 'push via ntfy';
     return this.sendReal ? 'simulated — no messaging configured' : 'rehearsal — nothing sent';
   }

@@ -86,7 +86,32 @@ Say **"ReadyPath predicts"**, not "AI tracking system" — "tracking" is exactly
 
 Double presses within 1.5 s are ignored, so a nervous double-tap never sends two texts.
 
-### Making it a real SMS (Twilio)
+### Option A — send it from your own phone number (free)
+
+Twilio can't send texts from a personal number: verified personal numbers only work as caller ID for voice calls ([Twilio](https://support.twilio.com/hc/en-us/articles/223135427-What-s-the-Difference-Between-a-Verified-Phone-Number-and-a-Twilio-Phone-Number)), and Twilio's Hosted SMS doesn't accept mobile numbers ([Twilio](https://www.twilio.com/docs/phone-numbers/hosted-numbers)). Porting your number to Twilio would move your phone service off your phone — don't. So your own device does the sending:
+
+**Android phone → httpSMS.** Install the httpSMS app ([httpsms.com](https://httpsms.com)), sign in, copy your API key, then in `.env`:
+
+```bash
+HTTPSMS_API_KEY=your-key
+HTTPSMS_FROM=your number, e.g. 647 555 0123
+STAGE_PHONE=the phone that receives the text
+```
+
+The SMS goes out through your SIM, on your plan ([API docs](https://docs.httpsms.com)). Keep the phone online, charged and out of battery saver.
+
+**iPhone + Mac → Messages app.** Run the server on the Mac signed in to Messages with your Apple ID, and set `MAC_MESSAGES=sms` (or `imessage` if the receiving phone is an iPhone).
+- iPhone: Settings → Messages (iOS 18: Settings → Apps → Messages) → **Text Message Forwarding** → turn on your Mac (needed for SMS).
+- Mac: Messages → Settings → iMessage → **Start new conversations from:** your phone number.
+- First send: macOS asks to let Terminal control Messages — click **Allow** (or System Settings → Privacy & Security → Automation).
+
+Things to know:
+- **Sender and receiver must be different phones.** If your number is also the phone on stage, it would be texting itself — use a teammate's phone as "Mike's phone".
+- The receiving phone shows your number or your contact name. Save your number on it as a contact named **FHN Toronto** so the banner reads like the hotel.
+- Audience members who join on `/join` are **never** texted from your personal number (they'd get your number). Override only with `ALLOW_GUEST_TEXTS_FROM_PERSONAL_NUMBER=true`.
+- If both Twilio and your own phone are configured, `SMS_PROVIDER=httpsms|mac|twilio|ntfy` picks one.
+
+### Option B — a Twilio number
 
 Twilio's free trial **cannot send custom text** — trial accounts can only send Twilio's canned templates to verified numbers ([trial limits](https://www.twilio.com/docs/usage/trials/try-out-sms)). For "room 504 is ready" you need an upgraded account:
 
@@ -97,7 +122,7 @@ Twilio's free trial **cannot send custom text** — trial accounts can only send
 
 Want to test the pipeline for free first? Set `TWILIO_TRIAL_TEMPLATE=sms_appointment_reminders` with a trial account: a real text arrives on a verified number, but with Twilio's template wording.
 
-### Free fallback: push notification (ntfy)
+### Option C — free push notification (ntfy)
 
 Not an SMS, but a real notification with sound on the phone, no account or cost. Install the **ntfy** app, subscribe to a hard-to-guess topic, and set `NTFY_TOPIC` to the same name. Used only for the stage guest, never for audience members.
 
@@ -109,7 +134,8 @@ When Twilio is configured, `/join` offers an optional mobile number with an expl
 
 - [ ] `STAGE_PIN` set if the app is on a public URL (stops audience members from triggering texts)
 - [ ] **Send test text** 30 minutes before; confirm it arrives
-- [ ] Mike's phone: volume up, **Do Not Disturb / Focus off**, the FHN number saved as a contact named "FHN Toronto"
+- [ ] Mike's phone: volume up, **Do Not Disturb / Focus off**, the sending number saved as a contact named "FHN Toronto"
+- [ ] Sending from your own phone: it's online, charged, not in battery saver (Android) — or the Mac is awake and signed in to Messages
 - [ ] `/stage` badge green, **Live messages** on, scene reset
 - [ ] Backup: the in-page alert on `/guest/MIKE`, and a screen recording of a successful run
 
@@ -192,6 +218,9 @@ See `.env.example`. Everything is optional; with nothing set, messages are simul
 |---|---|
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (or `TWILIO_MESSAGING_SERVICE_SID`) | Real SMS |
 | `TWILIO_TRIAL_TEMPLATE` | Trial accounts: send a Twilio template instead of custom text |
+| `HTTPSMS_API_KEY`, `HTTPSMS_FROM` | Send from your own Android phone's number |
+| `MAC_MESSAGES` (`sms` / `imessage`) | Send from your Apple ID / iPhone number via the Mac's Messages app |
+| `SMS_PROVIDER`, `ALLOW_GUEST_TEXTS_FROM_PERSONAL_NUMBER` | Choose a provider; allow audience texts from a personal number |
 | `NTFY_TOPIC`, `NTFY_SERVER` | Free push-notification fallback for the stage guest |
 | `STAGE_NAME`, `STAGE_ROOM`, `STAGE_PHONE`, `STAGE_PIN` | Stage guest and control lock |
 | `SMS_MAX_PER_HOUR`, `SMS_MAX_PER_GUEST_PER_HOUR` | Spending caps |
