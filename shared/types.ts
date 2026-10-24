@@ -288,6 +288,8 @@ export interface CompareSnapshot {
   mode: Mode;
   now: number;
   metrics: Metrics;
+  /** Room by room, so both sides can light rooms up as they become ready. */
+  rooms: { id: string; status: RoomStatus; groupBlock?: string }[];
 }
 
 export interface SimState {
@@ -429,6 +431,8 @@ export interface GuestView {
   notifications: GuestNotification[];
   /** Real-world delivery status of each notification (by notification id). */
   delivery: Record<string, { status: DeliveryStatus; provider: MessagingProvider; error?: string }>;
+  /** The guest's room timeline in real time (epoch ms), for the countdown. */
+  progress?: { startMs: number; readyMs: number; highMs: number; secondsPerMinute: number };
 }
 
 export const fmtTime = (minutes: number): string => {

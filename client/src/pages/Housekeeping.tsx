@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { fmtTime } from '../../../shared/types';
-import { api, useSim, useToast } from '../api';
+import { useSim, useToast } from '../api';
+import { hotel } from '../hotel/host';
 import { Icon } from '../components/Icon';
 import { PageHead, TeamTabs } from '../components/PageHead';
 
@@ -18,7 +19,7 @@ export default function Housekeeping() {
   const report = async (roomId: string, issue: string) => {
     setBusy(true);
     try {
-      const res = await api<{ ok: boolean; message: string }>(`/api/rooms/${roomId}/issue`, { issue });
+      const res = await hotel('issue', { roomId, issue });
       toast({ title: `Reported ${issue.toLowerCase()} · ${roomId}`, body: res.message, tone: 'good' });
     } catch (e) {
       toast({ title: 'Could not report', body: (e as Error).message, tone: 'bad' });

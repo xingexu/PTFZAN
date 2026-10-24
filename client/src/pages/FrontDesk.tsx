@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Guest, Hvac, Room, SimState } from '../../../shared/types';
 import { fmtRange, fmtTime } from '../../../shared/types';
-import { api, useSim, useToast } from '../api';
+import { useSim, useToast } from '../api';
+import { hotel } from '../hotel/host';
 import { Icon } from '../components/Icon';
 import { PageHead } from '../components/PageHead';
-import { GUEST_TAB, guestUrl } from '../links';
 import { atRisk, CONF_COLOR, CONF_WIDTH, HVAC_COLOR, HVAC_LABEL, HVAC_TILE, STATUS_COLOR, STATUS_LABEL, TILE_LABEL, visibleStatus } from '../components/rooms';
 
 /** Compact 12-hour clock for tiles, e.g. 1:05 */
@@ -158,7 +158,7 @@ function RoomDetail({ s, r, onClose }: { s: SimState; r: Room; onClose: () => vo
   const report = async () => {
     setBusy(true);
     try {
-      const res = await api<{ ok: boolean; message: string }>(`/api/rooms/${r.id}/issue`, { issue });
+      const res = await hotel('issue', { roomId: r.id, issue });
       toast({ title: `Issue reported · ${r.id}`, body: res.message, tone: ai ? 'good' : 'neutral' });
     } catch (e) {
       toast({ title: 'Could not report issue', body: (e as Error).message, tone: 'bad' });
@@ -279,11 +279,6 @@ function GuestLine({ s, g }: { s: SimState; g: Guest }) {
       </div>
       <div style={{ textAlign: 'right' }}>
         <GuestPill g={g} />
-        <div>
-          <a href={guestUrl(`/guest/${g.code}`)} target={GUEST_TAB} style={{ fontSize: 12 }}>
-            Open in guest view ↗
-          </a>
-        </div>
         {notes.length > 0 && <div className="muted" style={{ fontSize: 11.5 }}>{notes.length} msg sent</div>}
       </div>
     </div>

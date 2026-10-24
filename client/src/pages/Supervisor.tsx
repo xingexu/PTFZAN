@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { PlanProposal, SimState, StaffingForecast } from '../../../shared/types';
 import { fmtTime } from '../../../shared/types';
-import { api, useSim, useToast } from '../api';
+import { useSim, useToast } from '../api';
+import { hotel } from '../hotel/host';
 import { Icon } from '../components/Icon';
 import { PageHead, TeamTabs } from '../components/PageHead';
 
@@ -163,7 +164,7 @@ function AutoApprove({ s }: { s: SimState }) {
       <input
         type="checkbox"
         checked={s.autoApprove}
-        onChange={(e) => api('/api/sim/auto-approve', { value: e.target.checked }).catch((err) => toast({ title: 'Error', body: (err as Error).message, tone: 'bad' }))}
+        onChange={(e) => hotel('auto-approve', { value: e.target.checked }).catch((err) => toast({ title: 'Error', body: (err as Error).message, tone: 'bad' }))}
       />
       Auto-approve
     </label>
@@ -193,7 +194,7 @@ function ProposalCard({ p, s }: { p: PlanProposal; s: SimState }) {
   const act = async (kind: 'approve' | 'dismiss') => {
     setBusy(true);
     try {
-      await api(`/api/proposals/${p.id}/${kind}`, {});
+      await hotel(kind, { id: p.id });
       toast(
         kind === 'approve'
           ? { title: 'Plan approved', body: 'Attendant phones updated. Guests are receiving realistic ETAs.', tone: 'good' }

@@ -4,7 +4,7 @@
 // Prototype note: the predictor uses learned room-type averages plus queue simulation and an
 // uncertainty band that widens with queue depth. In a pilot the averages become a gradient-boosted
 // model trained on 60–90 days of room-level (never person-level) clean durations.
-import type { Attendant, Confidence, Eta, Guest, MaintenanceInsight, PlanChange, Room, SimState, StaffingForecast } from '../../shared/types.js';
+import type { Attendant, Confidence, Eta, Guest, MaintenanceInsight, PlanChange, Room, SimState, StaffingForecast } from '../types.js';
 import { ELEVATOR_PENALTY, HIST_AVG, INSPECTION_MIN, STAYOVER_MIN, TOMORROW } from './seed.js';
 
 export const needsWork = (r: Room) =>

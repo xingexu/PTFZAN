@@ -158,7 +158,7 @@ export class Stage {
       to: this.phone,
       title: 'FHN test',
       body: 'FHN Toronto: Test message - FHN guest alerts are connected to this phone.',
-      clickUrl: origin ? `${origin}/guest/${STAGE_CODE}` : undefined,
+      clickUrl: origin ? `${origin}/guest` : undefined,
       audience: 'stage',
       simulate: !this.sendReal,
     });
@@ -177,7 +177,7 @@ export class Stage {
       to: this.phone,
       title,
       body: sms,
-      clickUrl: origin ? `${origin}/guest/${STAGE_CODE}` : undefined,
+      clickUrl: origin ? `${origin}/guest` : undefined,
       audience: 'stage',
       simulate: !this.sendReal,
     });

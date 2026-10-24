@@ -19,7 +19,7 @@ export async function api<T = { ok: boolean; message?: string }>(path: string, b
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError('Cannot reach the FHN server. Check the connection.', 0);
+    throw new ApiError('Can’t reach the server. Check the connection.', 0);
   }
   let data: unknown = null;
   try {
@@ -33,24 +33,6 @@ export async function api<T = { ok: boolean; message?: string }>(path: string, b
   }
   return data as T;
 }
-
-// ───────── Guest app: remember this phone's booking (a per-viewer convenience only) ─────────
-const BOOKING_KEY = 'fhn.booking';
-export const getBooking = () => {
-  try {
-    return localStorage.getItem(BOOKING_KEY) ?? '';
-  } catch {
-    return '';
-  }
-};
-export const setBooking = (code: string | null) => {
-  try {
-    if (code) localStorage.setItem(BOOKING_KEY, code);
-    else localStorage.removeItem(BOOKING_KEY);
-  } catch {
-    /* private mode */
-  }
-};
 
 // ───────── Stage controls (optionally PIN-protected) ─────────
 const PIN_KEY = 'fhn.stagePin';
@@ -74,10 +56,9 @@ export const stageApi = <T = { ok: boolean; message?: string }>(path: string, bo
 export type Conn = 'connecting' | 'live' | 'reconnecting';
 
 /** Subscribe to a Server-Sent Events URL and keep the latest JSON payload. Reconnects with backoff. */
-export function useEventStream<T>(url: string | null): { data: T | null; conn: Conn; error: string | null } {
+export function useEventStream<T>(url: string | null): { data: T | null; conn: Conn } {
   const [data, setData] = useState<T | null>(null);
   const [conn, setConn] = useState<Conn>('connecting');
-  const [error, setError] = useState<string | null>(null);
   const retry = useRef(0);
 
   useEffect(() => {
@@ -91,7 +72,6 @@ export function useEventStream<T>(url: string | null): { data: T | null; conn: C
       es.onopen = () => {
         retry.current = 0;
         setConn('live');
-        setError(null);
       };
       es.onmessage = (e) => {
         try {
@@ -104,16 +84,6 @@ export function useEventStream<T>(url: string | null): { data: T | null; conn: C
         es?.close();
         if (closed) return;
         setConn('reconnecting');
-        // A 404 on a guest stream means a bad code; check once so we can show a clear message.
-        fetch(url.replace(/\/stream$/, ''))
-          .then(async (r) => {
-            if (r.status === 404) {
-              const j = await r.json().catch(() => ({}));
-              setError((j as { message?: string }).message ?? 'Not found');
-              closed = true;
-            }
-          })
-          .catch(() => undefined);
         const delay = Math.min(10000, 500 * 2 ** retry.current++);
         timer = setTimeout(() => !closed && open(), delay);
       };
@@ -139,7 +109,7 @@ export function useEventStream<T>(url: string | null): { data: T | null; conn: C
     };
   }, [url]);
 
-  return { data, conn, error };
+  return { data, conn };
 }
 
 export const SimContext = createContext<{ state: SimState | null; conn: Conn }>({ state: null, conn: 'connecting' });

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { demoDurationSec, demoSpeedAt } from '../src/demo.js';
-import { Simulation } from '../src/engine.js';
-import { findRecurringFaults, forecastStaffing, normaliseRow } from '../src/model.js';
-import { HISTORY_AS_OF, IN_HOUSE_CODE, MAINTENANCE_HISTORY, TIME as t } from '../src/seed.js';
+import { demoDurationSec, demoSpeedAt } from '../../shared/sim/demo.js';
+import { Simulation } from '../../shared/sim/engine.js';
+import { findRecurringFaults, forecastStaffing, normaliseRow } from '../../shared/sim/model.js';
+import { HISTORY_AS_OF, IN_HOUSE_CODE, MAINTENANCE_HISTORY, TIME as t } from '../../shared/sim/seed.js';
 
 function runToEnd(mode: 'baseline' | 'ai') {
   const sim = new Simulation(mode);

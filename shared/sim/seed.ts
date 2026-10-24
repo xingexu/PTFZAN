@@ -1,6 +1,6 @@
 // Seed data for the Friday, October 16, 2026 scenario at the FHN Toronto property.
 // Everything here is simulated, as the case permits.
-import type { Attendant, Guest, Room, RoomType, ScenarioEvent } from '../../shared/types.js';
+import type { Attendant, Guest, Room, RoomType, ScenarioEvent } from '../types.js';
 
 const t = (h: number, m = 0) => h * 60 + m;
 

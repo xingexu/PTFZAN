@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import type { GuestRequest, GuestView, HousekeepingPref, Hvac, RoomStatus } from '../../../../shared/types';
 import { fmtRange, fmtTime } from '../../../../shared/types';
-import { api, setBooking, ToastContext, useEventStream, useToast, type Toast } from '../../api';
+import { ToastContext, useToast, type Toast } from '../../api';
 import { chime } from '../../components/chime';
 import { Icon, type IconName } from '../../components/Icon';
 import { Brand, Logo } from '../../components/Logo';
+import { endStay, useJourney } from '../../guest/journey';
+import { guestPath } from '../../links';
 import { GuestFrame } from './GuestFrame';
 
 type Tab = 'home' | 'key' | 'requests' | 'chat';
@@ -36,19 +38,14 @@ const ISSUES: { label: string; icon: IconName }[] = [
 const ITEMS = ['Extra towels', 'Extra pillows', 'Toiletries', 'Iron & board', 'Crib', 'Phone charger'];
 
 export default function GuestApp() {
-  const { code = '' } = useParams();
   const [banners, toast] = usePhoneBanners();
-  const { data: v, conn, error } = useEventStream<GuestView>(`/api/guest/${encodeURIComponent(code)}/stream`);
+  const { view: v, act: run } = useJourney();
   const [tab, setTab] = useState<Tab>('home');
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [closing, setClosing] = useState(false);
   const [readCount, setReadCount] = useState<number | null>(null);
   const seen = useRef<Set<string> | null>(null);
   const [perm, setPerm] = useState<NotificationPermission | 'unsupported'>(canNotify() ? Notification.permission : 'unsupported');
-
-  useEffect(() => {
-    if (v) setBooking(v.guest.code);
-  }, [v?.guest.code]);
 
   useEffect(() => {
     document.title = v ? `${v.guest.name.split(' ')[0]}’s stay · Founders` : 'Founders Hotel Network';
@@ -97,35 +94,13 @@ export default function GuestApp() {
     }, SHEET_EXIT_MS);
   };
 
-  if (error || !v) {
-    return (
-      <GuestFrame darkStatus>
-        <div className="gx-page-head gx-top-pad">
-          <Brand sub="Hotel Network" />
-        </div>
-        <div className="gx-pad">
-          <div className="gx-card pad">
-            {error ? (
-              <>
-                <h2 style={{ fontFamily: 'var(--serif)', margin: 0 }}>Booking not found</h2>
-                <p className="gx-muted">{error}. Check the code in your confirmation, or start again.</p>
-                <Link to="/join" className="gbtn navy" onClick={() => setBooking(null)}>
-                  Find my reservation
-                </Link>
-              </>
-            ) : (
-              <span className="gx-muted">{conn === 'reconnecting' ? 'Reconnecting…' : 'Loading your stay…'}</span>
-            )}
-          </div>
-        </div>
-      </GuestFrame>
-    );
-  }
+  if (!v) return <Navigate to={guestPath('/')} replace />;
 
-  const act = async (path: string, body: unknown, ok?: string) => {
+  /** Runs a guest action. `ok: false` when the hotel's own message already confirms it. */
+  const act: Act = async (path, body, ok) => {
     try {
-      const r = await api<{ ok: boolean; message?: string }>(`/api/guest/${encodeURIComponent(v.guest.code)}/${path}`, body);
-      toast({ title: ok ?? 'Done', body: r.message, tone: 'good' });
+      const message = run(path, body as Record<string, unknown>);
+      if (ok !== false) toast({ title: ok ?? 'Done', body: message, tone: 'good' });
       return true;
     } catch (e) {
       toast({ title: 'Not available', body: (e as Error).message, tone: 'bad' });
@@ -141,7 +116,7 @@ export default function GuestApp() {
     const p = await Notification.requestPermission();
     setPerm(p);
     if (p === 'granted') {
-      await api(`/api/guest/${v.guest.code}/prefs`, { notifyBrowser: true }).catch(() => undefined);
+      run('prefs', { notifyBrowser: true });
       toast({ title: 'Notifications on', body: 'We’ll tell you the moment your room is ready.', tone: 'good' });
     }
   };
@@ -171,10 +146,10 @@ export default function GuestApp() {
 
   return (
     <ToastContext.Provider value={toast}>
-      <GuestFrame now={v.now} darkStatus={tab !== 'home'} tabs={tabs} live={conn === 'live'} banners={<PhoneBanners items={banners} />}>
+      <GuestFrame now={v.now} darkStatus={tab !== 'home'} tabs={tabs} demoPace banners={<PhoneBanners items={banners} />}>
         <div className="gx-pane" key={tab}>
           {tab === 'home' && <Home v={v} perm={perm} unread={unread} onEnable={enableNotifications} open={setSheet} go={goTab} act={act} />}
-          {tab === 'key' && <KeyTab v={v} />}
+          {tab === 'key' && <KeyTab v={v} act={act} />}
           {tab === 'requests' && <RequestsTab v={v} open={setSheet} />}
           {tab === 'chat' && <ChatTab v={v} />}
         </div>
@@ -183,7 +158,7 @@ export default function GuestApp() {
   );
 }
 
-type Act = (path: string, body: unknown, ok?: string) => Promise<boolean>;
+type Act = (path: string, body: unknown, ok?: string | false) => Promise<boolean>;
 
 const BANNER_MS = 3800;
 type Banner = Toast & { leaving?: boolean };
@@ -301,17 +276,17 @@ function Home({ v, perm, unread, onEnable, open, go, act }: { v: GuestView; perm
         </div>
 
         <div className="gx-foot">
-          This app shows only your booking. Texts are sent only with your consent. Simulated demo data.
+          This app shows only your booking. Demo data, kept on this phone.
           <br />
           <button
             className="why-toggle"
             style={{ marginTop: 8, color: 'var(--g-muted)' }}
             onClick={() => {
-              setBooking(null);
-              nav('/join');
+              endStay();
+              nav(guestPath('/'));
             }}
           >
-            <Icon name="logout" size={13} /> Use a different booking
+            <Icon name="logout" size={13} /> End this stay
           </button>
         </div>
       </div>
@@ -323,7 +298,6 @@ function RoomStatusCard({ v, perm, onEnable, go, act }: { v: GuestView; perm: st
   const [why, setWhy] = useState(false);
   const [busy, setBusy] = useState(false);
   const r = v.room;
-  const ai = v.mode === 'ai';
 
   if (v.guest.canCheckIn) {
     return (
@@ -346,7 +320,7 @@ function RoomStatusCard({ v, perm, onEnable, go, act }: { v: GuestView; perm: st
           disabled={busy}
           onClick={async () => {
             setBusy(true);
-            await act('check-in', {}, 'You’re checked in');
+            await act('check-in', {}, false);
             setBusy(false);
           }}
         >
@@ -366,24 +340,10 @@ function RoomStatusCard({ v, perm, onEnable, go, act }: { v: GuestView; perm: st
       </div>
     );
   }
-  if (!ai && r.status !== 'ready') {
-    return (
-      <div className="room-status" key="today">
-        <span className="gx-label">Room status</span>
-        <h2>Please see the front desk</h2>
-        <p className="gx-muted" style={{ margin: 0, fontSize: 14 }}>
-          Our team will update you at check-in.
-        </p>
-        <p className="gx-muted" style={{ margin: '12px 0 0', fontSize: 12, borderTop: '1px solid var(--g-line)', paddingTop: 10 }}>
-          This is what guests get today. Switch the hotel view to &ldquo;With FHN AI&rdquo; to see live ready times.
-        </p>
-      </div>
-    );
-  }
   if (r.status === 'ready') {
     return (
       <div className="room-status ready-card" key="ready" style={{ borderRadius: '0 0 22px 22px' }}>
-        <span className="gx-label">Ready{r.readyAt ? ` since ${fmtTime(r.readyAt)}` : ''}</span>
+        <span className="gx-label">Ready{r.readyAt ? ` since ${fmtTime(Math.floor(r.readyAt))}` : ''}</span>
         <h2>Room {r.id} is ready</h2>
         <p className="gx-muted" style={{ margin: '0 0 14px', fontSize: 14 }}>
           Floor {r.floor}. Skip the line — your mobile key works on the room door and elevator.
@@ -409,10 +369,11 @@ function RoomStatusCard({ v, perm, onEnable, go, act }: { v: GuestView; perm: st
   }
   return (
     <div className="room-status" key="eta" aria-live="polite">
-      <span className="gx-label">Your room will be ready</span>
-      <div className="eta">{r.eta ? fmtRange(r.eta.low, r.eta.high) : 'Scheduling…'}</div>
+      <span className="gx-label">Room {r.id} will be ready by</span>
+      <div className="eta">{r.eta ? fmtTime(r.eta.high) : 'Scheduling…'}</div>
+      {v.progress && <Countdown p={v.progress} />}
       <div className="ai-line">
-        <Icon name="sparkles" size={14} /> Based on live updates from housekeeping{r.eta ? ` · ${SURE[r.eta.confidence]}` : ''}
+        <Icon name="sparkles" size={14} /> {r.eta ? `Most likely ${fmtRange(r.eta.low, r.eta.high)} · ${SURE[r.eta.confidence]}` : 'Based on live updates from housekeeping'}
       </div>
       <Steps status={r.status} />
       {r.eta && (
@@ -424,7 +385,7 @@ function RoomStatusCard({ v, perm, onEnable, go, act }: { v: GuestView; perm: st
             <div className="why-box">
               Room {r.id} · {r.type}
               <ul>
-                {r.eta.drivers.filter((d) => !/Attendant|list/i.test(d)).map((d) => (
+                {r.eta.drivers.map((d) => (
                   <li key={d}>{d}</li>
                 ))}
                 <li>We promise the late end of the window.</li>
@@ -441,6 +402,22 @@ function RoomStatusCard({ v, perm, onEnable, go, act }: { v: GuestView; perm: st
           <Icon name="bell" size={16} /> Also notify me on this phone
         </button>
       )}
+    </div>
+  );
+}
+
+/** Time left until the promised time, as a bar that fills. */
+function Countdown({ p }: { p: NonNullable<GuestView['progress']> }) {
+  const now = Date.now();
+  const pct = Math.min(100, Math.max(0, ((now - p.startMs) / (p.highMs - p.startMs)) * 100));
+  const left = Math.max(0, Math.round((p.highMs - now) / 1000));
+  const text = left >= 60 ? `about ${Math.floor(left / 60)} min ${String(left % 60).padStart(2, '0')} s` : `under ${Math.max(1, left)} s`;
+  return (
+    <div className="countdown" aria-label={`Ready in ${text}`}>
+      <div className="cd-bar">
+        <i style={{ width: `${pct}%` }} />
+      </div>
+      <span className="cd-left">{text}</span>
     </div>
   );
 }
@@ -493,7 +470,7 @@ const climateShort = (h: Hvac, sp: number) => (h === 'eco' ? 'Saving energy' : h
 const SURE = { high: 'very likely', medium: 'likely', low: 'rough estimate' } as const;
 
 // ───────────────────────── Key ─────────────────────────
-function KeyTab({ v }: { v: GuestView }) {
+function KeyTab({ v, act }: { v: GuestView; act: Act }) {
   const [open, setOpen] = useState(false);
   const live = v.room.status === 'ready' || v.guest.inRoom;
   useEffect(() => {
@@ -526,7 +503,14 @@ function KeyTab({ v }: { v: GuestView }) {
         </div>
         {live ? (
           <>
-            <button className={`nfc ${open ? 'open' : 'active'}`} onClick={() => setOpen(true)} aria-label="Unlock door">
+            <button
+              className={`nfc ${open ? 'open' : 'active'}`}
+              onClick={() => {
+                setOpen(true);
+                void act('unlock', {}, false);
+              }}
+              aria-label="Unlock door"
+            >
               <Icon name={open ? 'check' : 'door'} size={40} strokeWidth={1.7} />
             </button>
             <b>{open ? `Room ${v.room.id} unlocked` : 'Tap to unlock (demo)'}</b>
@@ -619,7 +603,7 @@ function ChatTab({ v }: { v: GuestView }) {
     <>
       <div className="gx-page-head gx-top-pad">
         <h1>Messages</h1>
-        <p>From FHN Toronto{v.guest.consentSms ? ` · also by text to ${v.guest.phoneMasked}` : ''}</p>
+        <p>From FHN Toronto Downtown</p>
       </div>
       <div className="chat">
         <span className="chat-day">Today</span>
@@ -631,21 +615,11 @@ function ChatTab({ v }: { v: GuestView }) {
               <span className="num">{fmtTime(n.at)}</span>
             </div>
             {n.body}
-            <DeliveryChip d={v.delivery[n.id]} phone={v.guest.phoneMasked} />
           </div>
         ))}
       </div>
     </>
   );
-}
-
-function DeliveryChip({ d, phone }: { d?: GuestView['delivery'][string]; phone: string }) {
-  if (!d) return null;
-  if (d.provider === 'simulated') return <div className="dl">Shown here only — this demo isn’t sending real texts</div>;
-  if (d.status === 'failed' || d.status === 'undelivered') return <div className="dl bad">Text not delivered{d.error ? ` — ${d.error}` : ''}</div>;
-  if (d.status === 'delivered') return <div className="dl ok">✓ Delivered by text to {phone}</div>;
-  if (d.status === 'sent') return <div className="dl ok">✓ {d.provider === 'ntfy' ? 'Pushed to your phone' : `Texted to ${phone}`}</div>;
-  return <div className="dl">Sending text…</div>;
 }
 
 // ───────────────────────── Sheets ─────────────────────────
@@ -807,7 +781,7 @@ function IssueSheet({ v, act, onClose }: { v: GuestView; act: Act; onClose: () =
         disabled={!pick || busy}
         onClick={async () => {
           setBusy(true);
-          if (await act('issue', { issue: pick }, 'Reported')) onClose();
+          if (await act('issue', { issue: pick }, false)) onClose();
           setBusy(false);
         }}
       >
@@ -844,7 +818,7 @@ function ItemsSheet({ v, act, onClose }: { v: GuestView; act: Act; onClose: () =
         style={{ marginTop: 16 }}
         disabled={!pick}
         onClick={async () => {
-          if (await act('request', { item: pick }, 'Requested')) onClose();
+          if (await act('request', { item: pick }, false)) onClose();
         }}
       >
         <Icon name="send" size={16} /> Send request

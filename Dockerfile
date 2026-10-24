@@ -13,6 +13,7 @@ RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY server ./server
 COPY shared ./shared
+COPY api ./api
 COPY tsconfig.json ./
 EXPOSE 8787
 CMD ["npx", "tsx", "server/src/index.ts"]

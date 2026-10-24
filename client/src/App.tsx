@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { LogEntry, ScenarioEvent, SimState } from '../../shared/types';
 import { fmtTime } from '../../shared/types';
-import { api, getBooking, SimContext, ToastContext, useEventStream, useToast, type Toast } from './api';
+import { api, ApiError, SimContext, ToastContext, useToast, type Toast } from './api';
+import { hotel, useHotel } from './hotel/host';
 import { Icon, type IconName } from './components/Icon';
 import { Brand } from './components/Logo';
-import { GUEST_TAB, guestUrl, HOTEL_TAB, isGuestView } from './links';
+import { getSession, GUEST_TAB, guestUrl, hasServer, HOTEL_TAB, isGuestView, separateSites, sessionUser, setSession } from './links';
 import Engineering from './pages/Engineering';
 import FrontDesk from './pages/FrontDesk';
 import GuestApp from './pages/guest/GuestApp';
-import Onboarding from './pages/guest/Onboarding';
+import Welcome from './pages/guest/Welcome';
 import Housekeeping from './pages/Housekeeping';
+import Login from './pages/Login';
 import Overview from './pages/Overview';
-import Plan from './pages/Plan';
 import Stage from './pages/Stage';
 import StageRemote from './pages/StageRemote';
 import Supervisor from './pages/Supervisor';
@@ -35,35 +36,39 @@ export default function App() {
     setTimeout(() => setToasts((x) => x.map((y) => (y.id === id ? { ...y, leaving: true } : y))), TOAST_MS - TOAST_EXIT_MS);
     setTimeout(() => setToasts((x) => x.filter((y) => y.id !== id)), TOAST_MS);
   }, []);
-  const booking = getBooking();
   // Guest screens show notifications at the top like a phone; the hotel view keeps them in a corner, clear of the controls.
-  const guestScreen = isGuestView || /^\/(guest|join)/.test(useLocation().pathname);
+  const guestScreen = isGuestView || useLocation().pathname.startsWith('/guest');
 
   return (
     <ToastContext.Provider value={push}>
       {isGuestView ? (
         // The guest view is its own site: only the hotel's app lives here.
         <Routes>
-          <Route path="/guest/:code" element={<GuestApp />} />
-          <Route path="/join" element={<Onboarding />} />
-          <Route path="*" element={<Navigate to={booking ? `/guest/${booking}` : '/join'} replace />} />
+          <Route path="/" element={<Welcome />} />
+          <Route path="/stay" element={<GuestApp />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       ) : (
         <Routes>
-          <Route path="/guest/:code" element={<GuestApp />} />
-          <Route path="/join" element={<Onboarding />} />
-          <Route path="/app" element={<Navigate to={booking ? `/guest/${booking}` : '/join'} replace />} />
-          <Route path="/stage" element={<Stage />} />
-          <Route path="/stage/remote" element={<StageRemote />} />
-          <Route element={<HotelShell />}>
+          <Route path="/login" element={<Login />} />
+          {separateSites ? (
+            <Route path="/guest/*" element={<Away to={guestUrl('/')} />} />
+          ) : (
+            <>
+              <Route path="/guest" element={<Welcome />} />
+              <Route path="/guest/stay" element={<GuestApp />} />
+              <Route path="/guest/*" element={<Navigate to="/guest" replace />} />
+            </>
+          )}
+          {hasServer && <Route path="/stage" element={<Staff><Stage /></Staff>} />}
+          {hasServer && <Route path="/stage/remote" element={<StageRemote />} />}
+          <Route element={<Staff><HotelShell /></Staff>}>
             <Route index element={<Overview />} />
             <Route path="front-desk" element={<FrontDesk />} />
             <Route path="supervisor" element={<Supervisor />} />
             <Route path="attendant" element={<Housekeeping />} />
             <Route path="engineering" element={<Engineering />} />
-            <Route path="plan" element={<Plan />} />
             <Route path="housekeeping" element={<Navigate to="/attendant" replace />} />
-            <Route path="how-it-works" element={<Navigate to="/plan" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
@@ -83,18 +88,42 @@ export default function App() {
   );
 }
 
+/** Sends the browser to the other site (the guest app lives on its own site). */
+function Away({ to }: { to: string }) {
+  useEffect(() => window.location.replace(to), [to]);
+  return null;
+}
+
+/** Hotel screens are for signed-in staff. The server re-checks the session's signature in the background. */
+function Staff({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  const [user, setUser] = useState(sessionUser);
+  useEffect(() => {
+    if (!user) return;
+    api('/api/auth', { action: 'session', token: getSession() }).catch((e) => {
+      // Only a clear "no" signs the user out; an offline laptop keeps working.
+      if (e instanceof ApiError && e.status === 401) {
+        setSession(null);
+        setUser(null);
+      }
+    });
+  }, [user]);
+  if (!user) return <Navigate to="/login" replace state={{ from: pathname }} />;
+  return <>{children}</>;
+}
+
 const NAV: { to: string; label: string; icon: IconName; also?: string }[] = [
   { to: '/', label: 'Live', icon: 'gauge' },
   { to: '/front-desk', label: 'Rooms', icon: 'bed' },
   { to: '/supervisor', label: 'Team', icon: 'users', also: '/attendant' },
   { to: '/engineering', label: 'Building', icon: 'building' },
-  { to: '/plan', label: 'Plan', icon: 'target' },
 ];
 
 function HotelShell() {
-  const { data: state, conn } = useEventStream<SimState>('/api/stream');
+  const state = useHotel();
+  const nav = useNavigate();
   const { pathname } = useLocation();
-  const pending = state?.proposals.some((p) => p.status === 'pending');
+  const pending = state.proposals.some((p) => p.status === 'pending');
   useGuestActivity(state);
 
   useEffect(() => {
@@ -103,9 +132,14 @@ function HotelShell() {
     return () => document.body.classList.remove('hq-body');
   }, []);
 
+  const signOut = () => {
+    setSession(null);
+    nav('/login', { replace: true });
+  };
+
   return (
-    <SimContext.Provider value={{ state, conn }}>
-      <div className={`shell hq ${state?.mode === 'baseline' ? 'mode-today' : 'mode-ai'}`}>
+    <SimContext.Provider value={{ state, conn: 'live' }}>
+      <div className={`shell hq ${state.mode === 'baseline' ? 'mode-today' : 'mode-ai'}`}>
         <div className="hq-backdrop" aria-hidden="true" />
         <header className="hq-top">
           <NavLink to="/" className="brand light" aria-label="Hotel view home" viewTransition>
@@ -121,20 +155,25 @@ function HotelShell() {
             ))}
           </nav>
           <div className="hq-actions">
-            <a className="hq-pill" href={guestUrl('/app')} target={GUEST_TAB} title="Open the guest app in its own tab">
+            <a className="hq-pill guest" href={guestUrl('/')} target={GUEST_TAB} title="Open the guest app in its own tab">
               <Icon name="phoneDevice" size={15} />
-              <span>Guest view</span>
-              {!!state?.guestsOnline && <span className="live-count">{state.guestsOnline}</span>}
+              <span>Guest app</span>
+              <Icon name="external" size={13} />
             </a>
-            <Link className="hq-icon" to="/stage" title="Live text-message demo" aria-label="Live text-message demo">
-              <Icon name="monitor" size={16} />
-            </Link>
+            {hasServer && (
+              <NavLink className="hq-icon" to="/stage" title="Live text-message demo" aria-label="Live text-message demo">
+                <Icon name="monitor" size={16} />
+              </NavLink>
+            )}
+            <button className="hq-icon" onClick={signOut} title={`Signed in as ${sessionUser() ?? 'staff'} · sign out`} aria-label="Sign out">
+              <Icon name="logout" size={16} />
+            </button>
           </div>
         </header>
-        {!state ? <ShellSkeleton reconnecting={conn === 'reconnecting'} /> : <Outlet />}
-        {state && <Caption state={state} />}
-        {state && <DecisionCard state={state} />}
-        {state && <Player state={state} />}
+        <Outlet />
+        <Caption state={state} />
+        <DecisionCard state={state} />
+        <Player state={state} />
       </div>
     </SimContext.Provider>
   );
@@ -161,30 +200,15 @@ function useGuestActivity(state: SimState | null) {
   }, [log, toast]);
 }
 
-function ShellSkeleton({ reconnecting }: { reconnecting: boolean }) {
-  return (
-    <div className="page" aria-busy="true">
-      <div className="versus">
-        <div className="skeleton-card" />
-        <div />
-        <div className="skeleton-card" />
-      </div>
-      <p className="muted" style={{ marginTop: 16 }}>
-        {reconnecting ? 'Reconnecting…' : 'Loading Friday, October 16…'}
-      </p>
-    </div>
-  );
-}
-
 /** Calls an API action, surfacing failures as a toast. */
 function useAction() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const call = useCallback(
-    async (path: string, body: unknown = {}) => {
+    async (action: string, body: Record<string, unknown> = {}) => {
       setBusy(true);
       try {
-        await api(path, body);
+        await hotel(action, body);
       } catch (e) {
         toast({ title: 'That didn’t work', body: (e as Error).message, tone: 'bad' });
       } finally {
@@ -214,26 +238,26 @@ function Player({ state }: { state: SimState }) {
   return (
     <footer className="player">
       <div className="seg mode" role="group" aria-label="How the hotel runs the day">
-        <button className={state.mode === 'baseline' ? 'on today-on' : ''} disabled={busy} onClick={() => call('/api/sim/reset', { mode: 'baseline' })} title="The way the hotel runs today">
+        <button className={state.mode === 'baseline' ? 'on today-on' : ''} disabled={busy} onClick={() => call('reset', { mode: 'baseline' })} title="The way the hotel runs today">
           Today
         </button>
-        <button className={state.mode === 'ai' ? 'on ai-on' : ''} disabled={busy} onClick={() => call('/api/sim/reset', { mode: 'ai' })} title="With FHN AI">
+        <button className={state.mode === 'ai' ? 'on ai-on' : ''} disabled={busy} onClick={() => call('reset', { mode: 'ai' })} title="With FHN AI">
           <Icon name="sparkles" size={13} /> FHN AI
         </button>
       </div>
       <div className="pl-buttons">
-        <button className="pl-btn" disabled={busy} onClick={() => call('/api/sim/reset', { mode: state.mode })} title="Start the day again" aria-label="Start again">
+        <button className="pl-btn" disabled={busy} onClick={() => call('reset', { mode: state.mode })} title="Start the day again" aria-label="Start again">
           <Icon name="reset" size={16} />
         </button>
         <button
           className="pl-btn main"
           disabled={busy || state.finished || pending}
-          onClick={() => call('/api/sim/play', { playing: !state.playing })}
+          onClick={() => call('play', { playing: !state.playing })}
           aria-label={state.playing ? 'Pause' : 'Play'}
         >
           <Icon name={state.playing ? 'pause' : 'play'} size={18} />
         </button>
-        <button className="pl-btn" disabled={busy || state.finished || pending} onClick={() => call('/api/sim/next-event')} title="Skip to the next moment" aria-label="Skip to next moment">
+        <button className="pl-btn" disabled={busy || state.finished || pending} onClick={() => call('next-event')} title="Skip to the next moment" aria-label="Skip to next moment">
           <Icon name="skip" size={16} />
         </button>
       </div>
@@ -242,10 +266,10 @@ function Player({ state }: { state: SimState }) {
         {clock[0]}
         <small>{clock[1]}</small>
       </div>
-      <button className={`pl-demo ${auto ? 'running' : ''}`} disabled={busy} onClick={() => (auto ? call('/api/sim/play', { playing: false }) : call('/api/sim/demo'))} title="The whole day with FHN AI in about 30 seconds">
+      <button className={`pl-demo ${auto ? 'running' : ''}`} disabled={busy} onClick={() => (auto ? call('play', { playing: false }) : call('demo'))} title="The whole day with FHN AI in about 30 seconds">
         <Icon name={auto ? 'pause' : state.finished ? 'reset' : 'play'} size={13} /> {auto ? 'Stop' : state.finished ? 'Play again' : '30-sec demo'}
       </button>
-      <select className="pl-speed" aria-label="Playback speed" value={auto ? 'auto' : state.speed} onChange={(e) => call('/api/sim/speed', { speed: Number(e.target.value) })}>
+      <select className="pl-speed" aria-label="Playback speed" value={auto ? 'auto' : state.speed} onChange={(e) => call('speed', { speed: Number(e.target.value) })}>
         {auto && <option value="auto">Demo</option>}
         {SPEEDS.map(([s, label]) => (
           <option key={s} value={s}>
@@ -337,7 +361,7 @@ function DecisionCard({ state }: { state: SimState }) {
             <button className="btn sm" onClick={() => nav('/supervisor', { viewTransition: true })}>
               See plan
             </button>
-            <button className="btn sm ai" disabled={busy} onClick={() => call(`/api/proposals/${pending.id}/approve`)}>
+            <button className="btn sm ai" disabled={busy} onClick={() => call('approve', { id: pending.id })}>
               <Icon name="check" size={14} /> Approve
             </button>
           </>

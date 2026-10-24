@@ -6,7 +6,7 @@ FHN AI is one live room-state layer on top of FHN's existing property management
 
 | Challenge | What FHN AI does | Where to see it |
 |---|---|---|
-| **Room readiness** (the priority) | Predicts a ready-time **range** for every room, re-sequences housekeeping when the day changes, asks a supervisor to approve guest-impacting changes, and texts guests a realistic ETA and "your room is ready". | Overview, Front desk, Supervisor, guest app |
+| **Room readiness** (the priority) | Predicts a ready-time **range** for every room, re-sequences housekeeping when the day changes, asks a supervisor to approve guest-impacting changes, and texts guests a realistic ETA and "your room is ready". | Live, Rooms, Team, guest app |
 | **Labour** | At 8:00 the forecast shows three attendants can't finish the day, so the on-call attendant is booked — instead of pulling a supervisor and houseperson off their jobs at 3:45. No wasted knocks on occupied rooms. Tomorrow's staffing forecast recommends a floater instead of overtime; green-choice guests lower it live. | Supervisor, Attendant |
 | **Maintenance** | Every report becomes one ticket with an owner and a promised time the guest can see. Messy spreadsheet rows ("rm 411 ac not cold") are normalised so repeat faults trigger planned repairs. | Engineering, guest app → Requests |
 | **Energy** | Vacant rooms go to eco and come back to the guest's temperature 20 minutes before the forecast says someone will walk in. Never while a guest is inside. | Engineering, Front desk → *Room climate* |
@@ -38,44 +38,51 @@ Requires **Node 20+**.
 
 ```bash
 npm install
-npm run demo       # builds, starts, and opens both views in their own tabs
+cp .env.example .env   # then set ADMIN_USERNAME and ADMIN_PASSWORD (staff sign-in)
+npm run demo           # builds, starts, and opens both views in their own tabs
 ```
 
-That opens two separate sites, run by one server so they share the same live hotel:
+That opens two separate sites:
 
 | Tab | Address | Who it's for |
 |---|---|---|
-| **Hotel view** | http://localhost:8787 | Staff: overview, front desk, supervisor, attendant, repairs & energy, the plan |
-| **Guest view** | http://localhost:8788 | Guests: the hotel's app — check in, live ready time, mobile key, requests, messages |
+| **Hotel view** | http://localhost:8787 | Staff, after signing in: the live day, rooms, team, building |
+| **Guest view** | http://localhost:8788 | Guests: the hotel's app — register, check in, ready time, mobile key, requests, messages |
 
-Anything done in one shows up in the other instantly: when a guest checks in or reports a problem in the guest view, the hotel view pops up "From the guest app" and counts connected guests on its **Guest view** button; when the hotel approves a plan or a room is finished, the guest's phone shows a banner. Each view links to the other, and the two tabs have different icons.
+The hotel view asks staff to sign in (`/login`). The sign-in page also has a **Guest** tab with a QR code and an **Open the guest app** button; in the hotel view, the gold **Guest app** button in the top bar opens it too. The two tabs have different icons and each links to the other.
 
-`npm start` does the same without opening tabs. For development with hot reload: `npm run dev` (API on :8787, web on http://localhost:5173, both views on one origin at `/` and `/join`).
+`npm start` does the same without opening tabs. For development with hot reload: `npm run dev` (web on http://localhost:5173, guest app at `/guest`, sign-in API proxied to :8787).
 
-Other scripts: `npm test` (simulation tests), `npm run typecheck`.
+Other scripts: `npm test` (simulation, guest stay and sign-in tests), `npm run typecheck`.
 
-The start-up log prints the addresses phones on the same Wi-Fi can use; the QR code on the overview points phones at the guest view automatically. If macOS asks whether **node** may accept incoming connections, allow it. If the ports are busy, run `PORT=8790 npm start` (the guest view takes the next port, or set `GUEST_PORT`). On a single public URL (e.g. Render) both views share one address: hotel view at `/`, guest view at `/join`.
+The start-up log prints the addresses phones on the same Wi-Fi can use; the QR codes point phones at the guest view automatically. If macOS asks whether **node** may accept incoming connections, allow it. If the ports are busy, run `PORT=8790 npm start` (the guest view takes the next port, or set `GUEST_PORT`).
+
+### How the two views work
+
+- **The hotel day runs in the browser.** The hotel view replays October 16 on the presenter's screen, with a shadow run of the same day in the other mode for the side-by-side comparison. No server is needed for it.
+- **Each guest's stay runs on their own phone.** Registration and the stay are kept on that phone. At check-in the app calculates the wait the same way the hotel forecast does — the attendant's current room, the room type's clean time (King 35, Double Queen 39, Suite 52 min) and the 6-minute final check — and promises the late end of a window that widens with the room's place in the list. Messages then arrive when each moment comes: checked in with the ready time, cleaning started, final check, room ready (with the key active). The guest app runs at demo speed — one hotel minute every 2 seconds — so a wait is about 1½–2 minutes.
+- **Staff sign-in** is a small serverless function (`api/auth.ts`, also served by the local server). Credentials come only from environment variables; a successful sign-in returns a signed session that lasts 12 hours.
+
+Because the two views no longer share a server, guest actions don't appear on the hotel screen. Linking them live again would need a realtime backend (for example Supabase).
 
 ---
 
 ## Screens
 
-The hotel view is a dark, cinematic console with five screens and a video-style player bar at the bottom (Today / FHN AI, play, skip, the day's moments on a scrubber, the clock, the 30-sec demo). Each moment of the day appears as a subtitle as the playhead passes it; supervisor decisions float above the player.
+The hotel view is a dark, cinematic console with four screens and a video-style player bar at the bottom (Today / FHN AI, play, skip, the day's moments on a scrubber, the clock, the 30-sec demo). Each moment of the day appears as a subtitle as the playhead passes it; supervisor decisions float above the player. Panels are frosted "liquid glass" over soft moving light.
 
 | Route | Screen | What it shows |
 |---|---|---|
-| `/` | **Live** | Today's way vs FHN AI, head to head: a 40-seat lobby per side that lights up as guests wait, go out or reach their rooms; one number per challenge; QR code; live feed |
+| `/login` | **Sign in** | Hotel staff sign in; guests get the QR code and a link to the guest app |
+| `/` | **Live** | Today's way vs FHN AI, head to head: all 48 rooms per side, floor by floor — each room pops green the moment it's ready — with wedding rooms ready out of 20 and the wedding party in the lobby; one number per challenge; QR code; live feed |
 | `/front-desk` | **Rooms** | Room grid with expected ready time, how sure, "why this time", a temperature layer, arrivals, report a problem |
 | `/supervisor` | **Team** · Supervisor | Plan to approve, attendant lists, tomorrow's staffing forecast, decision history |
 | `/attendant` | **Team** · Attendant phone | What an attendant sees: current room, what's next, one-tap problem reports |
 | `/engineering` | **Building** | Repairs with who has them and when, repeat problems in old repair notes, live room-temperature map |
-| `/plan` | **Plan** | The business case: why rooms first (Exhibit 1), how it works, four wins, guardrails, $500K roadmap, measures, value, risks |
-| `/join` (guest view) | Guests (QR code target) | Hotel-app welcome: find a wedding-guest reservation |
-| `/guest/:code` (guest view) | Guests | The guest app: online check-in, live ready time, mobile key, temperature, housekeeping (skip cleaning), report a problem, request items, messages — with in-phone notification banners |
-| `/stage` | Projector | **Live SMS moment**: Mike's phone, behind-the-scenes steps, live delivery status |
-| `/stage/remote` | Teammate's phone | One big button that triggers the next step of the live moment |
-
-Example guest codes: `WED602`, `WED509`, `STAY411` (in-house guest whose AC fails at 2:05 PM), `RES306`, `RES512` (suite, arriving this evening), `MIKE` (stage guest). Audience guests who join via `/join` get a live ETA after **Check in now**. `/app` reopens the booking last used on that phone.
+| `/` (guest view) | Guests (QR code target) | Welcome: register with name, optional email and party size |
+| `/stay` (guest view) | Guests | The guest app: online check-in, calculated ready time with a countdown, mobile key, temperature, housekeeping (skip cleaning), report a problem, request items, messages — with in-phone notification banners |
+| `/stage` | Projector (local server only) | **Live SMS moment**: Mike's phone, behind-the-scenes steps, live delivery status |
+| `/stage/remote` | Teammate's phone (local server only) | One big button that triggers the next step of the live moment |
 
 ---
 
@@ -85,18 +92,17 @@ Press **30-sec demo** (gold button in the player bar). It replays the whole shif
 
 - races through the morning (sick call, late checkouts, elevator failure) at 30 sim-min/s,
 - holds for 2 seconds at **1:15 PM** while the supervisor approves the wedding re-plan,
-- slows to 9 sim-min/s from **2:30 to 4:00 PM** — the left lobby (today) fills to the case's 40 waiting guests while FHN AI's guests go straight to their rooms, and judges' phones get "room ready",
+- slows to 9 sim-min/s from **2:30 to 4:00 PM** — FHN AI's wedding rooms are all green by 3 PM while today's way is stuck at 8 of 20 and its lobby fills to the case's 40 waiting guests,
 - finishes at 5:00 PM with the front desk complete: every room ready, every arrival in their room.
 
-Any manual control (play, pause, speed, step, reset) hands control back to you. **Run the demo again** appears when it ends.
+Any manual control (play, pause, speed, step, reset) hands control back to you. **Play again** appears when it ends.
 
 ### Pitch script (≈3 minutes)
 
-1. **QR code first.** Judges scan, enter a first name and tap **Check in now** in the guest app. They immediately see a predicted ready-time range.
+1. **QR code first.** Judges scan, register, and tap **Check in now** in the guest app. They immediately see when their room will be ready and a countdown.
 2. **30-sec demo.** Narrate the four cards as they diverge: at 3:45, 40 wedding guests waiting today vs 0; attendant time lost knocking 155 → 0 min and 222 staff-minutes pulled off other jobs → 0; the 411 AC fixed in 32 vs 100 min with one report instead of two; 168 kWh saved.
-3. Judges' phones buzz with "Room … is ready" and the mobile key unlocks.
+3. About two minutes after check-in, judges' phones show "Room … is ready" and the mobile key unlocks.
 4. **Rooms** → click a room → *why this time*; flip to **Temperature**.
-5. **The plan** for the money questions: $500K phases, success measures, value case.
 
 Manual alternative: the skip button steps through the day's moments; at 1:15 PM a decision card offers **Approve** (or **See plan** for the full list on **Team**). Tick **Auto-approve** on **Team** for an unattended loop.
 
@@ -147,7 +153,6 @@ The SMS goes out through your SIM, on your plan ([API docs](https://docs.httpsms
 Things to know:
 - **Sender and receiver must be different phones.** If your number is also the phone on stage, it would be texting itself — use a teammate's phone as "Mike's phone".
 - The receiving phone shows your number or your contact name. Save your number on it as a contact named **FHN Toronto** so the banner reads like the hotel.
-- Audience members who join on `/join` are **never** texted from your personal number (they'd get your number). Override only with `ALLOW_GUEST_TEXTS_FROM_PERSONAL_NUMBER=true`.
 - If both Twilio and your own phone are configured, `SMS_PROVIDER=httpsms|mac|twilio|ntfy` picks one.
 
 ### Option B — a Twilio number
@@ -165,10 +170,6 @@ Want to test the pipeline for free first? Set `TWILIO_TRIAL_TEMPLATE=sms_appoint
 
 Not an SMS, but a real notification with sound on the phone, no account or cost. Install the **ntfy** app, subscribe to a hard-to-guess topic, and set `NTFY_TOPIC` to the same name. Used only for the stage guest, never for audience members.
 
-### Guests who join with their number
-
-When Twilio is configured, `/join` offers an optional mobile number with an explicit consent checkbox. Those guests get a real ETA text and a real "room ready" text from the simulation; each message on their page shows whether the text was delivered. Numbers are kept in server memory only, never sent to any browser (everything shown is masked), and are gone when the server restarts. Caps (`SMS_MAX_PER_HOUR`, `SMS_MAX_PER_GUEST_PER_HOUR`) protect your credit.
-
 ### Day-of checklist
 
 - [ ] `STAGE_PIN` set if the app is on a public URL (stops audience members from triggering texts)
@@ -176,7 +177,7 @@ When Twilio is configured, `/join` offers an optional mobile number with an expl
 - [ ] Mike's phone: volume up, **Do Not Disturb / Focus off**, the sending number saved as a contact named "FHN Toronto"
 - [ ] Sending from your own phone: it's online, charged, not in battery saver (Android) — or the Mac is awake and signed in to Messages
 - [ ] `/stage` badge green, **Live messages** on, scene reset
-- [ ] Backup: the in-page alert on `/guest/MIKE`, and a screen recording of a successful run
+- [ ] Backup: the phone on `/stage` shows the message too, and a screen recording of a successful run
 
 Honest limits: SMS usually lands in 2–10 seconds but carriers give no guarantee; venue reception matters. Rehearse the timing of your line against real delivery.
 
@@ -186,7 +187,7 @@ Honest limits: SMS usually lands in 2–10 seconds but carriers give no guarante
 
 **Inputs** (all data FHN already has or can capture with one tap): PMS checkouts, late checkouts, arrivals and group blocks; attendant room-status taps; historical clean time **by room type and condition**; maintenance tickets and the free-text maintenance spreadsheet; staff on shift; smart thermostats where installed.
 
-**1. Readiness forecast** (`server/src/model.ts → predictEtas`)
+**1. Readiness forecast** (`shared/sim/model.ts → predictEtas`)
 Simulates each attendant's queue forward using learned room-type averages, checkout availability, travel and elevator penalties, and break timing. Outputs a ready-time **range** whose width grows with queue depth and disruption, plus a confidence level and plain-language drivers.
 
 **2. Constraint-aware sequencing** (`planQueues`)
@@ -211,7 +212,7 @@ Pilot path: start rules-based exactly like this, then train a gradient-boosted m
 ## Guardrails
 
 - **Rooms, not people** — no per-person speed data, tracking or leaderboards (union concern). The staffing forecast is built from reservations, never from individuals.
-- **PIPEDA by design** — texts only with consent; each guest's app streams only that guest's booking; no guest personal data in the model.
+- **PIPEDA by design** — texts only with consent; a guest's details stay on their own phone; no guest personal data in the model.
 - **Ranges, not promises** — guests are promised the late end of the window.
 - **Approval for guest-impacting changes.**
 - **Comfort first** — an occupied room is never set back; guests can override from the app.
@@ -242,32 +243,40 @@ How today's process reproduces the log (modelling choices, all from the case tex
 ## Architecture
 
 ```
+api/auth.ts          staff sign-in (Vercel serverless function; the local server mounts the same handler)
 client/  React + Vite + TypeScript
-  pages/          Overview, FrontDesk, Supervisor, Housekeeping (attendant), Engineering, Plan,
-                  Stage, StageRemote
-  pages/guest/    GuestApp, Onboarding, GuestFrame (phone frame on desktop)
-  components/     Icon (inline SVG set), Logo, rooms (labels/colours), JoinQr
-  links.ts        which view this tab is (hotel or guest) and where the other view lives
-  api.ts          fetch helper + SSE hook with reconnect/backoff
-server/  Express + TypeScript (run with tsx)
-  src/seed.ts       Oct 16 scenario data, maintenance history, tomorrow's reservations
-  src/model.ts      forecast + planner + plan diff + staffing forecast + recurring faults
-  src/engine.ts     minute-by-minute simulation (readiness, labour, maintenance, climate, guest actions)
-  src/demo.ts       30-second autopilot speed profile
-  src/messaging.ts  Twilio SMS / ntfy push / simulated, with delivery tracking
-  src/stage.ts      the on-cue "Mike" scene
-  test/             Vitest: simulation, four challenges, demo timing, messaging, stage
-shared/types.ts     domain types used by both sides
+  hotel/host.ts      runs the hotel day in the browser (main run + shadow run, 30-second autopilot)
+  guest/journey.ts   one guest's stay on their phone: calculated wait, timed messages, requests
+  pages/             Login, Overview (Live), FrontDesk, Supervisor, Housekeeping (attendant), Engineering,
+                     Stage, StageRemote
+  pages/guest/       Welcome (register), GuestApp, GuestFrame (phone frame on desktop)
+  components/        Icon (inline SVG set), Logo, rooms (labels/colours), JoinQr
+  links.ts           which view this tab is (hotel or guest), where the other view lives, staff session
+  api.ts             fetch helper + SSE hook (stage) with reconnect/backoff
+shared/
+  sim/seed.ts        Oct 16 scenario data, maintenance history, tomorrow's reservations
+  sim/model.ts       forecast + planner + plan diff + staffing forecast + recurring faults
+  sim/engine.ts      minute-by-minute simulation (readiness, labour, maintenance, climate)
+  sim/demo.ts        30-second autopilot speed profile
+  types.ts           domain types used everywhere
+server/  Express + TypeScript (run with tsx), local only
+  src/index.ts       serves both views on two ports, staff sign-in, the live SMS moment
+  src/messaging.ts   Twilio SMS / your own phone / ntfy push / simulated, with delivery tracking
+  src/stage.ts       the on-cue "Mike" scene
+  test/              Vitest: simulation, four challenges, demo timing, guest stay, sign-in, messaging, stage
 ```
 
-The server listens on two ports (hotel view and guest view) and tells each page which view it is. It also runs two simulations in lockstep: the one on screen and a shadow run of the same day in the other mode, attached to every update as `compare`. Real-time updates use Server-Sent Events: `/api/stream` (staff, full state), `/api/stage/stream` (stage scene) and `/api/guest/:code/stream` (one guest only). State is in memory; a pilot would persist to PostgreSQL and integrate with the PMS through a read-only adapter.
+Locally the server listens on two ports (hotel view and guest view) and tells each page which view it is. On Vercel each view is its own project built from this repo; `VITE_VIEW` picks the view at build time. A pilot would move the simulation to the server, persist to PostgreSQL and integrate with the PMS through a read-only adapter.
 
 ### Environment variables
 
-See `.env.example`. Everything is optional; with nothing set, messages are simulated on screen.
+See `.env.example`. Only the staff sign-in is required; with nothing else set, messages are simulated on screen.
 
 | Variable | Purpose |
 |---|---|
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Staff sign-in (quote a password that contains `$`) |
+| `SESSION_SECRET` | Signs staff sessions (any long random string) |
+| `VITE_VIEW`, `VITE_HOTEL_URL`, `VITE_GUEST_URL` | Vercel builds: which view this site is, and where the other one lives |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (or `TWILIO_MESSAGING_SERVICE_SID`) | Real SMS |
 | `TWILIO_TRIAL_TEMPLATE` | Trial accounts: send a Twilio template instead of custom text |
 | `HTTPSMS_API_KEY`, `HTTPSMS_FROM` | Send from your own Android phone's number |
@@ -283,38 +292,30 @@ See `.env.example`. Everything is optional; with nothing set, messages are simul
 
 | Method | Path | Body |
 |---|---|---|
-| GET | `/api/state`, `/api/stream` | — (includes `compare` from the shadow run) |
-| POST | `/api/sim/reset` | `{ mode: "baseline" \| "ai" }` |
-| POST | `/api/sim/demo` | — (30-second autopilot) |
-| POST | `/api/sim/play` | `{ playing: boolean }` |
-| POST | `/api/sim/speed` | `{ speed: 5\|10\|20\|30\|60 }` (sim minutes per second) |
-| POST | `/api/sim/step` | `{ minutes }` |
-| POST | `/api/sim/next-event` | — |
-| POST | `/api/sim/auto-approve` | `{ value: boolean }` |
-| POST | `/api/proposals/:id/approve` · `/dismiss` | — |
-| POST | `/api/rooms/:id/issue` | `{ issue }` |
-| POST | `/api/guests/demo` | `{ name, phone?, consent?, checkIn? }` (`checkIn: false` = finish in the app) |
-| GET | `/api/guest/:code`, `/api/guest/:code/stream` | — |
-| POST | `/api/guest/:code/check-in` | — |
-| POST | `/api/guest/:code/issue` | `{ issue }` |
-| POST | `/api/guest/:code/request` | `{ item }` |
-| POST | `/api/guest/:code/climate` | `{ setpoint?, awayMinutes?: number \| null }` |
-| POST | `/api/guest/:code/housekeeping` | `{ pref: "standard" \| "green" \| "dnd" }` |
-| GET | `/api/messaging/status` | — |
-| GET | `/api/stage/state`, `/api/stage/stream` | — |
-| POST | `/api/stage/next` · `check-in` · `ready` · `reset` · `test` | header `x-stage-pin` when `STAGE_PIN` is set |
-| POST | `/api/stage/config` | `{ name?, phone?, room? }` |
-| POST | `/api/stage/send-real` | `{ value: boolean }` |
+| POST | `/api/auth` | `{ action: "login", username, password }` → `{ token }` · `{ action: "session", token }` → `{ user }` |
+| GET | `/api/messaging/status` | — (local server) |
+| GET | `/api/stage/state`, `/api/stage/stream` | — (local server) |
+| POST | `/api/stage/next` · `check-in` · `ready` · `reset` · `test` | header `x-stage-pin` when `STAGE_PIN` is set (local server) |
+| POST | `/api/stage/config` | `{ name?, phone?, room? }` (local server) |
+| POST | `/api/stage/send-real` | `{ value: boolean }` (local server) |
 
 ---
 
 ## Deploying for the live pitch
 
-SSE needs a long-running server, so use a host that runs Node or Docker (Render, Railway, Fly.io) rather than serverless functions.
+### Vercel: two sites from this repo
 
-- **Render**: connect the repo — `render.yaml` is included (service name `fhn-operations`).
-- **Docker**: `docker build -t fhn-operations . && docker run -p 8787:8787 fhn-operations`.
+`vercel.json` is included. Create two Vercel projects that both import this repository:
 
-Browser system notifications require **HTTPS** (any of the hosts above). Over plain HTTP the guest app still alerts in-app with a chime and vibration.
+| Project | Environment variables |
+|---|---|
+| **Hotel view** (e.g. `fhn-hotel`) | `VITE_VIEW=hotel`, `VITE_GUEST_URL=https://<guest project>.vercel.app`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `SESSION_SECRET` |
+| **Guest view** (e.g. `fhn-guest`) | `VITE_VIEW=guest`, `VITE_HOTEL_URL=https://<hotel project>.vercel.app` |
+
+Set the variables for Production (and Preview if you use it), then redeploy so the build picks them up. Never put the staff password in the repository — only in Vercel and in your local `.env`. With a single project and no `VITE_GUEST_URL`, the guest app lives at `/guest` on the same site.
+
+The live SMS moment (`/stage`) needs the long-running local server, so it is hidden on Vercel; run it from the presenting laptop with `npm start`, or on a Node/Docker host (`render.yaml` and the `Dockerfile` are included).
+
+Browser system notifications require **HTTPS** (Vercel has it). Over plain HTTP the guest app still alerts in-app with a chime and vibration.
 
 **Always keep a fallback:** run `npm run build && npm start` on the presenting laptop, and record a screen capture of the 30-second demo in case the venue Wi-Fi fails.

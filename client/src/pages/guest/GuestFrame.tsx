@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { fmtTime } from '../../../../shared/types';
 import { Icon } from '../../components/Icon';
+import { SECONDS_PER_HOTEL_MINUTE } from '../../guest/journey';
 import { HOTEL_TAB, hotelUrl } from '../../links';
 
 /**
@@ -8,18 +9,18 @@ import { HOTEL_TAB, hotelUrl } from '../../links';
  * with a short explanation beside it for the audience.
  */
 export function GuestFrame({
-  children, now, darkStatus, tabs, live, banners,
-}: { children: ReactNode; now?: number; darkStatus?: boolean; tabs?: ReactNode; live?: boolean; banners?: ReactNode }) {
+  children, now, darkStatus, tabs, demoPace, banners,
+}: { children: ReactNode; now?: number; darkStatus?: boolean; tabs?: ReactNode; demoPace?: boolean; banners?: ReactNode }) {
   return (
     <div className="gx">
       <div className="gx-stage">
         <aside className="gx-aside">
           <span className="eyebrow">Guest view · FHN Toronto Downtown</span>
           <h1>What a guest sees</h1>
-          <p>The same live hotel the staff see in the hotel view — turned into a time a guest can plan around.</p>
-          {live !== undefined && (
-            <span className={`live-pill ${live ? 'on' : ''}`}>
-              <span className="dot" /> {live ? 'Live with the hotel' : 'Reconnecting…'}
+          <p>Register, check in, and get a ready time you can plan around — then a message the moment the room is ready.</p>
+          {demoPace && (
+            <span className="live-pill on">
+              <span className="dot" /> Demo speed · one hotel minute every {SECONDS_PER_HOTEL_MINUTE} seconds
             </span>
           )}
           <ul>

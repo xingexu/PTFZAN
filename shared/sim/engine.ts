@@ -6,8 +6,8 @@
 import type {
   Attendant, Guest, GuestNotification, GuestRequest, GuestView, HousekeepingPref, LogEntry, MaintenanceTicket, Metrics, Mode,
   NotificationKind, PlanProposal, Room, RoomStatus, SimState,
-} from '../../shared/types.js';
-import { fmtRange, fmtTime } from '../../shared/types.js';
+} from '../types.js';
+import { fmtRange, fmtTime } from '../types.js';
 import { diffPlans, findRecurringFaults, forecastStaffing, knownAvailableAt, needBy, needsWork, planQueues, predictedDuration, predictEtas } from './model.js';
 import {
   buildSeed, ELEVATOR_PENALTY, GROUP, HISTORY_AS_OF, IN_HOUSE_CODE, INSPECTION_MIN, KW_ECO, KW_RUNNING, MAINTENANCE_HISTORY, SIM_END,
