@@ -223,46 +223,46 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
   const ready = v.room.status === 'ready';
   const inRoom = v.guest.inRoom;
   const keyLive = ready || inRoom;
+  const housekeeping = v.guest.housekeeping === 'green' ? 'Skipping tomorrow' : v.guest.housekeeping === 'dnd' ? 'Do not disturb' : 'Daily';
 
   return (
     <>
       <header className="gx-hero">
         <div className="gx-top">
-          <Brand />
+          <span className="gx-mark">
+            <Logo className="brand-mark" />
+            <b>FHN</b>
+          </span>
           <button className="gx-iconbtn" onClick={() => go('chat')} aria-label={`Messages${unread ? `, ${unread} new` : ''}`}>
-            <Icon name="bell" size={18} />
+            <Icon name="bell" size={19} />
             {unread > 0 && <span className="badge" />}
           </button>
         </div>
-        <div className="gx-greet">
-          <span className="eyebrow">{v.hotel}</span>
-          <h1>
-            {hello}, {first}
-          </h1>
-          <p>
-            {v.guest.group ? `${v.guest.group} · ` : ''}Party of {v.guest.partySize}
-          </p>
-        </div>
+        <h1 className="gx-title">
+          {hello}, {first}
+        </h1>
+        <p className="gx-sub">
+          {v.guest.group ? `${v.guest.group} · ` : ''}Party of {v.guest.partySize}
+        </p>
       </header>
 
       <div className="gx-body">
-        <section className="gx-card" aria-label="Your stay">
-          <div className="stay-strip">
-            <div>
-              <span>Check-in</span>
-              <b>{v.stay.arrive}</b>
-            </div>
-            <div>
-              <span>Check-out</span>
-              <b>{v.stay.depart}</b>
-            </div>
-            <div>
-              <span>Room</span>
-              <b>{v.room.id ?? '—'}</b>
-            </div>
+        <section className="gx-card stay-strip" aria-label="Your stay">
+          <div>
+            <span>Check-in</span>
+            <b>{v.stay.arrive}</b>
           </div>
-          <RoomStatusCard v={v} perm={perm} onEnable={onEnable} go={go} act={act} />
+          <div>
+            <span>Check-out</span>
+            <b>{v.stay.depart}</b>
+          </div>
+          <div>
+            <span>Room</span>
+            <b>{v.room.id ?? '—'}</b>
+          </div>
         </section>
+
+        <RoomStatusCard v={v} go={go} act={act} />
 
         {v.elevatorNotice && (
           <div className="notice" role="status">
@@ -271,48 +271,54 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
           </div>
         )}
 
-        <div className="qa-grid">
-          <QuickAction icon="key" label="Mobile key" sub={keyLive ? 'Ready' : 'When room is ready'} hot={keyLive} onClick={() => go('key')} />
-          <QuickAction icon="thermo" label="Temperature" sub={climateShort(v.climate.hvac, v.climate.setpoint)} onClick={() => open('climate')} />
-          <QuickAction icon="bed" label="Housekeeping" sub={v.guest.housekeeping === 'green' ? 'Skipping tomorrow' : v.guest.housekeeping === 'dnd' ? 'Do not disturb' : 'Daily cleaning'} onClick={() => open('housekeeping')} />
-          <QuickAction icon="wrench" label="Report a problem" sub={inRoom ? 'One report is enough' : 'Once you’re in'} onClick={() => open('issue')} />
-          <QuickAction icon="box" label="Request items" sub="Towels, pillows…" onClick={() => open('items')} />
-          <QuickAction icon="wifi" label="Wi-Fi" sub="FHN-Guest" onClick={() => open('wifi')} />
-        </div>
+        <section className="gx-group" aria-label="Your room">
+          <h3>Your room</h3>
+          <div className="gx-list">
+            <Row icon="key" label="Mobile key" detail={keyLive ? 'Ready' : 'When room is ready'} hot={keyLive} onClick={() => go('key')} />
+            <Row icon="thermo" label="Temperature" detail={climateShort(v.climate.hvac, v.climate.setpoint)} onClick={() => open('climate')} />
+            <Row icon="bed" label="Housekeeping" detail={housekeeping} onClick={() => open('housekeeping')} />
+            {perm !== 'granted' && <Row icon="bell" label="Notify me on this phone" detail="Off" onClick={onEnable} />}
+          </div>
+        </section>
 
-        <div className="gx-section-title">
+        <section className="gx-group" aria-label="Help">
+          <h3>Help</h3>
+          <div className="gx-list">
+            <Row icon="wrench" label="Report a problem" detail={inRoom ? '' : 'Once you’re in'} onClick={() => open('issue')} />
+            <Row icon="box" label="Request items" detail="Towels, pillows" onClick={() => open('items')} />
+            <Row icon="wifi" label="Wi-Fi" detail="FHN-Guest" onClick={() => open('wifi')} />
+          </div>
+        </section>
+
+        <section className="gx-group" aria-label="Around the hotel">
           <h3>Around the hotel</h3>
-          <span className="gx-muted" style={{ fontSize: 12.5 }}>Toronto Downtown</span>
-        </div>
-        <div className="explore">
-          <Explore icon="utensils" title="Founders Kitchen" sub="Breakfast 6:30–10:30 AM" bg="linear-gradient(135deg,#2d4a6b,#4e9f93)" />
-          <Explore icon="coffee" title="Lobby bar" sub="Open 4–11 PM · wedding welcome drinks" bg="linear-gradient(135deg,#232628,#2d4a6b)" />
-          <Explore icon="bag" title="Bell desk" sub="Bags held free while your room is prepared" bg="linear-gradient(135deg,#1f3a37,#3e9c8e)" />
-          <Explore icon="clock" title="Late checkout" sub="Request until 1 PM — subject to availability" bg="linear-gradient(135deg,#2a2f45,#55608f)" />
-        </div>
+          <div className="explore">
+            <Explore icon="utensils" title="Founders Kitchen" sub="Breakfast 6:30–10:30 AM" />
+            <Explore icon="coffee" title="Lobby bar" sub="Open 4–11 PM" />
+            <Explore icon="bag" title="Bell desk" sub="Bags held free while you wait" />
+            <Explore icon="clock" title="Late checkout" sub="Until 1 PM, on request" />
+          </div>
+        </section>
 
-        <a className="fhn-ai-link" href={hotelUrl('/')} target={HOTEL_TAB}>
-          <span className="qa-ic">
-            <Icon name="sparkles" size={17} />
-          </span>
-          <span className="grow">
-            <b>See FHN AI run the hotel</b>
-            <span>The same live day the hotel team sees</span>
-          </span>
-          <Icon name="right" size={16} />
-        </a>
+        <section className="gx-group" aria-label="FHN AI">
+          <div className="gx-list">
+            <a className="gx-row" href={hotelUrl('/')} target={HOTEL_TAB}>
+              <span className="gx-row-ic hot">
+                <Icon name="sparkles" size={16} />
+              </span>
+              <span className="gx-row-label">
+                See FHN AI run the hotel
+                <small>The same live day the hotel team sees</small>
+              </span>
+              <Icon name="right" size={15} className="gx-row-go" />
+            </a>
+          </div>
+        </section>
 
         <div className="gx-foot">
           This app shows only your booking. Demo data, saved with the hotel.
-          <br />
-          <button
-            className="why-toggle"
-            style={{ marginTop: 8, color: 'var(--g-muted)' }}
-            onClick={() => {
-              void onEnd().then(() => nav(guestPath('/')));
-            }}
-          >
-            <Icon name="logout" size={13} /> End this stay
+          <button className="gx-end" onClick={() => void onEnd().then(() => nav(guestPath('/')))}>
+            End this stay
           </button>
         </div>
       </div>
@@ -320,15 +326,29 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
   );
 }
 
-function RoomStatusCard({ v, perm, onEnable, go, act }: { v: GuestView; perm: string; onEnable: () => void; go: (t: Tab) => void; act: Act }) {
+/** A row in a grouped list, like iOS Settings. */
+function Row({ icon, label, detail, hot, onClick }: { icon: IconName; label: string; detail?: string; hot?: boolean; onClick: () => void }) {
+  return (
+    <button className="gx-row" onClick={onClick}>
+      <span className={`gx-row-ic ${hot ? 'hot' : ''}`}>
+        <Icon name={icon} size={16} />
+      </span>
+      <span className="gx-row-label">{label}</span>
+      {detail && <span className="gx-row-detail">{detail}</span>}
+      <Icon name="right" size={15} className="gx-row-go" />
+    </button>
+  );
+}
+
+function RoomStatusCard({ v, go, act }: { v: GuestView; go: (t: Tab) => void; act: Act }) {
   const [why, setWhy] = useState(false);
   const [busy, setBusy] = useState(false);
   const r = v.room;
 
   if (v.guest.canCheckIn) {
     return (
-      <div className="room-status" key="checkin">
-        <span className="gx-label">Online check-in</span>
+      <section className="gx-card room-status" key="checkin">
+        <span className="rs-k">Online check-in</span>
         <h2>Skip the front desk</h2>
         <ul className="checkin-list">
           <li>
@@ -350,58 +370,56 @@ function RoomStatusCard({ v, perm, onEnable, go, act }: { v: GuestView; perm: st
             setBusy(false);
           }}
         >
-          {busy ? 'Checking you in…' : 'Check in now'} <Icon name="arrow" size={17} />
+          {busy ? 'Checking you in…' : 'Check in now'}
         </button>
-      </div>
+      </section>
     );
   }
   if (v.guest.inRoom) {
     return (
-      <div className="room-status" key="in">
-        <span className="gx-label">You&rsquo;re in</span>
+      <section className="gx-card room-status" key="in">
+        <span className="rs-k">You&rsquo;re in</span>
         <h2>Welcome to room {r.id}</h2>
-        <p className="gx-muted" style={{ margin: 0, fontSize: 14 }}>
-          Floor {r.floor} · {r.type}. Anything not right? Report it once below — you&rsquo;ll see who&rsquo;s on it.
+        <p className="rs-note">
+          Floor {r.floor} · {r.type}. Anything not right? Report it once below and you&rsquo;ll see who&rsquo;s on it.
         </p>
-      </div>
+      </section>
     );
   }
   if (r.status === 'ready') {
     return (
-      <div className="room-status ready-card" key="ready" style={{ borderRadius: '0 0 22px 22px' }}>
-        <span className="gx-label">Ready{r.readyAt ? ` since ${fmtTime(Math.floor(r.readyAt))}` : ''}</span>
+      <section className="gx-card room-status ready-card" key="ready">
+        <span className="rs-k">Ready{r.readyAt ? ` since ${fmtTime(Math.floor(r.readyAt))}` : ''}</span>
         <h2>Room {r.id} is ready</h2>
-        <p className="gx-muted" style={{ margin: '0 0 14px', fontSize: 14 }}>
-          Floor {r.floor}. Skip the line — your mobile key works on the room door and elevator.
-        </p>
+        <p className="rs-note">Floor {r.floor}. Your mobile key opens the room door and the elevator.</p>
         <button className="gbtn white" onClick={() => go('key')}>
           <Icon name="key" size={17} /> Open mobile key
         </button>
-      </div>
+      </section>
     );
   }
   if (r.status === 'ooo') {
     return (
-      <div className="room-status" key="repair">
-        <span className="gx-label">We&rsquo;re on it</span>
+      <section className="gx-card room-status" key="repair">
+        <span className="rs-k">We&rsquo;re on it</span>
         <h2>Moving you to another room</h2>
         {v.ticket && (
-          <p className="gx-muted" style={{ margin: 0, fontSize: 14 }}>
+          <p className="rs-note">
             Ticket {v.ticket.id}: {v.ticket.issue}. Owner: {v.ticket.owner}.
           </p>
         )}
-      </div>
+      </section>
     );
   }
   return (
-    <div className="room-status" key="eta" aria-live="polite">
-      <span className="gx-label">Room {r.id} will be ready by</span>
+    <section className="gx-card room-status" key="eta" aria-live="polite">
+      <span className="rs-k">Room {r.id} · ready by</span>
       <div className="eta">{r.eta ? fmtTime(r.eta.high) : 'Scheduling…'}</div>
       {v.progress && <Countdown p={v.progress} />}
-      <div className="ai-line">
-        <Icon name="sparkles" size={14} /> {r.eta ? `FHN AI · most likely ${fmtRange(r.eta.low, r.eta.high)} · ${SURE[r.eta.confidence]}` : 'FHN AI is checking with housekeeping'}
-      </div>
       <Steps status={r.status} />
+      <div className="ai-line">
+        <Icon name="sparkles" size={14} /> {r.eta ? `FHN AI estimate · most likely ${fmtRange(r.eta.low, r.eta.high)}` : 'FHN AI is checking with housekeeping'}
+      </div>
       {r.eta && (
         <>
           <button className="why-toggle" onClick={() => setWhy(!why)} aria-expanded={why}>
@@ -409,26 +427,18 @@ function RoomStatusCard({ v, perm, onEnable, go, act }: { v: GuestView; perm: st
           </button>
           {why && (
             <div className="why-box">
-              Room {r.id} · {r.type}
               <ul>
                 {r.eta.drivers.map((d) => (
                   <li key={d}>{d}</li>
                 ))}
-                <li>We promise the late end of the window.</li>
+                <li>We promise the late end of the window ({SURE[r.eta.confidence]}).</li>
               </ul>
             </div>
           )}
         </>
       )}
-      <p className="gx-muted" style={{ margin: '12px 0 12px', fontSize: 13.5 }}>
-        No need to wait in the lobby — leave your bags at the bell desk and we&rsquo;ll message you.
-      </p>
-      {perm !== 'granted' && (
-        <button className="gbtn soft" onClick={onEnable}>
-          <Icon name="bell" size={16} /> Also notify me on this phone
-        </button>
-      )}
-    </div>
+      <p className="rs-note">No need to wait in the lobby — leave your bags at the bell desk and we&rsquo;ll message you.</p>
+    </section>
   );
 }
 
@@ -437,9 +447,9 @@ function Countdown({ p }: { p: NonNullable<GuestView['progress']> }) {
   const now = Date.now();
   const pct = Math.min(100, Math.max(0, ((now - p.startMs) / (p.highMs - p.startMs)) * 100));
   const left = Math.max(0, Math.round((p.highMs - now) / 1000));
-  const text = left >= 60 ? `about ${Math.floor(left / 60)} min ${String(left % 60).padStart(2, '0')} s` : `under ${Math.max(1, left)} s`;
+  const text = left >= 60 ? `About ${Math.floor(left / 60)} min ${String(left % 60).padStart(2, '0')} s left` : `Under ${Math.max(1, left)} s left`;
   return (
-    <div className="countdown" aria-label={`Ready in ${text}`}>
+    <div className="countdown" aria-label={text}>
       <div className="cd-bar">
         <i style={{ width: `${pct}%` }} />
       </div>
@@ -466,23 +476,11 @@ function Steps({ status }: { status: RoomStatus }) {
   );
 }
 
-function QuickAction({ icon, label, sub, onClick, hot }: { icon: IconName; label: string; sub: string; onClick: () => void; hot?: boolean }) {
-  return (
-    <button className={`qa ${hot ? 'hot' : ''}`} onClick={onClick}>
-      <span className="qa-ic">
-        <Icon name={icon} size={19} />
-      </span>
-      {label}
-      <span className="qa-sub">{sub}</span>
-    </button>
-  );
-}
-
-function Explore({ icon, title, sub, bg }: { icon: IconName; title: string; sub: string; bg: string }) {
+function Explore({ icon, title, sub }: { icon: IconName; title: string; sub: string }) {
   return (
     <div className="ex-card">
-      <div className="ex-art" style={{ background: bg }}>
-        <Icon name={icon} size={30} strokeWidth={1.6} />
+      <div className="ex-art">
+        <Icon name={icon} size={22} strokeWidth={1.8} />
       </div>
       <div className="txt">
         <b>{title}</b>

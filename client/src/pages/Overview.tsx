@@ -36,6 +36,13 @@ export default function Overview() {
 
   return (
     <main className="page live">
+      <header className="sim-head">
+        <span className="sim-chip">
+          <Icon name="play" size={11} /> Simulation
+        </span>
+        <h1>FHN Toronto Downtown · Friday, October 16</h1>
+        <p>A 2D cross-section of the hotel — every room, replayed minute by minute, today&rsquo;s way and with FHN AI.</p>
+      </header>
       <section className="versus" aria-label="Every room, side by side">
         <Board kind="today" rooms={todayRooms} m={today} />
         <Board kind="ai" rooms={aiRooms} m={ai} />
@@ -52,10 +59,10 @@ export default function Overview() {
       </section>
 
       <section className="wins" aria-label="The four challenges">
-        <Challenge icon="users" tone="red" label="Most guests waiting in the lobby" today={today?.lobbyPeak} ai={ai?.lobbyPeak} />
-        <Challenge icon="clock" tone="violet" label="Staff time wasted" unit="min" today={wasted(today)} ai={wasted(ai)} />
-        <Challenge icon="wrench" tone="amber" label="Broken AC fixed in" unit="min" today={today?.acFixMin} ai={ai?.acFixMin} open="still broken" waiting={acBroken ? undefined : 'Room 411’s AC breaks at 2:05 PM'} />
-        <Challenge icon="leaf" tone="teal" label="Energy saved" unit="kWh" today={today?.kwhSaved} ai={ai?.kwhSaved} more />
+        <Challenge icon="users" label="Most guests waiting" today={today?.lobbyPeak} ai={ai?.lobbyPeak} />
+        <Challenge icon="clock" label="Staff time wasted" unit="min" today={wasted(today)} ai={wasted(ai)} />
+        <Challenge icon="wrench" label="Broken AC fixed in" unit="min" today={today?.acFixMin} ai={ai?.acFixMin} open="still broken" waiting={acBroken ? undefined : 'Room 411’s AC breaks at 2:05 PM'} />
+        <Challenge icon="leaf" label="Energy saved" unit="kWh" today={today?.kwhSaved} ai={ai?.kwhSaved} more />
       </section>
 
       <aside className="live-side">
@@ -66,7 +73,7 @@ export default function Overview() {
   );
 }
 
-/** One side of the comparison: all 48 rooms, floor by floor, like a building directory. */
+/** One side of the comparison: the hotel drawn as a 2D cross-section — four guest floors over the lobby. */
 function Board({ kind, rooms, m }: { kind: 'today' | 'ai'; rooms: BoardRoom[]; m: M }) {
   const wedding = rooms.filter((r) => r.groupBlock);
   const total = wedding.length || 20;
@@ -97,31 +104,35 @@ function Board({ kind, rooms, m }: { kind: 'today' | 'ai'; rooms: BoardRoom[]; m
         <i style={{ width: `${(ready / total) * 100}%` }} />
       </div>
 
-      <div className="floors" role="img" aria-label={`${ready} of ${total} wedding rooms ready`}>
+      <div className="building" role="img" aria-label={`Cross-section of the hotel: ${ready} of ${total} wedding rooms ready, ${waiting} guests waiting in the lobby`}>
+        <div className="roof" aria-hidden="true" />
         {FLOORS.map((f) => (
-          <div className="floor" key={f}>
+          <div className="storey" key={f}>
             <span className="fl-n">{f}</span>
             {rooms
               .filter((r) => r.id.startsWith(String(f)))
               .map((r) => (
                 <span key={r.id} title={`Room ${r.id} · ${STATUS_WORD[r.status]}`} className={`rm s-${r.status === 'stayover' ? 'occupied' : r.status} ${r.groupBlock ? 'wed' : ''}`}>
+                  <span className="rm-f">{f}</span>
                   {r.id.slice(1)}
                 </span>
               ))}
           </div>
         ))}
+        <div className="storey lobby">
+          <span className="fl-n">L</span>
+          <div className="lobby-floor">
+            <span className="lb-label">Lobby</span>
+            <People waiting={waiting} />
+            <span className={`lb-num ${waiting ? 'hot' : ''}`}>
+              <b>
+                <Num value={waiting} />
+              </b>{' '}
+              waiting
+            </span>
+          </div>
+        </div>
       </div>
-
-      <footer className="lobby" aria-label={`${waiting} wedding guests waiting in the lobby`}>
-        <span className="lb-label">Lobby</span>
-        <People waiting={waiting} />
-        <span className={`lb-num ${waiting ? 'hot' : ''}`}>
-          <b>
-            <Num value={waiting} />
-          </b>{' '}
-          waiting
-        </span>
-      </footer>
     </div>
   );
 }
@@ -143,12 +154,12 @@ function People({ waiting }: { waiting: number }) {
 
 /** One challenge: today's way and FHN AI side by side. */
 function Challenge({
-  icon, tone, label, unit, today, ai, more, open, waiting,
-}: { icon: IconName; tone: string; label: string; unit?: string; today?: number | null; ai?: number | null; more?: boolean; open?: string; waiting?: string }) {
+  icon, label, unit, today, ai, more, open, waiting,
+}: { icon: IconName; label: string; unit?: string; today?: number | null; ai?: number | null; more?: boolean; open?: string; waiting?: string }) {
   // FHN AI is ahead once its number is in and today's is worse or still open.
   const better = ai != null && (today == null ? !more : more ? ai > today : ai < today);
   return (
-    <div className={`win glass tone-${tone}`}>
+    <div className="win glass">
       <div className="win-top">
         <span className="win-ic">
           <Icon name={icon} size={15} />
@@ -176,7 +187,7 @@ function GuestCard() {
   if (counts) count = counts.registered ? `${counts.registered} registered · ${counts.checkedIn} checked in` : 'Live · be the first to register';
   return (
     <a className="guest-card glass" href={guestUrl('/')} target={GUEST_TAB} title={url}>
-      {src ? <img src={src} alt={`QR code to ${url}`} /> : <span className="qr-blank" />}
+      {src ? <img src={src} alt={`QR code to ${url}`} className="fade-img" /> : <span className="qr-blank" />}
       <span className="gc-text">
         <b>Be a wedding guest</b>
         <span className="gc-sub">Scan to try the guest app</span>

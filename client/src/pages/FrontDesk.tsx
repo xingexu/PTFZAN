@@ -92,7 +92,7 @@ function Legend({ layer, ai }: { layer: Layer; ai: boolean }) {
         </span>
       ))}
       <span>
-        <span className="dot" style={{ background: 'var(--violet)' }} /> Wedding
+        <span className="dot" style={{ background: '#fff' }} /> Wedding
       </span>
       {ai && (
         <span>

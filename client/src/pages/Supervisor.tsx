@@ -53,7 +53,7 @@ export default function Supervisor() {
                       return (
                         <div key={id} className={`qitem ${i === 0 && a.currentRoom ? 'now' : ''}`}>
                           <span className="row" style={{ gap: 5 }}>
-                            {id} {r.groupBlock && <span className="dot" style={{ background: 'var(--violet)' }} />}
+                            {id} {r.groupBlock && <span className="dot" style={{ background: '#fff' }} />}
                           </span>
                           <span className="muted" style={{ fontSize: 11.5 }}>
                             {i === 0 && a.currentRoom ? 'now' : r.status === 'occupied' ? 'guest in' : r.status === 'stayover' ? 'staying' : r.type === 'Double Queen' ? 'Double' : r.type}
@@ -246,7 +246,7 @@ function ProposalCard({ p, s }: { p: PlanProposal; s: SimState }) {
             return (
               <tr key={c.roomId}>
                 <td>
-                  <b>{c.roomId}</b> {r?.groupBlock && <span className="dot" style={{ background: 'var(--violet)', marginLeft: 3 }} />}
+                  <b>{c.roomId}</b> {r?.groupBlock && <span className="dot" style={{ background: '#fff', marginLeft: 3 }} />}
                 </td>
                 <td className="muted">{c.from}</td>
                 <td>{c.to}</td>
