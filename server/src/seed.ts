@@ -19,6 +19,11 @@ export const FLOORS = [3, 4, 5, 6];
 export const SIM_START = t(8, 0);
 export const SIM_END = t(17, 0);
 export const GROUP = 'Chen–Okafor Wedding';
+export const IN_HOUSE_CODE = 'STAY411';
+
+/** Room HVAC draw (kWh per room-hour) at full comfort vs eco setback. Planning assumptions for a PTAC/fan-coil room. */
+export const KW_RUNNING = 0.9;
+export const KW_ECO = 0.25;
 
 /** Historical average full-clean minutes by ROOM TYPE (never by person). */
 export const HIST_AVG: Record<RoomType, number> = { King: 35, 'Double Queen': 39, Suite: 52 };
@@ -69,7 +74,7 @@ export function buildSeed(): Seed {
       const id = `${floor}${String(n).padStart(2, '0')}`;
       const type = typeFor(n);
       condition[id] = 0.9 + rand() * 0.42; // 0.90–1.32 → portfolio mean ≈ 38 min, matching the case
-      const room: Room = { id, floor, type, status: 'ready' };
+      const room: Room = { id, floor, type, status: 'ready', hvac: 'comfort' };
 
       if (floor >= 5 && n <= 10) {
         room.groupBlock = GROUP;
@@ -86,6 +91,7 @@ export function buildSeed(): Seed {
         // Stayovers on floors 3–4: guest leaves for the day, room needs light service.
         room.status = 'stayover';
         room.guestOutAt = t(8, 30) + Math.floor(rand() * 150);
+        if (id === '302' || id === '404') room.serviced = true; // "Do not disturb" all day — no service
       } else if (n <= 10) {
         // Regular departures on floors 3–4.
         room.status = 'occupied';
@@ -120,8 +126,8 @@ export function buildSeed(): Seed {
   };
   const blockRooms = rooms.filter((r) => r.groupBlock);
   blockRooms.forEach((r, i) => {
-    // Wedding parties arrive in a wave between 14:45 and 15:40.
-    const arrival = t(14, 45) + Math.round((i / (blockRooms.length - 1)) * 55);
+    // Exhibit 4: wedding guests begin arriving at 15:00; all 40 are in the lobby by 15:45.
+    const arrival = t(15, 0) + Math.round((i / (blockRooms.length - 1)) * 40);
     guests.push({
       code: `WED${r.id}`,
       name: nextName(),
@@ -135,50 +141,114 @@ export function buildSeed(): Seed {
       phoneMasked: `(416) •••-${String(1200 + i * 37).slice(-4)}`,
       notifyBrowser: false,
       lobbyMinutes: 0,
+      housekeeping: 'standard',
+      setpoint: 21,
     });
   });
   for (const r of rooms.filter((x) => x.arrivalId?.startsWith('RES-'))) {
     const isSuite = r.type === 'Suite';
-    const arrival = isSuite ? t(16, 30) + Math.floor(rand() * 25) : t(15, 20) + Math.floor(rand() * 70);
+    // Suites check in this evening, after the 08:00–17:00 shift record; other rooms from 15:20.
+    const arrival = isSuite ? t(17, 30) + Math.floor(rand() * 60) : t(15, 20) + Math.floor(rand() * 70);
     guests.push({
       code: `RES${r.id}`,
       name: nextName(),
       partySize: 1 + Math.floor(rand() * 2),
       roomId: r.id,
       arrivalTime: arrival,
-      expectedArrival: isSuite ? t(16, 30) : t(16, 0),
+      expectedArrival: isSuite ? t(18, 0) : t(16, 0),
       state: 'expected',
       consentSms: true,
       phoneMasked: `(647) •••-${String(3000 + Number(r.id)).slice(-4)}`,
       notifyBrowser: false,
       lobbyMinutes: 0,
+      housekeeping: 'standard',
+      setpoint: 21,
     });
   }
+  // An in-house guest (411, a suite stayover). Back from meetings at 2 PM — when their AC fails.
+  guests.push({
+    code: IN_HOUSE_CODE,
+    name: 'Noor Haddad',
+    partySize: 1,
+    roomId: '411',
+    arrivalTime: t(14, 0),
+    expectedArrival: t(14, 0),
+    state: 'checked-in',
+    consentSms: true,
+    phoneMasked: '(905) •••-0411',
+    notifyBrowser: false,
+    lobbyMinutes: 0,
+    inHouse: true,
+    housekeeping: 'standard',
+    setpoint: 21,
+  });
 
-  // Four attendants scheduled (one per floor); Attendant 3 calls in sick at 08:00.
-  const attendants: Attendant[] = [1, 2, 3, 4].map((n) => ({
+  // Four attendants scheduled (one per floor) plus one on call; Attendant 3 calls in sick at 08:00 (Exhibit 4).
+  const attendants: Attendant[] = [1, 2, 3, 4, 5].map((n) => ({
     id: `A${n}`,
-    label: `Attendant ${n}`,
-    present: true,
+    label: n === 5 ? 'Backup attendant' : `Attendant ${n}`,
+    present: n !== 5,
+    onCall: n === 5,
     queue: [],
     busyUntil: SIM_START + 30, // shift briefing until 08:30
-    lastFloor: n + 2,
-    activity: 'Shift briefing',
-    breakAt: n % 2 === 0 ? t(12, 0) : t(12, 30),
+    lastFloor: [3, 4, 5, 6, 5][n - 1],
+    activity: n === 5 ? 'On call — not booked' : 'Shift briefing',
+    breakAt: n === 5 ? t(13, 30) : n % 2 === 0 ? t(12, 0) : t(12, 30),
     hadBreak: false,
     wastedVisits: 0,
+    wastedMin: 0,
   }));
 
+  // Exhibit 4 — the Toronto property's shift record, 08:00–17:00, verbatim times.
   const events: ScenarioEvent[] = [
-    { at: t(8, 0), id: 'absence', title: 'Sick call', detail: 'Attendant 3 calls in sick after the day’s assignments were issued.' },
-    { at: t(10, 30), id: 'late', title: 'Late checkouts', detail: 'Rooms 505, 509 and 606 request late checkout (12:15–13:00).' },
-    { at: t(12, 0), id: 'elevator', title: 'Elevator B out', detail: 'Carts and guests share one elevator. Floors 5–6 slow down.' },
-    { at: t(13, 15), id: 'group', title: 'Wedding moves to 3 PM', detail: 'The Chen–Okafor party (20 rooms, 40 guests) now arrives ~3:00 PM, not after 5:00 PM.' },
-    { at: t(14, 45), id: 'arrivals', title: 'Arrivals begin', detail: 'The wedding party begins to arrive at the front desk.' },
-    { at: t(15, 45), id: 'checkpoint', title: 'Checkpoint', detail: 'The moment the real incident escalated to the duty manager.' },
+    { at: t(8, 0), id: 'absence', title: 'Absence', detail: 'Employee absence reported after assignments are issued.' },
+    { at: t(10, 30), id: 'late', title: 'Late checkouts', detail: 'Late checkouts recorded (505, 509, 606).' },
+    { at: t(12, 0), id: 'elevator', title: 'Elevator out', detail: 'Elevator taken out of service. Carts and guests share the remaining elevator.' },
+    { at: t(13, 15), id: 'group', title: 'Wedding at 3', detail: 'The wedding group confirms arrivals around 15:00 (20 rooms, 40 guests).' },
+    { at: t(14, 30), id: 'calls', title: 'Calls', detail: 'Calls made for readiness updates.' },
+    { at: t(15, 0), id: 'arrivals', title: 'Arrivals', detail: 'Wedding guests begin arriving.' },
+    { at: t(15, 45), id: 'checkpoint', title: 'Checkpoint', detail: 'Today: 40 guests waiting, 12 rooms still being prepared — escalated to the duty manager.' },
+    { at: t(17, 0), id: 'release', title: 'Shift ends', detail: 'Remaining group rooms released; check-in queue clears; elevator fault still open.' },
   ];
+
 
   return { rooms, guests, attendants, events, condition };
 }
 
 export const TIME = t;
+
+/**
+ * Maintenance history exactly as it lives today: free-text spreadsheet rows, typed by different people.
+ * The prototype normalises these with keyword rules; the pilot uses an LLM with a fixed output schema.
+ */
+export const MAINTENANCE_HISTORY: { date: string; raw: string }[] = [
+  { date: '2026-08-14', raw: 'TV 306 no signal - reseated cable' },
+  { date: '2026-08-21', raw: 'rm 411 ac not cold, reset breaker' },
+  { date: '2026-08-24', raw: 'Elev B door sensor fault, reset by contractor' },
+  { date: '2026-08-29', raw: 'Ice machine fl 4 leaking onto carpet' },
+  { date: '2026-09-09', raw: '411 PTAC no cooling - cleaned filter' },
+  { date: '2026-09-14', raw: "elevator b - door won't close fl 5" },
+  { date: '2026-09-18', raw: '509 shower drain slow' },
+  { date: '2026-09-25', raw: 'Rm 612 heat not working, thermostat replaced' },
+  { date: '2026-09-30', raw: 'Guest in 411 says room warm, AC fan only' },
+  { date: '2026-10-02', raw: 'slow drain bathtub 509, snaked' },
+  { date: '2026-10-05', raw: 'ELEV-B door reopening repeatedly, guests stuck 2 min' },
+  { date: '2026-10-09', raw: 'Lobby door closer squeaking' },
+];
+export const HISTORY_AS_OF = '2026-10-16';
+
+/** Tomorrow (Sat, Oct 17) from the PMS: the wedding block stays over, other rooms turn. */
+export const TOMORROW = {
+  date: 'Sat, Oct 17',
+  departures: 16,
+  stayovers: 26, // 20 wedding rooms + 6 stayovers
+  arrivals: 14,
+  /** Weekend schedule as posted today. */
+  scheduled: 3,
+  /** When the work lands: share of departures checking out and of stayovers serviced in each block. */
+  blocks: [
+    { label: '8–11 AM', hours: 3, departShare: 0.3, stayShare: 0.4 },
+    { label: '11 AM–3 PM', hours: 4, departShare: 0.55, stayShare: 0.5 },
+    { label: '3–5 PM', hours: 2, departShare: 0.15, stayShare: 0.1 },
+  ],
+};

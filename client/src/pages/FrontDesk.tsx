@@ -1,19 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Guest, Room, SimState } from '../../../shared/types';
+import { useEffect, useRef, useState } from 'react';
+import type { Guest, Hvac, Room, SimState } from '../../../shared/types';
 import { fmtRange, fmtTime } from '../../../shared/types';
 import { api, useSim, useToast } from '../api';
-import { atRisk, CONF_COLOR, CONF_WIDTH, STATUS_COLOR, STATUS_LABEL, TILE_LABEL, visibleStatus } from '../components/rooms';
+import { Icon } from '../components/Icon';
+import { GUEST_TAB, guestUrl } from '../links';
+import { atRisk, CONF_COLOR, CONF_WIDTH, HVAC_COLOR, HVAC_LABEL, HVAC_TILE, STATUS_COLOR, STATUS_LABEL, TILE_LABEL, visibleStatus } from '../components/rooms';
 
 /** Compact 12-hour clock for tiles, e.g. 1:05 */
 const clock = (m: number) => fmtTime(m).replace(/ (AM|PM)$/, '');
 
 const ISSUES = ['AC not cooling', 'Plumbing leak', 'TV not working', 'Door lock fault', 'Heating failure'];
+const SURE = { high: 'Very likely', medium: 'Likely', low: 'Rough guess' } as const;
+type Layer = 'readiness' | 'climate';
 
 export default function FrontDesk() {
   const { state } = useSim();
   const [sel, setSel] = useState<string | null>(null);
+  const [layer, setLayer] = useState<Layer>('readiness');
   if (!state) return null;
-  const rp = state.mode === 'readypath';
+  const ai = state.mode === 'ai';
   const floors = [6, 5, 4, 3];
   const selected = sel ? state.rooms.find((r) => r.id === sel) : undefined;
 
@@ -23,34 +28,32 @@ export default function FrontDesk() {
         <div>
           <h1>Front desk</h1>
           <p>
-            {rp
-              ? 'Every agent sees the same live status and predicted ready-time range for every room. Click a room to see why.'
-              : `Agents only know what the last update told them. Status as of ${fmtTime(state.frontDeskSnapshotAt)}.`}
+            {ai
+              ? 'Everyone at the desk sees the same live status and expected ready time for every room. Click a room to see why.'
+              : `The desk only knows what the last phone call said — status as of ${fmtTime(state.frontDeskSnapshotAt)}.`}
           </p>
         </div>
-        <div className="legend" aria-label="Legend">
-          {(['ready', 'inspection', 'cleaning', 'dirty', 'occupied', 'stayover', 'ooo'] as const).map((s) => (
-            <span key={s}>
-              <span className="dot" style={{ background: STATUS_COLOR[s] }} /> {STATUS_LABEL[s]}
-            </span>
-          ))}
-          <span>
-            <span className="dot" style={{ background: 'var(--violet)' }} /> Wedding block
-          </span>
-          {rp && (
-            <span>
-              <span className="dot" style={{ background: 'transparent', border: '2px solid var(--red)' }} /> At risk
-            </span>
-          )}
+        <div className="layer-seg" role="tablist" aria-label="Map layer">
+          <button role="tab" aria-selected={layer === 'readiness'} className={layer === 'readiness' ? 'on' : ''} onClick={() => setLayer('readiness')}>
+            <Icon name="bed" size={14} /> Room status
+          </button>
+          <button role="tab" aria-selected={layer === 'climate'} className={layer === 'climate' ? 'on' : ''} onClick={() => setLayer('climate')}>
+            <Icon name="thermo" size={14} /> Temperature
+          </button>
         </div>
       </div>
 
       <div className="grid fd">
         <section className="card" aria-label="Room grid">
           <div className="card-head">
-            <h2>Rooms by floor</h2>
-            {!rp && <span className="pill red">Last phoned-in status · {fmtTime(state.frontDeskSnapshotAt)}</span>}
-            {rp && state.elevatorDown && <span className="pill amber">Elevator B out · floors 5–6 slower</span>}
+            <Legend layer={layer} ai={ai} />
+            {!ai && layer === 'readiness' && <span className="pill red">Last phone update · {fmtTime(state.frontDeskSnapshotAt)}</span>}
+            {ai && state.elevatorDown && layer === 'readiness' && <span className="pill amber">Elevator B out · floors 5–6 slower</span>}
+            {layer === 'climate' && (
+              <span className={`pill ${ai ? 'teal' : 'red'}`}>
+                {ai ? `${state.metrics.kwhSaved} kWh of energy saved today` : `${state.metrics.vacantRunning} empty rooms with heat/AC on full`}
+              </span>
+            )}
           </div>
           <div className="floors">
             {floors.map((f) => (
@@ -59,7 +62,7 @@ export default function FrontDesk() {
                 {state.rooms
                   .filter((r) => r.floor === f)
                   .map((r) => (
-                    <RoomTile key={r.id} s={state} r={r} selected={sel === r.id} onClick={() => setSel(sel === r.id ? null : r.id)} />
+                    <RoomTile key={r.id} s={state} r={r} layer={layer} selected={sel === r.id} onClick={() => setSel(sel === r.id ? null : r.id)} />
                   ))}
               </div>
             ))}
@@ -74,33 +77,68 @@ export default function FrontDesk() {
   );
 }
 
-function RoomTile({ s, r, selected, onClick }: { s: SimState; r: Room; selected: boolean; onClick: () => void }) {
+function Legend({ layer, ai }: { layer: Layer; ai: boolean }) {
+  if (layer === 'climate') {
+    const keys: Hvac[] = ai ? ['comfort', 'eco', 'precool'] : ['comfort', 'running'];
+    return (
+      <div className="legend" aria-label="Legend">
+        {keys.map((h) => (
+          <span key={h}>
+            <span className="dot" style={{ background: HVAC_COLOR[h] }} /> {HVAC_LABEL[h]}
+          </span>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="legend" aria-label="Legend">
+      {(['ready', 'inspection', 'cleaning', 'dirty', 'occupied', 'ooo'] as const).map((s) => (
+        <span key={s}>
+          <span className="dot" style={{ background: STATUS_COLOR[s] }} /> {STATUS_LABEL[s]}
+        </span>
+      ))}
+      <span>
+        <span className="dot" style={{ background: 'var(--violet)' }} /> Wedding
+      </span>
+      {ai && (
+        <span>
+          <span className="dot" style={{ background: 'transparent', border: '2px solid var(--red)' }} /> Might be late
+        </span>
+      )}
+    </div>
+  );
+}
+
+function RoomTile({ s, r, layer, selected, onClick }: { s: SimState; r: Room; layer: Layer; selected: boolean; onClick: () => void }) {
   const st = visibleStatus(s, r);
-  const rp = s.mode === 'readypath';
-  const risk = atRisk(s, r);
+  const ai = s.mode === 'ai';
+  const risk = layer === 'readiness' && atRisk(s, r);
   // Tiles show the promise (late end of the range); the detail panel shows the full range and why.
   let etaText = '';
-  if (st === 'stayover') etaText = '';
+  if (layer === 'climate') etaText = r.hvac === 'precool' ? 'guest soon' : r.hvac === 'eco' ? 'saving' : '';
+  else if (st === 'stayover') etaText = '';
   else if (st === 'ready') etaText = r.readyAt ? `✓ ${clock(r.readyAt)}` : '';
-  else if (rp && r.eta) etaText = `by ${clock(r.eta.high)}`;
-  else if (rp && st === 'ooo') etaText = r.maintenanceTicket ?? 'Ticket';
-  else if (!rp) etaText = 'Call HK';
+  else if (ai && r.eta) etaText = `by ${clock(r.eta.high)}`;
+  else if (ai && st === 'ooo') etaText = r.maintenanceTicket ?? 'Repair';
+  else if (!ai) etaText = 'Not sure';
+  const cls = layer === 'climate' ? `h-${r.hvac}` : `s-${st}`;
+  const label = layer === 'climate' ? HVAC_TILE[r.hvac] : TILE_LABEL[st];
 
   return (
     <button
-      className={`tile s-${st} ${selected ? 'sel' : ''} ${risk ? 'risk' : ''} ${!rp && st !== 'ready' ? 'unknown' : ''}`}
+      className={`tile ${cls} ${selected ? 'sel' : ''} ${risk ? 'risk' : ''} ${!ai && layer === 'readiness' && st !== 'ready' ? 'unknown' : ''}`}
       onClick={onClick}
       aria-pressed={selected}
-      aria-label={`Room ${r.id}, ${STATUS_LABEL[st]}${etaText ? `, ${etaText}` : ''}${r.groupBlock ? ', wedding block' : ''}`}
+      aria-label={`Room ${r.id}, ${layer === 'climate' ? HVAC_LABEL[r.hvac] : STATUS_LABEL[st]}${etaText ? `, ${etaText}` : ''}${r.groupBlock ? ', wedding block' : ''}`}
     >
       <span className="num">
         {r.id}
         {r.groupBlock && <span className="grp" />}
       </span>
-      <span className="st">{TILE_LABEL[st]}</span>
+      <span className="st">{label}</span>
       {etaText && <span className="eta">{etaText}</span>}
-      {rp && r.eta && st !== 'stayover' && (
-        <span className="conf" title={`${r.eta.confidence} confidence`}>
+      {layer === 'readiness' && ai && r.eta && st !== 'stayover' && (
+        <span className="conf" title={`How sure: ${SURE[r.eta.confidence]}`}>
           <i style={{ width: CONF_WIDTH[r.eta.confidence], background: CONF_COLOR[r.eta.confidence] }} />
         </span>
       )}
@@ -118,7 +156,7 @@ function RoomDetail({ s, r, onClose }: { s: SimState; r: Room; onClose: () => vo
   }, [r.id]);
   const [issue, setIssue] = useState(ISSUES[0]);
   const [busy, setBusy] = useState(false);
-  const rp = s.mode === 'readypath';
+  const ai = s.mode === 'ai';
   const st = visibleStatus(s, r);
   const guests = s.guests.filter((g) => g.roomId === r.id);
   const att = r.cleaningBy ? s.attendants.find((a) => a.id === r.cleaningBy) : undefined;
@@ -128,7 +166,7 @@ function RoomDetail({ s, r, onClose }: { s: SimState; r: Room; onClose: () => vo
     setBusy(true);
     try {
       const res = await api<{ ok: boolean; message: string }>(`/api/rooms/${r.id}/issue`, { issue });
-      toast({ title: `Issue reported · ${r.id}`, body: res.message, tone: rp ? 'good' : 'neutral' });
+      toast({ title: `Issue reported · ${r.id}`, body: res.message, tone: ai ? 'good' : 'neutral' });
     } catch (e) {
       toast({ title: 'Could not report issue', body: (e as Error).message, tone: 'bad' });
     } finally {
@@ -142,30 +180,34 @@ function RoomDetail({ s, r, onClose }: { s: SimState; r: Room; onClose: () => vo
         <h2>
           Room {r.id} <span className="muted" style={{ fontWeight: 600 }}>· {r.type}</span>
         </h2>
-        <button className="btn" onClick={onClose} aria-label="Close room details">✕</button>
+        <button className="btn ghost sm" onClick={onClose} aria-label="Close room details">
+          <Icon name="x" size={16} />
+        </button>
       </div>
       <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
-          <div className="muted" style={{ fontSize: 13, fontWeight: 700 }}>
-            {st === 'ready' ? 'READY' : rp ? 'PREDICTED READY' : 'READINESS'}
-          </div>
+          <div className="eyebrow">{st === 'ready' ? 'Ready' : ai ? 'Expected ready' : 'Status'}</div>
           {st === 'ready' ? (
-            <div className="eta-big" style={{ color: 'var(--green)' }}>Ready{r.readyAt ? ` · ${fmtTime(r.readyAt)}` : ''}</div>
-          ) : rp && r.eta ? (
-            <>
+            <div className="eta-big" style={{ color: 'var(--green-ink)' }}>Ready{r.readyAt ? ` · ${fmtTime(r.readyAt)}` : ''}</div>
+          ) : ai && r.eta ? (
+            <div className="row wrap">
               <div className="eta-big">{fmtRange(r.eta.low, r.eta.high)}</div>
-              <span className={`pill ${r.eta.confidence === 'high' ? 'green' : r.eta.confidence === 'medium' ? 'amber' : 'red'}`}>{r.eta.confidence} confidence</span>
-            </>
-          ) : rp ? (
-            <div className="eta-big" style={{ fontSize: 18 }}>{st === 'ooo' ? 'Out of order' : st === 'stayover' ? 'Stayover — no arrival' : 'Not scheduled'}</div>
+              <span className={`pill ${r.eta.confidence === 'high' ? 'green' : r.eta.confidence === 'medium' ? 'amber' : 'red'}`}>{SURE[r.eta.confidence]}</span>
+            </div>
+          ) : ai ? (
+            <div className="eta-big" style={{ fontSize: 18 }}>{st === 'ooo' ? 'Being repaired' : st === 'stayover' ? 'Guest staying on — no arrival' : 'Not on today’s list'}</div>
           ) : (
-            <div className="eta-big" style={{ fontSize: 18, color: 'var(--red)' }}>Unknown — phone housekeeping</div>
+            <div className="eta-big" style={{ fontSize: 18, color: 'var(--red-ink)' }}>Unknown — call housekeeping to check</div>
           )}
         </div>
 
-        {rp && r.eta && (
+        {ai && r.eta && (
           <div>
-            <div className="muted" style={{ fontSize: 13, fontWeight: 700 }}>WHY THIS ESTIMATE</div>
+            <div className="row" style={{ gap: 6 }}>
+              <span className="ai-chip">
+                <Icon name="sparkles" size={12} /> Why this time
+              </span>
+            </div>
             <ul className="why">
               {r.eta.drivers.map((d) => (
                 <li key={d}>{d}</li>
@@ -176,8 +218,11 @@ function RoomDetail({ s, r, onClose }: { s: SimState; r: Room; onClose: () => vo
 
         <dl>
           <dt>Status</dt>
-          <dd>{STATUS_LABEL[st]}{!rp && st !== r.status ? <span className="muted"> (may be outdated)</span> : null}</dd>
-          {rp && att && (
+          <dd>
+            {STATUS_LABEL[st]}
+            {!ai && st !== r.status ? <span className="muted"> (may be outdated)</span> : null}
+          </dd>
+          {ai && att && (
             <>
               <dt>Being cleaned</dt>
               <dd>{att.label}</dd>
@@ -189,37 +234,42 @@ function RoomDetail({ s, r, onClose }: { s: SimState; r: Room; onClose: () => vo
               <dd>{r.lateReported ? `Late · ${fmtTime(r.actualCheckout!)}` : `By ${fmtTime(r.scheduledCheckout)}`}</dd>
             </>
           )}
+          <dt>Temperature</dt>
+          <dd>
+            <span className="dot" style={{ background: HVAC_COLOR[r.hvac], marginRight: 6 }} />
+            {HVAC_LABEL[r.hvac]}
+          </dd>
           {ticket && (
             <>
-              <dt>Ticket</dt>
-              <dd>{ticket.id} · {ticket.issue}</dd>
+              <dt>Repair</dt>
+              <dd>
+                {ticket.id} · {ticket.issue}
+              </dd>
             </>
           )}
         </dl>
 
         <div>
-          <div className="muted" style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>ARRIVING GUESTS</div>
-          {guests.length === 0 ? (
-            <div className="muted" style={{ fontSize: 14 }}>No arrival assigned.</div>
-          ) : (
-            guests.map((g) => <GuestLine key={g.code} s={s} g={g} />)
-          )}
+          <div className="eyebrow" style={{ marginBottom: 6 }}>Guests</div>
+          {guests.length === 0 ? <div className="muted" style={{ fontSize: 13.5 }}>No arrival assigned.</div> : guests.map((g) => <GuestLine key={g.code} s={s} g={g} />)}
         </div>
 
         <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-          <label htmlFor="issue" className="muted" style={{ fontSize: 13, fontWeight: 700 }}>REPORT A ROOM ISSUE</label>
+          <label htmlFor="issue" className="eyebrow">
+            Report a problem in this room
+          </label>
           <div className="row" style={{ marginTop: 6 }}>
-            <select id="issue" className="input" style={{ padding: '8px 10px', fontSize: 14 }} value={issue} onChange={(e) => setIssue(e.target.value)}>
+            <select id="issue" className="input" value={issue} onChange={(e) => setIssue(e.target.value)}>
               {ISSUES.map((i) => (
                 <option key={i}>{i}</option>
               ))}
             </select>
             <button className="btn danger" disabled={busy || r.status === 'ooo'} onClick={report}>
-              Report
+              <Icon name="wrench" size={14} /> Report
             </button>
           </div>
           <p className="muted" style={{ fontSize: 12.5, margin: '6px 0 0' }}>
-            {rp ? 'Opens a maintenance ticket, moves the guest to the best available room and tells them who owns the fix.' : 'Today: the ticket goes to maintenance; the guest is not told.'}
+            {ai ? 'Creates one repair request, moves the guest to the best free room and tells them who is fixing it.' : 'Today: maintenance gets a note; the guest isn’t told.'}
           </p>
         </div>
       </div>
@@ -230,21 +280,21 @@ function RoomDetail({ s, r, onClose }: { s: SimState; r: Room; onClose: () => vo
 function GuestLine({ s, g }: { s: SimState; g: Guest }) {
   const notes = s.notifications.filter((n) => n.guestCode === g.code);
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 14 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '7px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
       <div>
         <b>{g.name}</b> <span className="muted">· {g.partySize}p</span>
-        <div className="muted" style={{ fontSize: 12.5 }}>
-          Arrives ~{fmtTime(g.arrivalTime)} · {g.consentSms ? `SMS ${g.phoneMasked}` : g.isDemoGuest ? 'Browser notifications' : 'Declined texts'}
+        <div className="muted" style={{ fontSize: 12 }}>
+          {g.inHouse ? 'In-house guest' : `Arrives ~${fmtTime(g.arrivalTime)}`} · {g.consentSms ? `Texts to ${g.phoneMasked}` : g.isDemoGuest ? 'Guest app messages' : 'No texts (declined)'}
         </div>
       </div>
       <div style={{ textAlign: 'right' }}>
         <GuestPill g={g} />
         <div>
-          <a href={`/guest/${g.code}`} target="_blank" rel="noreferrer" style={{ fontSize: 12.5 }}>
-            Guest view ↗
+          <a href={guestUrl(`/guest/${g.code}`)} target={GUEST_TAB} style={{ fontSize: 12 }}>
+            Open in guest view ↗
           </a>
         </div>
-        {notes.length > 0 && <div className="muted" style={{ fontSize: 12 }}>{notes.length} msg sent</div>}
+        {notes.length > 0 && <div className="muted" style={{ fontSize: 11.5 }}>{notes.length} msg sent</div>}
       </div>
     </div>
   );
@@ -254,45 +304,49 @@ export function GuestPill({ g }: { g: Guest }) {
   const map = {
     expected: ['slate', 'Expected'],
     waiting: ['red', 'Waiting in lobby'],
-    'informed-away': ['violet', 'Informed · away'],
-    'checked-in': ['green', 'Checked in'],
+    'informed-away': ['violet', 'Out · has a time'],
+    'checked-in': ['green', g.inHouse ? 'In house' : 'Checked in'],
   } as const;
   const [c, t] = map[g.state];
   return <span className={`pill ${c}`}>{t}</span>;
 }
 
 function Arrivals({ s, onPick }: { s: SimState; onPick: (id: string) => void }) {
-  const rp = s.mode === 'readypath';
-  const list = useMemo(
-    () =>
-      s.guests
-        .filter((g) => !g.isDemoGuest && g.state !== 'checked-in')
-        .sort((a, b) => (a.state === 'waiting' ? -1 : 0) - (b.state === 'waiting' ? -1 : 0) || a.arrivalTime - b.arrivalTime),
-    [s.guests],
-  );
-  const desk = s.deskAgents;
+  const ai = s.mode === 'ai';
+  const pending = s.guests.filter((g) => !g.isDemoGuest && !g.inHouse && g.state !== 'checked-in');
+  // Guests due after the 5 PM end of the shift record are listed separately.
+  const evening = pending.filter((g) => g.state === 'expected' && g.arrivalTime > s.end);
+  const list = pending
+    .filter((g) => !evening.includes(g))
+    .sort((a, b) => (a.state === 'waiting' ? -1 : 0) - (b.state === 'waiting' ? -1 : 0) || a.arrivalTime - b.arrivalTime);
   return (
     <>
+      {s.finished && <ShiftSummary s={s} />}
       <section className="card" aria-label="Front desk agents">
         <div className="card-head">
-          <h2>Desk agents</h2>
+          <h2>Front desk staff</h2>
         </div>
         <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {desk.map((d, i) => (
-            <div key={d.id} className="row" style={{ justifyContent: 'space-between', fontSize: 14 }}>
-              <b>Agent {i + 1}</b>
-              <span className={`pill ${d.task.startsWith('Calling') ? 'red' : d.task === 'Available' ? 'slate' : 'teal'}`}>{s.now < d.busyUntil ? d.task : 'Available'}</span>
-            </div>
-          ))}
+          {s.deskAgents.map((d, i) => {
+            const task = s.now < d.busyUntil ? d.task : 'Available';
+            return (
+              <div key={d.id} className="row" style={{ justifyContent: 'space-between', fontSize: 13.5 }}>
+                <b>Desk {i + 1}</b>
+                <span className={`pill ${task.startsWith('Calling') || task.startsWith('Taking') ? 'red' : task === 'Available' ? 'slate' : 'ai'}`}>{task}</span>
+              </div>
+            );
+          })}
         </div>
       </section>
       <section className="card" aria-label="Arrivals">
         <div className="card-head">
-          <h2>Arrivals not yet in rooms</h2>
-          <span className="mono muted">{list.length}</span>
+          <h2>Guests not in their rooms yet</h2>
+          <span className="pill slate">{list.length}</span>
         </div>
         {list.length === 0 ? (
-          <div className="empty">Everyone is in their room.</div>
+          <div className="empty row" style={{ justifyContent: 'center', color: 'var(--green-ink)', fontWeight: 650 }}>
+            <Icon name="check" size={16} /> Everyone who has arrived is in their room.
+          </div>
         ) : (
           <ul className="arrivals">
             {list.map((g) => {
@@ -306,18 +360,18 @@ function Arrivals({ s, onPick }: { s: SimState; onPick: (id: string) => void }) 
                   </span>
                   <GuestPill g={g} />
                   <span className="sub">
-                    <button className="btn" style={{ padding: '2px 8px', fontSize: 12.5 }} onClick={() => onPick(r.id)}>
+                    <button className="btn sm" onClick={() => onPick(r.id)}>
                       Room {r.id}
                     </button>
                     <span>~{fmtTime(g.arrivalTime)}</span>
                     {vis === 'ready' ? (
-                      <span style={{ color: 'var(--green)', fontWeight: 700 }}>Room ready</span>
-                    ) : rp && r.eta ? (
-                      <span className="mono">{fmtRange(r.eta.low, r.eta.high)}</span>
+                      <span style={{ color: 'var(--green-ink)', fontWeight: 700 }}>Room ready</span>
+                    ) : ai && r.eta ? (
+                      <span className="num" style={{ fontWeight: 700, color: 'var(--ink-2)' }}>{fmtRange(r.eta.low, r.eta.high)}</span>
                     ) : (
-                      <span className="muted">ETA unknown</span>
+                      <span className="muted">Ready time unknown</span>
                     )}
-                    {rp && (sent ? <span className="pill teal">Notified</span> : !g.consentSms ? <span className="pill slate">No texts</span> : null)}
+                    {ai && (sent ? <span className="pill ai">Texted</span> : !g.consentSms ? <span className="pill slate">No texts</span> : null)}
                   </span>
                 </li>
               );
@@ -325,6 +379,62 @@ function Arrivals({ s, onPick }: { s: SimState; onPick: (id: string) => void }) 
           </ul>
         )}
       </section>
+      {evening.length > 0 && (
+        <section className="card" aria-label="Arriving this evening">
+          <div className="card-head">
+            <h2>Arriving this evening</h2>
+            <span className="pill slate">{evening.length}</span>
+          </div>
+          <ul className="arrivals">
+            {evening.map((g) => {
+              const r = s.rooms.find((x) => x.id === g.roomId)!;
+              return (
+                <li key={g.code}>
+                  <span className="nm">
+                    {g.name} <span className="muted" style={{ fontWeight: 600 }}>· {g.partySize}p</span>
+                  </span>
+                  <span className="muted" style={{ fontSize: 12 }}>~{fmtTime(g.arrivalTime)}</span>
+                  <span className="sub">
+                    <button className="btn sm" onClick={() => onPick(r.id)}>
+                      Room {r.id}
+                    </button>
+                    {r.status === 'ready' ? (
+                      <span style={{ color: 'var(--green-ink)', fontWeight: 700 }}>Room ready</span>
+                    ) : ai && r.eta ? (
+                      <span className="num" style={{ fontWeight: 700, color: 'var(--ink-2)' }}>{fmtRange(r.eta.low, r.eta.high)}</span>
+                    ) : (
+                      <span className="muted">{STATUS_LABEL[visibleStatus(s, r)]}</span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
     </>
+  );
+}
+
+/** End of the shift record: what the evening team inherits. */
+function ShiftSummary({ s }: { s: SimState }) {
+  const open = s.rooms.filter((r) => ['occupied', 'dirty', 'cleaning', 'inspection'].includes(r.status) || (r.status === 'stayover' && !r.serviced));
+  const ready = s.rooms.filter((r) => r.status === 'ready').length;
+  const done = open.length === 0;
+  return (
+    <section className="card card-pad" aria-label="Shift summary" style={{ borderColor: done ? '#bfe5cf' : '#f2dcd3', background: done ? 'var(--green-soft)' : '#fbf3ef' }}>
+      <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
+        <span className={`pillar-icon ${done ? 'tone-teal' : 'tone-amber'}`}>
+          <Icon name={done ? 'check' : 'alert'} size={16} />
+        </span>
+        <div>
+          <h2>{done ? 'Shift complete — every room finished' : `Shift ends with ${open.length} rooms unfinished`}</h2>
+          <p className="muted" style={{ margin: '3px 0 0', fontSize: 13 }}>
+            {ready} rooms ready · {s.metrics.lobbyWaiting} guests waiting
+            {done ? ' · nothing handed over to the evening shift' : ` · handed to the evening shift: ${open.map((r) => r.id).join(', ')}`}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }

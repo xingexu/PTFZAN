@@ -4,7 +4,8 @@ import type { DeliveryRecord, DeliveryStatus, StageState } from '../../../shared
 import { fmtRange, fmtTime } from '../../../shared/types';
 import { ApiError, getStagePin, setStagePin, stageApi, useEventStream, useToast } from '../api';
 import { chime } from '../components/chime';
-import { Logo } from '../components/Logo';
+import { Icon } from '../components/Icon';
+import { Brand, Logo } from '../components/Logo';
 import { latestFor, PinDialog } from '../components/stageShared';
 
 /** Projector screen for the live "Mike gets a text" moment. Space / → / PageDown = next step, Shift+R = reset. */
@@ -18,7 +19,7 @@ export default function Stage() {
   const pending = useRef<null | (() => Promise<unknown>)>(null);
 
   useEffect(() => {
-    document.title = 'Live demo · ReadyPath';
+    document.title = 'Live text demo · FHN';
   }, []);
 
   const run = useCallback(
@@ -78,22 +79,18 @@ export default function Stage() {
   if (!s) {
     return (
       <div className="stage">
-        <div className="stage-loading">{conn === 'reconnecting' ? 'Reconnecting to ReadyPath…' : 'Loading live demo…'}</div>
+        <div className="stage-loading">{conn === 'reconnecting' ? 'Reconnecting to FHN…' : 'Loading live demo…'}</div>
       </div>
     );
   }
 
-  const nextLabel = s.step === 'booked' ? `Check ${s.name} in → send ETA text` : s.step === 'checked-in' ? `Room ${s.roomId} ready → text ${s.name}` : 'Texts sent — reset to run again';
+  const nextLabel = s.step === 'booked' ? `Check ${s.name} in → send ready-time text` : s.step === 'checked-in' ? `Room ${s.roomId} ready → text ${s.name}` : 'Texts sent — reset to run again';
 
   return (
     <div className="stage">
       <header className="stage-top">
-        <Link to="/" className="brand" aria-label="Back to ReadyPath">
-          <Logo className="brand-mark" />
-          <div>
-            <div className="brand-name">ReadyPath</div>
-            <div className="brand-sub">Live demo</div>
-          </div>
+        <Link to="/" aria-label="Back to FHN Operations">
+          <Brand sub="Live text demo" tone="light" />
         </Link>
         <ProviderBadge s={s} />
         <div className="stage-top-right">
@@ -101,7 +98,9 @@ export default function Stage() {
             <input type="checkbox" checked={s.sendReal} onChange={(e) => run(() => stageApi('send-real', { value: e.target.checked }))} />
             <span>{s.sendReal ? 'Live messages' : 'Rehearsal (no texts)'}</span>
           </label>
-          <button className="iconbtn" onClick={() => setSettings(true)} aria-label="Stage settings">⚙ Setup</button>
+          <button className="tp-btn" onClick={() => setSettings(true)} aria-label="Stage settings">
+            <Icon name="sliders" size={15} /> Setup
+          </button>
         </div>
       </header>
 
@@ -122,13 +121,13 @@ export default function Stage() {
             body={
               s.eta ? (
                 <>
-                  ReadyPath predicts room {s.roomId} ready <b className="mono">{fmtRange(s.eta.low, s.eta.high)}</b>
-                  <span className="pill green" style={{ marginLeft: 8 }}>high confidence</span>
-                  <div className="muted stage-why">Previous guest out · {s.roomType} average 35 min · attendant cleaning now · we promise the late end</div>
-                  <MiniDelivery rec={latestFor(s, 'eta')} label="ETA text" />
+                  FHN AI predicts room {s.roomId} ready <b className="mono">{fmtRange(s.eta.low, s.eta.high)}</b>
+                  <span className="pill green" style={{ marginLeft: 8 }}>very likely</span>
+                  <div className="muted stage-why">Previous guest has left · {s.roomType} rooms take about 35 min · being cleaned now · we promise the later time</div>
+                  <MiniDelivery rec={latestFor(s, 'eta')} label="Ready-time text" />
                 </>
               ) : (
-                <span className="muted">{s.name} checks in from the FHN app he already uses. No new app, no front desk.</span>
+                <span className="muted">{s.name} checks in from the FHN app. No line, no front desk.</span>
               )
             }
           />
@@ -139,9 +138,9 @@ export default function Stage() {
             time={s.readyAt}
             body={
               <div className="row wrap" style={{ gap: 8 }}>
-                <span className={`pill ${s.step === 'ready' ? 'slate' : 'teal'}`}>Cleaning</span>
+                <span className={`pill ${s.step === 'ready' ? 'slate' : 'ai'}`}>Cleaning</span>
                 <span aria-hidden="true">→</span>
-                <span className={`pill ${s.step === 'ready' ? 'teal' : 'slate'}`}>Inspected</span>
+                <span className={`pill ${s.step === 'ready' ? 'ai' : 'slate'}`}>Inspected</span>
                 <span aria-hidden="true">→</span>
                 <span className={`pill ${s.step === 'ready' ? 'green' : 'slate'}`}>Room {s.roomId} ready</span>
                 {s.step === 'ready' && s.eta && s.readyAt !== null && s.readyAt <= s.eta.high && <span className="muted">· on or before the promised time</span>}
@@ -160,11 +159,11 @@ export default function Stage() {
       </main>
 
       <footer className="stage-controls">
-        <button className="btn primary lg stage-go" disabled={busy || s.step === 'ready'} onClick={next}>
+        <button className="btn brass lg stage-go" disabled={busy || s.step === 'ready'} onClick={next}>
           {s.step === 'booked' ? '①' : s.step === 'checked-in' ? '②' : '✓'} {nextLabel}
         </button>
         <button className="btn lg" disabled={busy} onClick={reset}>
-          ↺ Reset
+          <Icon name="reset" size={16} /> Reset
         </button>
         <label className="stage-sound">
           <input type="checkbox" checked={sound} onChange={(e) => setSound(e.target.checked)} /> Chime on this screen
@@ -269,7 +268,7 @@ function PhoneMock({ s }: { s: StageState }) {
         </div>
         <div className="sms-head">
           <div className="sms-avatar" aria-hidden="true">
-            <Logo className="brand-mark" />
+            <Logo className="brand-mark" tone="light" />
           </div>
           <div className="sms-name">FHN Toronto</div>
           <div className="muted" style={{ fontSize: 12 }}>Text Message</div>
@@ -443,7 +442,9 @@ function SettingsDrawer({ s, onClose, run }: { s: StageState; onClose: () => voi
       <aside className="drawer" role="dialog" aria-modal="true" aria-label="Stage setup" onClick={(e) => e.stopPropagation()}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2 style={{ margin: 0 }}>Stage setup</h2>
-          <button className="btn" onClick={onClose} aria-label="Close setup">✕</button>
+          <button className="btn ghost sm" onClick={onClose} aria-label="Close setup">
+            <Icon name="x" size={16} />
+          </button>
         </div>
         <form onSubmit={save} className="grid" style={{ gap: 14, marginTop: 16 }}>
           <div className="field">

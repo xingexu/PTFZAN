@@ -19,7 +19,7 @@ export async function api<T = { ok: boolean; message?: string }>(path: string, b
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError('Cannot reach the ReadyPath server. Check the connection.', 0);
+    throw new ApiError('Cannot reach the FHN server. Check the connection.', 0);
   }
   let data: unknown = null;
   try {
@@ -34,8 +34,26 @@ export async function api<T = { ok: boolean; message?: string }>(path: string, b
   return data as T;
 }
 
+// ───────── Guest app: remember this phone's booking (a per-viewer convenience only) ─────────
+const BOOKING_KEY = 'fhn.booking';
+export const getBooking = () => {
+  try {
+    return localStorage.getItem(BOOKING_KEY) ?? '';
+  } catch {
+    return '';
+  }
+};
+export const setBooking = (code: string | null) => {
+  try {
+    if (code) localStorage.setItem(BOOKING_KEY, code);
+    else localStorage.removeItem(BOOKING_KEY);
+  } catch {
+    /* private mode */
+  }
+};
+
 // ───────── Stage controls (optionally PIN-protected) ─────────
-const PIN_KEY = 'readypath.stagePin';
+const PIN_KEY = 'fhn.stagePin';
 export const getStagePin = () => {
   try {
     return sessionStorage.getItem(PIN_KEY) ?? '';
@@ -120,6 +138,8 @@ export interface Toast {
   title: string;
   body?: string;
   tone?: 'good' | 'bad' | 'neutral';
+  /** Shown in the hotel view when a guest does something in the guest app. */
+  fromGuest?: boolean;
 }
 type ToastFn = (t: Omit<Toast, 'id'>) => void;
 export const ToastContext = createContext<ToastFn>(() => undefined);

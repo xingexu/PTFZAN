@@ -1,7 +1,8 @@
 // Shared domain types used by both the API server and the React client.
 // Times are "simulation minutes since midnight" (e.g. 15:00 → 900).
 
-export type Mode = 'baseline' | 'readypath';
+/** baseline = today's process · ai = FHN AI coordinating every department. */
+export type Mode = 'baseline' | 'ai';
 
 export type RoomType = 'King' | 'Double Queen' | 'Suite';
 
@@ -13,6 +14,13 @@ export type RoomStatus =
   | 'inspection'
   | 'ready' // vacant, clean, inspected
   | 'ooo'; // out of order (maintenance)
+
+/**
+ * Room climate state.
+ * comfort = someone is in the room · running = vacant but still at full HVAC (today's waste)
+ * eco = vacant, set back · precool = returning to comfort ahead of a predicted arrival
+ */
+export type Hvac = 'comfort' | 'running' | 'eco' | 'precool';
 
 export type Confidence = 'high' | 'medium' | 'low';
 
@@ -55,6 +63,7 @@ export interface Room {
   serviced?: boolean;
   /** Baseline: last time an attendant knocked on this (still occupied) room. */
   knockedAt?: number;
+  hvac: Hvac;
 }
 
 export interface Attendant {
@@ -69,6 +78,12 @@ export interface Attendant {
   breakAt: number;
   hadBreak: boolean;
   wastedVisits: number;
+  /** Minutes lost knocking on rooms that were still occupied. */
+  wastedMin: number;
+  /** Pulled off another job at escalation (today's process only). */
+  helper?: boolean;
+  /** On the on-call list: works only if someone books them. */
+  onCall?: boolean;
 }
 
 export type GuestState =
@@ -76,6 +91,8 @@ export type GuestState =
   | 'informed-away' // got a realistic ETA and chose not to queue
   | 'waiting' // standing in the lobby
   | 'checked-in';
+
+export type HousekeepingPref = 'standard' | 'green' | 'dnd';
 
 export interface Guest {
   code: string; // portal code, e.g. "WED512A"
@@ -93,15 +110,24 @@ export interface Guest {
   notifyBrowser: boolean;
   lastEtaSent?: { low: number; high: number };
   isDemoGuest?: boolean;
+  /** Already staying with us (not an arrival) — excluded from arrival metrics. */
+  inHouse?: boolean;
+  /** Demo guests: completed online check-in in the guest app. */
+  onlineCheckIn?: boolean;
   /** Minutes spent standing in the lobby without a room. */
   lobbyMinutes: number;
   /** Informed-away guests come back at this time after the "ready" message. */
   returnAt?: number;
   /** Front desk is busy re-rooming this guest until this time (baseline). */
   heldUntil?: number;
+  housekeeping: HousekeepingPref;
+  /** Preferred room temperature, °C. */
+  setpoint: number;
+  /** Checked-in guest stepped out; expected back around this time (drives eco / pre-conditioning). */
+  awayUntil?: number;
 }
 
-export type NotificationKind = 'eta' | 'eta-update' | 'ready' | 'room-change' | 'info';
+export type NotificationKind = 'eta' | 'eta-update' | 'ready' | 'room-change' | 'info' | 'request';
 
 export interface GuestNotification {
   id: string;
@@ -122,6 +148,26 @@ export interface MaintenanceTicket {
   status: 'open' | 'resolved';
   owner: string;
   impact: string;
+  resolvedAt?: number;
+}
+
+/** A guest's request or problem report, tracked from report to resolution. */
+export interface GuestRequest {
+  id: string;
+  guestCode: string;
+  roomId: string;
+  kind: 'issue' | 'amenity';
+  title: string;
+  openedAt: number;
+  /** Who owns it — shown to the guest so they never have to report twice. */
+  owner: string | null;
+  /** Promised by (null = no promise given, i.e. today's process). */
+  etaAt: number | null;
+  status: 'received' | 'assigned' | 'on-the-way' | 'resolved';
+  resolvedAt?: number;
+  ticketId?: string;
+  /** How many times the guest had to report it. */
+  reports: number;
 }
 
 export interface PlanChange {
@@ -146,9 +192,11 @@ export interface PlanProposal {
 
 export interface LogEntry {
   at: number;
-  dept: 'Housekeeping' | 'Front desk' | 'Maintenance' | 'Duty manager' | 'ReadyPath' | 'Guest';
+  dept: 'Housekeeping' | 'Front desk' | 'Maintenance' | 'Duty manager' | 'FHN AI' | 'Guest';
   text: string;
   tone: 'neutral' | 'warn' | 'bad' | 'good' | 'ai';
+  /** Something a guest did in the guest app — the hotel view surfaces these as they happen. */
+  fromApp?: boolean;
 }
 
 export interface ScenarioEvent {
@@ -159,6 +207,7 @@ export interface ScenarioEvent {
 }
 
 export interface Metrics {
+  // Room readiness & arrivals
   lobbyWaiting: number;
   lobbyPeak: number;
   informedAway: number;
@@ -172,13 +221,70 @@ export interface Metrics {
   notificationsSent: number;
   etaAccuracyPct: number | null; // % of rooms ready by the time promised to the guest
   etaScored: number;
+  /** Wedding party, in persons. */
+  groupWaiting: number;
+  groupAway: number;
+  groupIn: number;
+  groupExpected: number;
+  // Labour
   wastedVisits: number;
+  attendantMinLost: number;
+  /** Staff-minutes pulled off other jobs (supervisor, houseperson) to finish rooms after escalation. */
+  pulledStaffMin: number;
+  // Maintenance
+  ticketsOpen: number;
+  /** Extra times a guest had to report the same problem. */
+  repeatReports: number;
+  /** Minutes from the 411 AC report to the fix (null = not fixed yet). */
+  acFixMin: number | null;
+  // Energy
+  ecoRoomHours: number;
+  kwhSaved: number;
+  /** Vacant rooms still at full heating/cooling right now. */
+  vacantRunning: number;
+  /** Arrivals whose room was brought back to comfort before they walked in. */
+  preconditioned: number;
 }
 
 export interface DeskAgent {
   id: string;
   busyUntil: number;
   task: string;
+}
+
+/** Tomorrow's housekeeping workload, forecast from reservations and room-type clean times (never per person). */
+export interface StaffingForecast {
+  date: string;
+  departures: number;
+  stayovers: number;
+  greenChoice: number;
+  arrivals: number;
+  workloadHours: number;
+  scheduled: number;
+  attendantsNeeded: number;
+  /** Overtime hours if the current schedule is kept. */
+  overtimeHours: number;
+  recommendation: string;
+  blocks: { label: string; attendants: number; load: number }[];
+}
+
+/** A recurring fault found by normalising free-text maintenance spreadsheet rows. */
+export interface MaintenanceInsight {
+  asset: string;
+  location: string;
+  fault: string;
+  occurrences: number;
+  windowDays: number;
+  severity: 'high' | 'medium';
+  recommendation: string;
+  examples: { date: string; raw: string }[];
+}
+
+/** The same day, replayed in the other mode — lets every screen show "today vs with FHN AI". */
+export interface CompareSnapshot {
+  mode: Mode;
+  now: number;
+  metrics: Metrics;
 }
 
 export interface SimState {
@@ -189,6 +295,8 @@ export interface SimState {
   playing: boolean;
   speed: number; // sim minutes per real second
   autoApprove: boolean;
+  /** The 30-second demo is driving playback (speed profile + supervisor approval). */
+  autopilot: boolean;
   elevatorDown: boolean;
   groupConfirmed: boolean;
   rooms: Room[];
@@ -196,17 +304,24 @@ export interface SimState {
   guests: Guest[];
   notifications: GuestNotification[];
   tickets: MaintenanceTicket[];
+  requests: GuestRequest[];
   proposals: PlanProposal[];
   log: LogEntry[];
   events: ScenarioEvent[];
   nextEventIndex: number;
   metrics: Metrics;
+  staffing: StaffingForecast;
+  insights: MaintenanceInsight[];
   /** Baseline front desk only sees what the last phone call told them. */
   frontDeskSnapshotAt: number;
   frontDeskSnapshot: Record<string, RoomStatus>;
   deskAgents: DeskAgent[];
   pausedReason?: string;
   finished: boolean;
+  /** Attached by the server: the shadow run in the other mode. */
+  compare?: CompareSnapshot;
+  /** Attached by the server: guest app sessions open right now. */
+  guestsOnline?: number;
 }
 
 // ───────────────────────── Real guest messaging (SMS / push) ─────────────────────────
@@ -279,11 +394,12 @@ export interface StageState {
   lastCueAt: number | null; // epoch ms
 }
 
-/** Privacy-scoped payload for one guest's portal. */
+/** Privacy-scoped payload for one guest's app — never contains another guest's data. */
 export interface GuestView {
   mode: Mode;
   now: number;
   hotel: string;
+  stay: { arrive: string; depart: string; nights: number; confirmation: string };
   guest: {
     code: string;
     name: string;
@@ -294,10 +410,19 @@ export interface GuestView {
     notifyBrowser: boolean;
     phoneMasked: string;
     isDemoGuest: boolean;
+    /** Completed online check-in (or is otherwise registered). */
+    checkedInOnline: boolean;
+    /** Can tap "Check in online" now. */
+    canCheckIn: boolean;
+    /** Physically in the room (mobile key used). */
+    inRoom: boolean;
+    housekeeping: HousekeepingPref;
   };
   room: { id: string | null; type: RoomType; status: RoomStatus; eta: Eta | null; readyAt: number | null; floor: number };
+  climate: { hvac: Hvac; setpoint: number; awayUntil: number | null };
   elevatorNotice: string | null;
   ticket: { id: string; owner: string; issue: string } | null;
+  requests: GuestRequest[];
   notifications: GuestNotification[];
   /** Real-world delivery status of each notification (by notification id). */
   delivery: Record<string, { status: DeliveryStatus; provider: MessagingProvider; error?: string }>;

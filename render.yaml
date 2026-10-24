@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: fhn-readypath
+    name: fhn-operations
     runtime: node
     plan: free
     buildCommand: npm ci && npm run build

@@ -156,8 +156,8 @@ export class Stage {
       guestCode: STAGE_CODE,
       kind: 'test',
       to: this.phone,
-      title: 'ReadyPath test',
-      body: 'FHN Toronto: Test message - ReadyPath is connected to this phone.',
+      title: 'FHN test',
+      body: 'FHN Toronto: Test message - FHN guest alerts are connected to this phone.',
       clickUrl: origin ? `${origin}/guest/${STAGE_CODE}` : undefined,
       audience: 'stage',
       simulate: !this.sendReal,
@@ -220,9 +220,10 @@ export class Stage {
       if (r.guestCode === STAGE_CODE && r.notificationId && !delivery[r.notificationId]) delivery[r.notificationId] = { status: r.status, provider: r.provider, error: r.error };
     }
     return {
-      mode: 'readypath',
+      mode: 'ai',
       now: this.now(),
       hotel: 'FHN Toronto Downtown',
+      stay: { arrive: 'Today', depart: 'Tomorrow', nights: 1, confirmation: `RS${this.roomId}-MKE` },
       guest: {
         code: STAGE_CODE,
         name: this.name,
@@ -232,20 +233,26 @@ export class Stage {
         notifyBrowser: true,
         phoneMasked: this.phone ? maskPhone(this.phone) : 'This page',
         isDemoGuest: true,
+        checkedInOnline: this.step !== 'booked',
+        canCheckIn: false,
+        inRoom: false,
+        housekeeping: 'standard',
       },
       room: {
-        id: this.roomId,
+        id: this.step === 'booked' ? null : this.roomId,
         type: roomType(this.roomId),
         status: ready ? 'ready' : 'cleaning',
         eta:
           !ready && this.eta
-            ? { low: this.eta.low, high: this.eta.high, confidence: 'high', drivers: ['Previous guest checked out', `${roomType(this.roomId)} average 35 min`, 'Attendant cleaning now'] }
+            ? { low: this.eta.low, high: this.eta.high, confidence: 'high', drivers: ['Previous guest has checked out', `${roomType(this.roomId)} rooms take about 35 min`, 'Being cleaned now'] }
             : null,
         readyAt: this.readyAt,
         floor: Number(this.roomId.slice(0, -2)),
       },
+      climate: { hvac: ready ? 'precool' : 'eco', setpoint: 21, awayUntil: null },
       elevatorNotice: null,
       ticket: null,
+      requests: [],
       notifications: this.messages,
       delivery,
     };

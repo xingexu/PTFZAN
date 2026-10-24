@@ -1,120 +1,229 @@
-import type { Guest, SimState } from '../../../shared/types';
+import type { ReactNode } from 'react';
+import type { Metrics, SimState } from '../../../shared/types';
 import { fmt24 } from '../../../shared/types';
 import { useSim } from '../api';
+import { Icon, type IconName } from '../components/Icon';
 import { JoinQr } from '../components/JoinQr';
+import { sides } from '../components/rooms';
+
+type M = Metrics | null;
 
 export default function Overview() {
   const { state } = useSim();
   if (!state) return null;
-  const m = state.metrics;
-  const rp = state.mode === 'readypath';
+  const { ai, today } = sides(state);
+  const acReported = state.now >= 14 * 60 + 5;
+  const flagged = state.insights.filter((i) => i.severity === 'high').length;
 
   return (
     <main className="page">
-      <div className="page-head">
+      <div className="ov-head">
         <div>
-          <h1>Friday, October 16 · Wedding arrivals</h1>
-          <p>
-            {rp
-              ? 'Same sick call, same late checkouts, same elevator failure, same wedding. This time every department works from one predicted readiness view.'
-              : 'The shift as it happened: each department responds to its own responsibilities, coordinating by phone.'}
-          </p>
+          <h1>Friday, October 16 · Toronto Downtown</h1>
+          <p>The shift record from Exhibit 4, 8:00 AM–5:00 PM · Chen–Okafor wedding, 20 rooms, 40 guests. Each card compares FHN AI with the same day run today&rsquo;s way.</p>
         </div>
-        <span className={`pill ${rp ? 'teal' : 'red'}`} style={{ fontSize: 13, padding: '5px 12px' }}>
-          {rp ? 'With ReadyPath' : 'Today’s process'}
-        </span>
       </div>
 
-      <section className="kpis" aria-label="Key measures">
-        <Kpi label="In the lobby now" value={m.lobbyWaiting} unit="guests" note={`Peak ${m.lobbyPeak} today`} tone={m.lobbyWaiting >= 10 ? 'bad' : undefined} />
-        <Kpi label="Informed & away" value={m.informedAway} unit="guests" note="Have an ETA, not queueing" />
-        <Kpi label="Wedding rooms ready by 3 PM" value={m.groupRoomsReadyBy1500} unit={`/ ${m.groupRoomsTotal}`} note={`${m.groupRoomsNotReady} still in progress`} />
-        <Kpi label="Avg lobby wait" value={m.avgWaitMin} unit="min" note={`Longest ${m.longestWaitMin} min`} tone={m.avgWaitMin >= 15 ? 'bad' : undefined} />
-        <Kpi label="Readiness phone calls" value={m.readinessCalls} note={`${m.wastedVisits} wasted room visits`} tone={m.readinessCalls > 3 ? 'bad' : 'good'} />
-        <Kpi
-          label="ETA promises kept"
-          value={m.etaAccuracyPct === null ? '—' : m.etaAccuracyPct}
-          unit={m.etaAccuracyPct === null ? '' : '%'}
-          note={rp ? `${m.etaScored} rooms scored · ${m.notificationsSent} messages sent` : 'No ETAs are given today'}
-          tone={m.etaAccuracyPct !== null && m.etaAccuracyPct >= 80 ? 'good' : undefined}
+      <section className="pillars" aria-label="The four operational challenges">
+        <Pillar
+          lead
+          icon="bed"
+          tone="ai"
+          title="Room readiness"
+          sub="Housekeeping ↔ front desk"
+          rows={[
+            row('Wedding guests waiting in the lobby', ai, today, (m) => m.groupWaiting, { lowerIsBetter: true }),
+            row('Wedding rooms ready by 3 PM', ai, today, (m) => m.groupRoomsReadyBy1500, { unit: '/20' }),
+          ]}
+          note={`Ready-time promises kept: ${ai?.etaAccuracyPct ?? '—'}${ai?.etaAccuracyPct != null ? '%' : ''} · ${ai?.notificationsSent ?? 0} messages to guests`}
+        />
+        <Pillar
+          icon="users"
+          tone="violet"
+          title="Labour"
+          sub="Same staff, no wasted trips"
+          rows={[
+            row('Time lost knocking on occupied rooms', ai, today, (m) => m.attendantMinLost, { unit: 'min', lowerIsBetter: true }),
+            row('Staff pulled off other jobs', ai, today, (m) => m.pulledStaffMin, { unit: 'min', lowerIsBetter: true }),
+          ]}
+          note="Sick call: backup attendant booked at 8:00 from the forecast, not found out at 3:45"
+        />
+        <Pillar
+          icon="wrench"
+          tone="amber"
+          title="Maintenance"
+          sub="One report, one owner"
+          rows={[
+            row('Suite 411 AC fixed in', ai, today, (m) => (acReported ? m.acFixMin : null), { unit: 'min', lowerIsBetter: true, none: acReported ? 'open' : '—' }),
+            row('Times the guest had to report it', ai, today, (m) => (acReported ? 1 + m.repeatReports : null), { lowerIsBetter: true, none: '—' }),
+          ]}
+          note={`${flagged} repeat problems spotted in old repair notes`}
+        />
+        <Pillar
+          icon="leaf"
+          tone="teal"
+          title="Energy"
+          sub="Empty rooms save energy"
+          rows={[
+            row('Energy saved in empty rooms', ai, today, (m) => m.kwhSaved, { unit: 'kWh' }),
+            row('Empty rooms with heat/AC on full', ai, today, (m) => m.vacantRunning, { lowerIsBetter: true }),
+          ]}
+          note={`${ai?.preconditioned ?? 0} guests walked into a room already at the right temperature`}
         />
       </section>
 
-      <div className="grid overview" style={{ marginTop: 16 }}>
-        <div className="grid">
-          <Lobby state={state} />
+      <div className="ov-main">
+        <Lobbies ai={ai} today={today} />
+        <div className="side-col">
           <JoinQr />
+          <ShiftLog state={state} />
         </div>
-        <section className="card" aria-label="Shift log">
-          <div className="card-head">
-            <h2>Shift log</h2>
-            <span className="muted" style={{ fontSize: 13 }}>Newest first</span>
-          </div>
-          <ul className="log">
-            {state.log.map((l, i) => (
-              <li key={`${l.at}-${i}-${l.text.length}`} className={l.tone}>
-                <span className="t">{fmt24(l.at)}</span>
-                <span>
-                  <span className="dept">{l.dept}</span>
-                  {l.text}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
       </div>
     </main>
   );
 }
 
-function Kpi({ label, value, unit, note, tone }: { label: string; value: number | string; unit?: string; note?: string; tone?: 'good' | 'bad' }) {
+interface Row {
+  label: string;
+  ai: ReactNode;
+  today: ReactNode;
+  worse: boolean;
+}
+
+function row(
+  label: string,
+  ai: M,
+  today: M,
+  get: (m: Metrics) => number | null,
+  opts: { unit?: string; lowerIsBetter?: boolean; zero?: string; none?: string } = {},
+): Row {
+  // "/20" hugs the number; "min" and "kWh" get a space.
+  const suffix = !opts.unit ? '' : opts.unit.startsWith('/') ? opts.unit : ` ${opts.unit}`;
+  const show = (m: M, big: boolean): ReactNode => {
+    if (!m) return '—';
+    const v = get(m);
+    if (v === null) return opts.none ?? '—';
+    if (v === 0 && opts.zero) return opts.zero;
+    if (!big) return `${v}${suffix}`;
+    return (
+      <>
+        {v}
+        {opts.unit && <small>{opts.unit}</small>}
+      </>
+    );
+  };
+  const a = ai ? get(ai) : null;
+  const b = today ? get(today) : null;
+  const worse = a !== null && b !== null && (opts.lowerIsBetter ? b > a : b < a);
+  return { label, ai: show(ai, true), today: show(today, false), worse };
+}
+
+function Pillar({ icon, tone, title, sub, rows, note, lead }: { icon: IconName; tone: string; title: string; sub: string; rows: Row[]; note: string; lead?: boolean }) {
   return (
-    <div className={`card kpi ${tone ?? ''}`}>
-      <div className="label">{label}</div>
-      <div className="value">
-        {value}
-        {unit && <small>{unit}</small>}
+    <article className={`card pillar ${lead ? 'lead' : ''}`}>
+      <div className="pillar-top">
+        <span className={`pillar-icon tone-${tone}`}>
+          <Icon name={icon} size={17} />
+        </span>
+        <span className="pillar-title">
+          {title}
+          <small>{sub}</small>
+        </span>
+        {lead && <span className="pill ai lead-tag">Priority</span>}
       </div>
-      {note && <div className="note">{note}</div>}
-    </div>
+      {rows.map((r) => (
+        <div className="pm" key={r.label}>
+          <span className="pm-label">{r.label}</span>
+          <span className="pm-ai">{r.ai}</span>
+          <span className="pm-today">Today {r.worse ? <b>{r.today}</b> : r.today}</span>
+        </div>
+      ))}
+      <div className="pillar-note">
+        <Icon name="sparkles" size={13} />
+        <span>{note}</span>
+      </div>
+    </article>
   );
 }
 
-function Lobby({ state }: { state: SimState }) {
-  const real = state.guests.filter((g) => !g.isDemoGuest && g.group);
-  const people = (f: (g: Guest) => boolean) => real.filter(f).flatMap((g) => Array.from({ length: g.partySize }, (_, i) => `${g.code}-${i}`));
-  const waiting = people((g) => g.state === 'waiting');
-  const away = people((g) => g.state === 'informed-away');
-  const inRoom = people((g) => g.state === 'checked-in');
-  const expected = people((g) => g.state === 'expected');
-
+function Lobbies({ ai, today }: { ai: M; today: M }) {
   return (
-    <section className="card lobby" aria-label="Wedding party status">
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h2>Wedding party · 40 guests</h2>
-        <span className="muted" style={{ fontSize: 13 }}>{expected.length} not yet arrived</span>
+    <section className="card" aria-label="Wedding party, side by side">
+      <div className="card-head">
+        <div className="title">
+          <Icon name="users" size={16} />
+          <h2>Wedding party · 40 guests</h2>
+        </div>
+        <span className="sub">Same arrivals, two ways of running the day</span>
       </div>
-      <div className="lobby-zones">
-        <Zone title="Waiting in lobby" ids={waiting} cls="waiting" />
-        <Zone title="Informed, not queueing" ids={away} cls="away" />
-        <Zone title="In their rooms" ids={inRoom} cls="in" />
+      <div className="lobbies">
+        <LobbyPanel title="Today’s way" pill={<span className="pill red">Phone calls</span>} m={today} />
+        <LobbyPanel title="With FHN AI" pill={<span className="pill ai">Live ready times</span>} m={ai} />
+      </div>
+      <div className="lobby-foot">
+        <span>
+          <span className="dot" style={{ background: 'var(--red)' }} /> Waiting in the lobby, no answer
+        </span>
+        <span>
+          <span className="dot" style={{ background: 'var(--violet)' }} /> Knows when their room will be ready, out for lunch
+        </span>
+        <span>
+          <span className="dot" style={{ background: 'var(--green)' }} /> In their room
+        </span>
       </div>
     </section>
   );
 }
 
-function Zone({ title, ids, cls }: { title: string; ids: string[]; cls: string }) {
+function LobbyPanel({ title, pill, m }: { title: string; pill: ReactNode; m: M }) {
   return (
-    <div className="zone">
-      <h4>
+    <div className="lobby-panel">
+      <h3>
         <span>{title}</span>
-        <span className="mono">{ids.length}</span>
-      </h4>
-      <div className="people" aria-hidden="true">
-        {ids.map((id) => (
-          <span key={id} className={`person ${cls}`} />
-        ))}
+        {pill}
+      </h3>
+      <Zone label="Waiting in lobby" n={m?.groupWaiting ?? 0} cls="waiting" />
+      <Zone label="Out, has a time" n={m?.groupAway ?? 0} cls="away" />
+      <Zone label="In their rooms" n={m?.groupIn ?? 0} cls="in" />
+      <div className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
+        {m && m.groupExpected > 0 ? `${m.groupExpected} not arrived yet` : m ? `Avg lobby wait ${m.avgWaitMin} min · longest ${m.longestWaitMin} min` : ''}
       </div>
     </div>
+  );
+}
+
+function Zone({ label, n, cls }: { label: string; n: number; cls: string }) {
+  return (
+    <div className="lzone">
+      <span className="lzone-label">{label}</span>
+      <span className="people" aria-hidden="true">
+        {Array.from({ length: n }, (_, i) => (
+          <span key={i} className={`person ${cls}`} />
+        ))}
+      </span>
+      <span className="lzone-n">{n}</span>
+    </div>
+  );
+}
+
+function ShiftLog({ state }: { state: SimState }) {
+  return (
+    <section className="card" aria-label="Shift log">
+      <div className="card-head">
+        <h2>Shift log</h2>
+        <span className="sub">{state.mode === 'ai' ? 'With FHN AI' : 'Today’s way'} · newest first</span>
+      </div>
+      <ul className="log">
+        {state.log.map((l) => (
+          <li key={`${l.at}-${l.dept}-${l.text}`} className={l.tone}>
+            <span className="t">{fmt24(l.at)}</span>
+            <span>
+              <span className="dept">{l.dept}</span>
+              {l.text}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

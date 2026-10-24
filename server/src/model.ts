@@ -1,10 +1,11 @@
-// ReadyPath "AI" core: readiness prediction + constraint-aware re-sequencing.
+// FHN AI core: readiness prediction + constraint-aware re-sequencing, plus the two models that reuse
+// the same room-level data — tomorrow's staffing forecast and recurring-fault detection.
 //
 // Prototype note: the predictor uses learned room-type averages plus queue simulation and an
 // uncertainty band that widens with queue depth. In a pilot the averages become a gradient-boosted
 // model trained on 60–90 days of room-level (never person-level) clean durations.
-import type { Attendant, Confidence, Eta, PlanChange, Room, SimState } from '../../shared/types.js';
-import { ELEVATOR_PENALTY, HIST_AVG, INSPECTION_MIN, STAYOVER_MIN } from './seed.js';
+import type { Attendant, Confidence, Eta, Guest, MaintenanceInsight, PlanChange, Room, SimState, StaffingForecast } from '../../shared/types.js';
+import { ELEVATOR_PENALTY, HIST_AVG, INSPECTION_MIN, STAYOVER_MIN, TOMORROW } from './seed.js';
 
 export const needsWork = (r: Room) =>
   r.status === 'occupied' || r.status === 'dirty' || (r.status === 'stayover' && !r.serviced);
@@ -31,11 +32,14 @@ export function needBy(r: Room, s: Pick<SimState, 'guests' | 'groupConfirmed'>):
   if (!g) return 20 * 60;
   // Plan to the 3:00 PM check-in promise for every arrival, not to arrival guesses.
   // Group blocks carry more risk (simultaneous arrivals), so they lead once confirmed.
-  if (g.group) return s.groupConfirmed ? 15 * 60 - 30 : 15 * 60 + 12;
-  return 15 * 60 + Math.max(0, Math.round((g.expectedArrival - 15 * 60) / 10));
+  const base = g.group ? (s.groupConfirmed ? 15 * 60 - 30 : 15 * 60 + 12) : 15 * 60 + Math.max(0, Math.round((g.expectedArrival - 15 * 60) / 10));
+  // A time already promised to a guest becomes a deadline, so re-plans never quietly break it.
+  return r.promisedBy !== undefined ? Math.min(base, r.promisedBy - 15) : base;
 }
 
 const travel = (from: number, to: number) => (from === to ? 1 : 4);
+/** A room that would start this close to a due break is assumed to wait for it (an overrun makes that likely). */
+const BREAK_SLACK = 20;
 const elevator = (r: Room, down: boolean) => (down && r.floor >= 5 ? ELEVATOR_PENALTY : 0);
 
 interface Cursor {
@@ -60,10 +64,10 @@ function startCursor(a: Attendant, rooms: Map<string, Room>, now: number): Curso
 }
 
 function band(position: number, r: Room, elevatorDown: boolean): number {
-  return Math.round(4 + 3 * Math.sqrt(position) + (elevatorDown && r.floor >= 5 ? 3 : 0) + (r.status === 'occupied' && !r.lateReported ? 4 : 0));
+  return Math.round(6 + 4 * Math.sqrt(position) + (elevatorDown && r.floor >= 5 ? 3 : 0) + (r.status === 'occupied' && !r.lateReported ? 4 : 0));
 }
 
-const confidenceOf = (half: number): Confidence => (half <= 8 ? 'high' : half <= 13 ? 'medium' : 'low');
+const confidenceOf = (half: number): Confidence => (half <= 10 ? 'high' : half <= 16 ? 'medium' : 'low');
 
 /** Predict ready-time ranges for every room given a set of attendant queues. */
 export function predictEtas(s: SimState, queues?: Record<string, string[]>): Map<string, Eta> {
@@ -73,7 +77,7 @@ export function predictEtas(s: SimState, queues?: Record<string, string[]>): Map
 
   for (const r of s.rooms) {
     if (r.status === 'inspection' && r.workEndsAt !== undefined) {
-      out.set(r.id, { low: Math.max(now, r.workEndsAt - 1), high: r.workEndsAt + 2, confidence: 'high', drivers: ['Clean finished — in inspection'] });
+      out.set(r.id, { low: Math.max(now, r.workEndsAt - 1), high: r.workEndsAt + 2, confidence: 'high', drivers: ['Cleaned — final check under way'] });
     } else if (r.status === 'cleaning' && r.workStartedAt !== undefined) {
       const end =
         Math.max(now + 2, r.workStartedAt + predictedDuration(r) + 2) + (r.serviceKind === 'stayover' ? 0 : INSPECTION_MIN);
@@ -81,7 +85,7 @@ export function predictEtas(s: SimState, queues?: Record<string, string[]>): Map
         low: end - 4,
         high: end + 5,
         confidence: 'high',
-        drivers: [`Cleaning now (${r.type} avg ${HIST_AVG[r.type]} min)`, ...(elevator(r, s.elevatorDown) ? ['Elevator B outage adds cart time'] : [])],
+        drivers: [`Being cleaned now (${r.type} rooms take about ${HIST_AVG[r.type]} min)`, ...(elevator(r, s.elevatorDown) ? ['Elevator B is out — carts take longer'] : [])],
       });
     }
   }
@@ -96,7 +100,7 @@ export function predictEtas(s: SimState, queues?: Record<string, string[]>): Map
       if (!r || !needsWork(r) || r.status === 'ooo') continue;
       pos++;
       let start = Math.max(c.t, knownAvailableAt(r, now));
-      if (!c.hadBreak && start >= c.breakAt) {
+      if (!c.hadBreak && start >= c.breakAt - BREAK_SLACK) {
         start = Math.max(start, c.breakAt) + 30;
         c.hadBreak = true;
       }
@@ -107,17 +111,18 @@ export function predictEtas(s: SimState, queues?: Record<string, string[]>): Map
       const half = band(pos, r, s.elevatorDown);
       const drivers: string[] = [];
       if (r.status === 'occupied') drivers.push(r.lateReported ? `Late checkout reported (${fmt(r.actualCheckout!)})` : `Guest checks out by ${fmt(r.scheduledCheckout!)}`);
-      if (r.status === 'dirty') drivers.push('Vacant — waiting in queue');
-      drivers.push(`#${pos} in ${a.label}'s queue`);
-      drivers.push(`${r.type} average ${predictedDuration(r)} min`);
-      if (elevator(r, s.elevatorDown)) drivers.push('Elevator B outage adds cart time');
+      if (r.status === 'dirty') drivers.push('Empty — waiting its turn');
+      drivers.push(`${ordinal(pos)} on ${a.label}'s list`);
+      drivers.push(`${r.type} rooms take about ${predictedDuration(r)} min`);
+      if (elevator(r, s.elevatorDown)) drivers.push('Elevator B is out — carts take longer');
       out.set(r.id, { low: ready - half, high: ready + half, confidence: confidenceOf(half), drivers });
     }
   }
   return out;
 }
 
-const fmt = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+const fmt = (m: number) => `${((Math.floor(m / 60) + 11) % 12) + 1}:${String(m % 60).padStart(2, '0')}`;
+const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
 /**
  * Constraint-aware list scheduling: the attendant who frees up first takes the room with the best
@@ -151,7 +156,7 @@ export function planQueues(s: SimState): Record<string, string[]> {
     });
     const r = remaining.splice(bestIdx, 1)[0];
     let start = Math.max(c.t, knownAvailableAt(r, s.now));
-    if (!c.hadBreak && start >= c.breakAt) {
+    if (!c.hadBreak && start >= c.breakAt - BREAK_SLACK) {
       start = Math.max(start, c.breakAt) + 30;
       c.hadBreak = true;
     }
@@ -185,13 +190,13 @@ export function diffPlans(s: SimState, proposed: Record<string, string[]>, trigg
     const moved = !o || o.att !== n.att || Math.abs(o.idx - n.idx) >= 2;
     if (!moved) continue;
     const r = s.rooms.find((x) => x.id === id)!;
-    let reason = 'Rebalanced so the queue finishes sooner';
+    let reason = 'Evened out so everyone finishes sooner';
     if (r.groupBlock && s.groupConfirmed && (!o || n.idx < o.idx || o.att !== n.att)) reason = 'Wedding party now arrives 3:00 PM';
-    else if (r.lateReported && r.status === 'occupied') reason = 'Late checkout — moved behind available rooms';
-    else if (o && !s.attendants.find((a) => a.id === o.att)?.present) reason = `Covering for absent ${label(o.att)}`;
-    else if (s.elevatorDown && r.floor >= 5) reason = `Batched on floor ${r.floor} to save elevator trips`;
-    else if (r.status === 'dirty') reason = 'Vacant now — can start immediately';
-    else if (r.status === 'stayover') reason = 'Stayover service moved after arrival rooms';
+    else if (r.lateReported && r.status === 'occupied') reason = 'Late checkout — empty rooms first';
+    else if (o && !s.attendants.find((a) => a.id === o.att)?.present) reason = `Covering for ${label(o.att)} (off sick)`;
+    else if (s.elevatorDown && r.floor >= 5) reason = `Grouped on floor ${r.floor} to save elevator trips`;
+    else if (r.status === 'dirty') reason = 'Empty now — can start right away';
+    else if (r.status === 'stayover') reason = 'Staying guest’s tidy-up moved after arrival rooms';
     changes.push({
       roomId: id,
       from: o ? `${label(o.att)} · #${o.idx}` : 'Unassigned',
@@ -202,4 +207,120 @@ export function diffPlans(s: SimState, proposed: Record<string, string[]>, trigg
   }
   void trigger;
   return changes.sort((a, b) => b.weight - a.weight).map(({ weight: _w, ...c }) => c);
+}
+
+// ───────────────────────── Labour: tomorrow's staffing forecast ─────────────────────────
+
+/** Productive cleaning hours per attendant shift (8 h minus briefing, breaks and cart travel). */
+const PRODUCTIVE_HOURS = 6.5;
+/** Full clean + inspection, weighted by the room mix (6 King · 4 Double Queen · 2 Suite per floor). */
+const AVG_FULL_CLEAN = (6 * HIST_AVG.King + 4 * HIST_AVG['Double Queen'] + 2 * HIST_AVG.Suite) / 12 + INSPECTION_MIN;
+/** Share of a block's hours an attendant spends cleaning (the rest is carts, travel, linen runs). */
+const ON_FLOOR = 0.82;
+
+/**
+ * Workload = departures × full clean + stayovers × light service (minus guests who chose to skip it),
+ * converted to attendants per block. Built only from reservations and room-type averages.
+ */
+export function forecastStaffing(guests: Guest[]): StaffingForecast {
+  const greenChoice = guests.filter((g) => g.housekeeping !== 'standard' && !g.inHouse).length;
+  const stayovers = Math.max(0, TOMORROW.stayovers - greenChoice);
+  const minutes = TOMORROW.departures * AVG_FULL_CLEAN + stayovers * STAYOVER_MIN;
+  const workloadHours = Math.round((minutes / 60) * 10) / 10;
+  const attendantsNeeded = Math.ceil(workloadHours / PRODUCTIVE_HOURS);
+  const overtimeHours = Math.max(0, Math.round((workloadHours - TOMORROW.scheduled * PRODUCTIVE_HOURS) * 10) / 10);
+  // Departures follow the checkout curve; stayovers are serviced while guests are out.
+  const blocks = TOMORROW.blocks.map((b) => {
+    const load = (TOMORROW.departures * AVG_FULL_CLEAN * b.departShare + stayovers * STAYOVER_MIN * b.stayShare) / 60;
+    return { label: b.label, load: Math.round(load * 10) / 10, attendants: Math.max(1, Math.ceil(load / (b.hours * ON_FLOOR))) };
+  });
+  const peak = blocks.reduce((a, b) => (b.load > a.load ? b : a));
+  const recommendation =
+    overtimeHours > 0
+      ? `Add one extra attendant ${peak.label} instead of ${overtimeHours} h of overtime.`
+      : greenChoice > 0
+        ? `Schedule fits. ${greenChoice} guest${greenChoice === 1 ? '' : 's'} skipping cleaning freed ${Math.round((greenChoice * STAYOVER_MIN) / 6) / 10} h.`
+        : 'Current schedule fits the forecast.';
+  return {
+    date: TOMORROW.date,
+    departures: TOMORROW.departures,
+    stayovers,
+    greenChoice,
+    arrivals: TOMORROW.arrivals,
+    workloadHours,
+    scheduled: TOMORROW.scheduled,
+    attendantsNeeded,
+    overtimeHours,
+    recommendation,
+    blocks,
+  };
+}
+
+// ───────────────────────── Maintenance: recurring faults from messy records ─────────────────────────
+
+interface Normalised {
+  date: string;
+  raw: string;
+  asset: string;
+  location: string;
+  fault: string;
+}
+
+const ASSETS: { re: RegExp; asset: string }[] = [
+  // Most specific first: "ice machine leaking" is an ice machine, not plumbing.
+  { re: /\belev(ator)?[\s-]*b\b/i, asset: 'Elevator B' },
+  { re: /\bice machine\b/i, asset: 'Ice machine' },
+  { re: /\bdoor closer\b/i, asset: 'Door closer' },
+  { re: /\b(ptac|a\/?c|hvac|heat|thermostat)\b/i, asset: 'Room heating/cooling' },
+  { re: /\b(drain|shower|bathtub|toilet|leak)/i, asset: 'Plumbing' },
+  { re: /\btv\b/i, asset: 'TV' },
+];
+const FAULTS: { re: RegExp; fault: string }[] = [
+  { re: /not cold|no cooling|warm|fan only/i, fault: 'not cooling' },
+  { re: /heat not working/i, fault: 'no heat' },
+  { re: /door/i, fault: 'door fault' },
+  { re: /drain/i, fault: 'slow drain' },
+  { re: /leak/i, fault: 'leak' },
+  { re: /signal/i, fault: 'no signal' },
+];
+
+/** Turns one free-text row into a structured record (asset · location · fault). */
+export function normaliseRow(row: { date: string; raw: string }): Normalised {
+  const asset = ASSETS.find((a) => a.re.test(row.raw))?.asset ?? 'Other';
+  const fault = FAULTS.find((f) => f.re.test(row.raw))?.fault ?? 'other';
+  const room = row.raw.match(/\b([3-6]\d{2})\b/)?.[1];
+  const floor = row.raw.match(/\bfl(?:oor)?\.?\s*(\d)\b/i)?.[1];
+  const location = asset === 'Elevator B' ? 'Elevator B' : room ? `Room ${room}` : floor ? `Floor ${floor}` : 'Public area';
+  return { ...row, asset, location, fault };
+}
+
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+
+/** Groups normalised rows by asset + location + fault and flags repeats inside the window. */
+export function findRecurringFaults(rows: { date: string; raw: string }[], asOf: string, windowDays = 60): MaintenanceInsight[] {
+  const groups = new Map<string, Normalised[]>();
+  for (const n of rows.map(normaliseRow)) {
+    if (daysBetween(n.date, asOf) > windowDays) continue;
+    const key = `${n.asset}|${n.location}|${n.fault}`;
+    groups.set(key, [...(groups.get(key) ?? []), n]);
+  }
+  const out: MaintenanceInsight[] = [];
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    const { asset, location, fault } = list[0];
+    const high = list.length >= 3;
+    out.push({
+      asset,
+      location,
+      fault,
+      occurrences: list.length,
+      windowDays,
+      severity: high ? 'high' : 'medium',
+      recommendation: high
+        ? `Plan a repair this week — an emergency call-out costs about 3× a planned one.`
+        : 'Watch: one more report triggers a planned repair.',
+      examples: list.map(({ date, raw }) => ({ date, raw })),
+    });
+  }
+  return out.sort((a, b) => b.occurrences - a.occurrences);
 }

@@ -14,7 +14,7 @@ export default function StageRemote() {
   const pending = useRef<null | (() => Promise<unknown>)>(null);
 
   useEffect(() => {
-    document.title = 'Stage remote · ReadyPath';
+    document.title = 'Stage remote · FHN';
   }, []);
 
   const run = useCallback(
@@ -45,12 +45,12 @@ export default function StageRemote() {
 
   const rec = latestFor(s, 'ready') ?? latestFor(s, 'eta');
   const label = s.step === 'booked' ? `Check ${s.name} in` : s.step === 'checked-in' ? `Room ${s.roomId} ready` : 'Done';
-  const sub = s.step === 'booked' ? 'Sends the ETA text' : s.step === 'checked-in' ? `Sends the “room ready” text to ${s.name}` : 'Reset to run again';
+  const sub = s.step === 'booked' ? 'Sends the ready-time text' : s.step === 'checked-in' ? `Sends the “room ready” text to ${s.name}` : 'Reset to run again';
 
   return (
     <div className="remote">
       <header className="remote-top">
-        <Logo className="brand-mark" />
+        <Logo className="brand-mark" tone="light" />
         <div>
           <div style={{ fontWeight: 800 }}>Stage remote</div>
           <div className="muted" style={{ fontSize: 12 }}>
@@ -79,7 +79,7 @@ export default function StageRemote() {
       <div className="remote-status" aria-live="polite">
         {rec ? (
           <>
-            <b>{rec.kind === 'ready' ? 'Ready text' : 'ETA text'}:</b>{' '}
+            <b>{rec.kind === 'ready' ? 'Room-ready text' : 'Ready-time text'}:</b>{' '}
             <span className={rec.status === 'failed' || rec.status === 'undelivered' ? 'bad' : ''}>{rec.status}</span>
             {rec.latencyMs !== undefined && <span className="muted"> · {(rec.latencyMs / 1000).toFixed(1)}s</span>}
             {rec.error && <div className="bad" style={{ fontSize: 13 }}>{rec.error}</div>}
@@ -92,7 +92,7 @@ export default function StageRemote() {
       </div>
 
       <button className="btn block" disabled={busy} onClick={() => run(() => stageApi('reset'))}>
-        ↺ Reset scene
+        Reset scene
       </button>
 
       {needPin && (

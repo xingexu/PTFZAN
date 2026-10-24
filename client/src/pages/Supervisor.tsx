@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import type { PlanProposal, SimState } from '../../../shared/types';
+import type { PlanProposal, SimState, StaffingForecast } from '../../../shared/types';
 import { fmtTime } from '../../../shared/types';
 import { api, useSim, useToast } from '../api';
+import { Icon } from '../components/Icon';
+
+const DECIDED: Record<PlanProposal['status'], string> = { pending: 'Waiting', approved: 'Approved', 'auto-applied': 'Automatic', dismissed: 'Kept old plan' };
 
 export default function Supervisor() {
   const { state } = useSim();
   if (!state) return null;
-  const rp = state.mode === 'readypath';
+  const ai = state.mode === 'ai';
   const pending = state.proposals.find((p) => p.status === 'pending');
-  const history = state.proposals.filter((p) => p.status !== 'pending' && p.trigger !== 'Routine refresh').slice(0, 12);
+  const history = state.proposals.filter((p) => p.status !== 'pending' && p.trigger !== 'Regular update').slice(0, 12);
 
   return (
     <main className="page">
@@ -16,21 +19,21 @@ export default function Supervisor() {
         <div>
           <h1>Housekeeping supervisor</h1>
           <p>
-            {rp
-              ? 'ReadyPath proposes; you decide. Routine changes apply automatically. Changes that affect guest promises wait for your approval.'
-              : 'Today: the supervisor rebuilds assignments by hand and relays changes by phone or in person.'}
+            {ai
+              ? 'FHN AI suggests; you decide. Small changes happen automatically. Anything that changes what guests were told waits for you.'
+              : 'Today: the supervisor rewrites the lists by hand and passes changes on by phone or in person.'}
           </p>
         </div>
-        {rp && <AutoApprove s={state} />}
+        {ai && <AutoApprove s={state} />}
       </div>
 
       <div className="grid sup">
         <div className="grid">
-          {rp && (pending ? <ProposalCard p={pending} s={state} /> : <NoPending s={state} />)}
+          {ai && (pending ? <ProposalCard p={pending} s={state} /> : <NoPending s={state} />)}
           <section className="card" aria-label="Attendant queues">
             <div className="card-head">
-              <h2>Attendant queues</h2>
-              <span className="muted" style={{ fontSize: 13 }}>Room-level only · no individual speed tracking</span>
+              <h2>Attendant lists</h2>
+              <span className="sub">Tracks rooms, never people</span>
             </div>
             <div className="queues">
               {state.attendants.map((a) => {
@@ -39,24 +42,32 @@ export default function Supervisor() {
                   <div key={a.id} className={`queue ${a.present ? '' : 'absent'}`}>
                     <h4>
                       {a.label}
-                      {!a.present ? <span className="pill red">Absent</span> : <span className="mono muted" style={{ fontSize: 12 }}>{items.length} rooms</span>}
+                      {a.present ? (
+                        <span className="pill slate">{items.length} rooms</span>
+                      ) : a.onCall ? (
+                        <span className="pill violet">On call</span>
+                      ) : a.helper ? (
+                        <span className="pill slate">Back to own job</span>
+                      ) : (
+                        <span className="pill red">Absent</span>
+                      )}
                     </h4>
                     <div className="act">{a.activity}</div>
                     {items.slice(0, 9).map((id, i) => {
                       const r = state.rooms.find((x) => x.id === id)!;
                       return (
                         <div key={id} className={`qitem ${i === 0 && a.currentRoom ? 'now' : ''}`}>
-                          <span>
-                            {id} {r.groupBlock && <span className="dot" style={{ background: 'var(--violet)', marginLeft: 3 }} />}
+                          <span className="row" style={{ gap: 5 }}>
+                            {id} {r.groupBlock && <span className="dot" style={{ background: 'var(--violet)' }} />}
                           </span>
-                          <span className="muted" style={{ fontSize: 12 }}>
-                            {i === 0 && a.currentRoom ? 'now' : r.status === 'occupied' ? 'guest in' : r.status === 'stayover' ? 'stayover' : r.type === 'Double Queen' ? 'DQ' : r.type}
+                          <span className="muted" style={{ fontSize: 11.5 }}>
+                            {i === 0 && a.currentRoom ? 'now' : r.status === 'occupied' ? 'guest in' : r.status === 'stayover' ? 'staying' : r.type === 'Double Queen' ? 'Double' : r.type}
                           </span>
                         </div>
                       );
                     })}
                     {items.length > 9 && <div className="muted" style={{ fontSize: 12 }}>+{items.length - 9} more</div>}
-                    {a.present && items.length === 0 && <div className="muted" style={{ fontSize: 13 }}>Nothing assigned</div>}
+                    {a.present && items.length === 0 && <div className="muted" style={{ fontSize: 12.5 }}>Nothing assigned</div>}
                   </div>
                 );
               })}
@@ -65,32 +76,8 @@ export default function Supervisor() {
         </div>
 
         <aside className="side">
-          <section className="card" aria-label="Maintenance tickets">
-            <div className="card-head">
-              <h2>Maintenance</h2>
-              <span className="mono muted">{state.tickets.filter((t) => t.status === 'open').length} open</span>
-            </div>
-            {state.tickets.length === 0 ? (
-              <div className="empty">No open tickets.</div>
-            ) : (
-              <ul className="history">
-                {state.tickets.map((t) => (
-                  <li key={t.id}>
-                    <div className="row" style={{ justifyContent: 'space-between' }}>
-                      <b>{t.id} · {t.asset}</b>
-                      <span className="pill red">{t.status}</span>
-                    </div>
-                    <div>{t.issue}</div>
-                    <div className="muted" style={{ fontSize: 12.5 }}>
-                      Opened {fmtTime(t.openedAt)} · {t.owner}
-                      {rp ? ` · ${t.impact}` : ''}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-          {rp && (
+          <StaffingCard f={state.staffing} ai={ai} />
+          {ai && (
             <section className="card" aria-label="Decision history">
               <div className="card-head">
                 <h2>Decision history</h2>
@@ -103,9 +90,9 @@ export default function Supervisor() {
                     <li key={p.id}>
                       <div className="row" style={{ justifyContent: 'space-between' }}>
                         <b>{p.trigger}</b>
-                        <span className={`pill ${p.status === 'approved' ? 'green' : p.status === 'dismissed' ? 'slate' : 'teal'}`}>{p.status}</span>
+                        <span className={`pill ${p.status === 'approved' ? 'green' : p.status === 'dismissed' ? 'slate' : 'ai'}`}>{DECIDED[p.status]}</span>
                       </div>
-                      <div className="muted" style={{ fontSize: 12.5 }}>
+                      <div className="muted" style={{ fontSize: 12 }}>
                         {fmtTime(p.createdAt)} · {p.changes.length} rooms · {p.impact}
                       </div>
                     </li>
@@ -120,16 +107,75 @@ export default function Supervisor() {
   );
 }
 
+/** Labour: tomorrow's workload from reservations — staffed in advance instead of patched with overtime. */
+function StaffingCard({ f, ai }: { f: StaffingForecast; ai: boolean }) {
+  const max = Math.max(...f.blocks.map((b) => b.attendants), f.scheduled) + 1;
+  return (
+    <section className="card" aria-label="Tomorrow's staffing forecast">
+      <div className="card-head">
+        <div className="title">
+          <Icon name="calendar" size={16} />
+          <h2>Tomorrow · {f.date}</h2>
+        </div>
+        <span className="ai-chip">
+          <Icon name="sparkles" size={12} /> Forecast
+        </span>
+      </div>
+      <div className="card-pad">
+        <div className="forecast-stats">
+          <div className="fstat">
+            <b>{f.workloadHours} h</b>
+            <span>hours of cleaning</span>
+          </div>
+          <div className="fstat">
+            <b>{f.departures}</b>
+            <span>departures</span>
+          </div>
+          <div className="fstat">
+            <b>{f.stayovers}</b>
+            <span>staying guests{f.greenChoice ? ` (−${f.greenChoice} skipping)` : ''}</span>
+          </div>
+        </div>
+        <div className="blocks" aria-label="Attendants needed per block">
+          {f.blocks.map((b) => (
+            <div className="block" key={b.label}>
+              <span>{b.label}</span>
+              <span className="block-bar" title={`${b.load} h of work`}>
+                <i style={{ width: `${(b.attendants / max) * 100}%` }} />
+                <span className="cap" style={{ left: `${(f.scheduled / max) * 100}%` }} title={`${f.scheduled} scheduled`} />
+              </span>
+              <span className="num">{b.attendants} needed</span>
+            </div>
+          ))}
+          <div className="muted" style={{ fontSize: 11.5 }}>Black line = {f.scheduled} attendants on the posted weekend schedule.</div>
+        </div>
+        <div className={`banner ${f.overtimeHours > 0 ? 'ai' : 'done'}`} style={{ borderRadius: 10, marginTop: 12, border: 0 }}>
+          <span className="grow">
+            <Icon name={f.overtimeHours > 0 ? 'users' : 'check'} size={15} />
+            <span>
+              {f.recommendation}
+              {f.overtimeHours > 0 && !ai && ' (Today, this shows up as overtime on the day.)'}
+            </span>
+          </span>
+        </div>
+        <p className="muted" style={{ fontSize: 12, margin: '10px 0 0' }}>
+          Built from bookings and how long each room type takes to clean — never from individual attendants. Guests who skip cleaning in the app lower it right away.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function AutoApprove({ s }: { s: SimState }) {
   const toast = useToast();
   return (
-    <label className="row" style={{ fontWeight: 700, fontSize: 14, gap: 8 }}>
+    <label className="row" style={{ fontWeight: 650, fontSize: 13.5, gap: 8 }}>
       <input
         type="checkbox"
         checked={s.autoApprove}
         onChange={(e) => api('/api/sim/auto-approve', { value: e.target.checked }).catch((err) => toast({ title: 'Error', body: (err as Error).message, tone: 'bad' }))}
       />
-      Auto-approve everything (unattended demo)
+      Approve automatically (hands-free demo)
     </label>
   );
 }
@@ -137,11 +183,16 @@ function AutoApprove({ s }: { s: SimState }) {
 function NoPending({ s }: { s: SimState }) {
   const last = s.proposals.find((p) => p.status !== 'pending');
   return (
-    <section className="card card-pad">
-      <h2>No decision needed right now</h2>
-      <p className="muted" style={{ margin: '6px 0 0' }}>
-        {last ? `Last change: "${last.trigger}" at ${fmtTime(last.createdAt)} (${last.status}).` : 'ReadyPath is monitoring room status, checkouts, absences and maintenance.'}
-      </p>
+    <section className="card card-pad row" style={{ alignItems: 'flex-start', gap: 12 }}>
+      <span className="pillar-icon tone-ai">
+        <Icon name="check" size={16} />
+      </span>
+      <div>
+        <h2>No decision needed right now</h2>
+        <p className="muted" style={{ margin: '4px 0 0' }}>
+          {last ? `Last change: “${last.trigger}” at ${fmtTime(last.createdAt)} (${DECIDED[last.status].toLowerCase()}).` : 'FHN AI is watching room status, checkouts, absences and repairs.'}
+        </p>
+      </div>
     </section>
   );
 }
@@ -166,21 +217,27 @@ function ProposalCard({ p, s }: { p: PlanProposal; s: SimState }) {
   };
   return (
     <section className="card proposal pending" aria-label="Plan awaiting approval">
-      <div className="card-head" style={{ background: 'var(--teal-soft)', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+      <div className="proposal-head">
         <div>
-          <span className="pill teal">Needs approval · {fmtTime(p.createdAt)}</span>
-          <h2 style={{ marginTop: 6 }}>{p.trigger}</h2>
-          <div className="muted" style={{ fontSize: 14 }}>{p.summary}</div>
+          <span className="ai-chip">
+            <Icon name="sparkles" size={12} /> Your decision · {fmtTime(p.createdAt)}
+          </span>
+          <h2 style={{ marginTop: 8, fontSize: 18 }}>{p.trigger}</h2>
+          <div className="muted" style={{ fontSize: 13.5 }}>{p.summary}</div>
         </div>
         <div className="row wrap">
-          <button className="btn" disabled={busy} onClick={() => act('dismiss')}>Keep current plan</button>
-          <button className="btn primary lg" disabled={busy} onClick={() => act('approve')}>Approve & notify guests</button>
+          <button className="btn" disabled={busy} onClick={() => act('dismiss')}>
+            Keep current plan
+          </button>
+          <button className="btn ai lg" disabled={busy} onClick={() => act('approve')}>
+            <Icon name="check" size={16} /> Approve & notify guests
+          </button>
         </div>
       </div>
-      <div className="card-pad" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid var(--line)' }}>
-        <b>Predicted impact:</b> <span>{p.impact}</span>
-        <span className="muted" style={{ fontSize: 13 }}>
-          · {s.guests.filter((g) => g.group && g.consentSms).length} wedding guests will get an ETA by text on approval
+      <div className="card-pad row wrap" style={{ borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
+        <b>What changes:</b> <span>{p.impact}</span>
+        <span className="muted" style={{ fontSize: 12.5 }}>
+          · {s.guests.filter((g) => g.group && g.consentSms).length} wedding guests get their ready time by text when you approve
         </span>
       </div>
       <table className="changes">
@@ -208,7 +265,7 @@ function ProposalCard({ p, s }: { p: PlanProposal; s: SimState }) {
           })}
         </tbody>
       </table>
-      {p.changes.length > 10 && <div className="muted" style={{ padding: '8px 18px 14px', fontSize: 13 }}>+{p.changes.length - 10} smaller changes</div>}
+      {p.changes.length > 10 && <div className="muted" style={{ padding: '8px 18px 14px', fontSize: 12.5 }}>+{p.changes.length - 10} smaller changes</div>}
     </section>
   );
 }
