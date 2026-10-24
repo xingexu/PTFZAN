@@ -1,0 +1,896 @@
+/* Midnight — the one theme, for the hotel view and the guest app alike. Loaded last.
+   Deep navy night with a faint aurora, dark glass panels with a thin light rim, light text, and one clear
+   colour per room status (Apple's dark-mode system colours). Panels inside a panel sit one step lighter. */
+
+:root {
+  color-scheme: dark;
+
+  /* Night sky and text. */
+  --bg: #060a16;
+  --bg-2: #0b1122;
+  --ink: #eef3fc;
+  --ink-2: #c9d4e6;
+  --muted: #9babc2;
+  --faint: #7d8ca4;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.14);
+  --fill: rgba(255, 255, 255, 0.08);
+  --fill-2: rgba(255, 255, 255, 0.05);
+
+  /* Accent (FHN AI blue). */
+  --accent: #4d9bff;
+  --accent-ink: #8cc2ff;
+  --accent-2: #7cb6ff;
+  --accent-soft: rgba(77, 155, 255, 0.16);
+  --accent-line: rgba(77, 155, 255, 0.4);
+  --on-accent: #ffffff;
+  --sky: rgba(77, 155, 255, 0.12);
+  --gray: #5d6b82;
+
+  /* Room status. */
+  --st-ready: #30d158;
+  --st-ready-ink: #86ebaa;
+  --st-cleaning: #9d87ff;
+  --st-cleaning-ink: #cbbfff;
+  --st-check: #ffd60a;
+  --st-check-ink: #ffe680;
+  --st-dirty: #ff9f0a;
+  --st-dirty-ink: #ffc56b;
+  --st-ooo: #ff453a;
+  --st-ooo-ink: #ff9d96;
+  --st-occupied: #5d6b82;
+  --st-eco: #40c8e0;
+  --st-eco-ink: #97e3f0;
+
+  --green: var(--st-ready);
+  --green-ink: var(--st-ready-ink);
+  --green-soft: rgba(48, 209, 88, 0.16);
+  --indigo: var(--st-cleaning);
+  --indigo-ink: var(--st-cleaning-ink);
+  --indigo-soft: rgba(157, 135, 255, 0.16);
+  --yellow: var(--st-check);
+  --yellow-ink: var(--st-check-ink);
+  --yellow-soft: rgba(255, 214, 10, 0.16);
+  --amber: var(--st-dirty);
+  --amber-ink: var(--st-dirty-ink);
+  --amber-soft: rgba(255, 159, 10, 0.16);
+  --red: var(--st-ooo);
+  --red-ink: var(--st-ooo-ink);
+  --red-soft: rgba(255, 69, 58, 0.16);
+  --violet: #bf5af2;
+  --violet-ink: #e0a8ff;
+  --violet-soft: rgba(191, 90, 242, 0.16);
+  --teal: var(--st-eco);
+
+  /* Dark glass: a thin light rim on top, a deep shadow below. */
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 0.5px rgba(255, 255, 255, 0.07), 0 0 0 0.5px rgba(0, 0, 0, 0.5);
+  --glass-drop: 0 2px 6px rgba(0, 0, 0, 0.25), 0 24px 60px -24px rgba(0, 0, 0, 0.85);
+  --glass-fill: transparent;
+  --btn-glass: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.045));
+  --btn-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.45), 0 6px 16px -8px rgba(0, 0, 0, 0.6);
+  --btn-glow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(140, 194, 255, 0.35), 0 0 0 0.5px rgba(0, 0, 0, 0.45), 0 8px 24px -8px rgba(77, 155, 255, 0.45);
+  --inner-glass: linear-gradient(160deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.035));
+  --inner-rim: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+  --tint-glass: radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, 0.28), transparent 55%), linear-gradient(180deg, #3f8cff, #1a62e0);
+  --tint-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 0 0 0.5px rgba(255, 255, 255, 0.18), 0 0 0 0.5px rgba(0, 30, 90, 0.6), 0 10px 26px -8px rgba(40, 120, 255, 0.55);
+}
+
+/* ── The night sky ──────────────────────────────────────────────────────────────── */
+html,
+body,
+body.hq-body {
+  background: var(--bg);
+  color: var(--ink);
+}
+.backdrop,
+.gx-backdrop {
+  background:
+    radial-gradient(1100px 760px at 12% -12%, rgba(64, 98, 255, 0.24), transparent 62%),
+    radial-gradient(900px 640px at 105% 18%, rgba(0, 170, 210, 0.13), transparent 60%),
+    radial-gradient(1000px 900px at 55% 125%, rgba(124, 74, 255, 0.16), transparent 62%),
+    linear-gradient(180deg, #070b19 0%, #0a1024 45%, #060914 100%);
+}
+.backdrop::before {
+  /* Faint stars, very sparse, so the night isn't a flat colour. */
+  background:
+    radial-gradient(1px 1px at 12% 22%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(1px 1px at 68% 14%, rgba(255, 255, 255, 0.35), transparent 60%),
+    radial-gradient(1.5px 1.5px at 84% 62%, rgba(255, 255, 255, 0.3), transparent 60%),
+    radial-gradient(1px 1px at 32% 78%, rgba(255, 255, 255, 0.28), transparent 60%),
+    radial-gradient(1px 1px at 48% 40%, rgba(255, 255, 255, 0.22), transparent 60%),
+    radial-gradient(1px 1px at 92% 30%, rgba(255, 255, 255, 0.3), transparent 60%);
+  filter: none;
+}
+.backdrop::after {
+  background: none;
+}
+.mode-today .backdrop::before,
+.mode-today .backdrop::after {
+  filter: none;
+}
+
+/* ── Dark glass panels ─────────────────────────────────────────────────────────── */
+.glass,
+.card,
+.gx-card,
+.gx-list,
+.ex-card,
+.sheet,
+.player,
+.decision,
+.toast,
+.gx-banner,
+.drawer,
+.stage,
+.stage-step,
+.stage-controls,
+.remote-status,
+.remote-top,
+.hq-rail,
+.gx-tabs,
+.key-card {
+  background: linear-gradient(160deg, rgba(34, 45, 74, 0.72), rgba(17, 24, 44, 0.66));
+  -webkit-backdrop-filter: blur(26px) saturate(1.4);
+  backdrop-filter: blur(26px) saturate(1.4);
+  box-shadow: var(--glass-rim), var(--glass-drop);
+  color: var(--ink);
+}
+/* The light rim and the slow reflection, kept faint on dark glass. */
+.glass::before,
+.card::before,
+.gx-card::before,
+.sheet::before,
+.player::before,
+.decision::before,
+.toast::before,
+.gx-banner::before,
+.stage-step::before,
+.remote-status::before,
+.remote-top::before,
+.drawer::before {
+  background:
+    radial-gradient(180px circle at var(--lx, 20%) var(--ly, 0), rgba(160, 200, 255, 0.35), transparent 75%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.03) 40%, rgba(120, 160, 255, 0.06) 60%, rgba(255, 255, 255, 0.12));
+}
+.glass::after,
+.card::after,
+.gx-card::after,
+.sheet::after,
+.player::after,
+.decision::after {
+  background:
+    radial-gradient(320px circle at var(--lx, 15%) var(--ly, -160px), rgba(120, 165, 255, 0.08), transparent 70%),
+    linear-gradient(115deg, transparent 34%, rgba(255, 255, 255, 0.045) 48%, rgba(140, 180, 255, 0.03) 53%, transparent 66%);
+  background-size: 100% 100%, 350% 100%;
+  background-repeat: no-repeat;
+}
+
+/* Panels inside a panel: one step lighter. */
+.fstat,
+.estats .fstat,
+.summary-metric-icon,
+.win-ic,
+.hl-ic,
+.gx-row-ic,
+.rail-property,
+.rail-note,
+.energy-comfort-note,
+.energy-orb,
+.why-box,
+.task,
+.qitem,
+.queue,
+.queue-avatar,
+.lobby-floor,
+.kbd,
+.sms-avatar,
+.phone-screen,
+.room-search,
+.layer-seg,
+.seg,
+.hq-nav,
+.input,
+.gx-banner .app-ic {
+  background: var(--inner-glass);
+  box-shadow: var(--inner-rim);
+  color: var(--ink);
+}
+.energy-orb {
+  color: var(--st-eco);
+}
+.queue.absent {
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0 8px, rgba(255, 255, 255, 0.06) 8px 16px);
+}
+.input:focus,
+.room-search:focus-within {
+  box-shadow: inset 0 0 0 1px var(--accent-line), 0 0 0 3px rgba(77, 155, 255, 0.18);
+}
+input,
+select,
+textarea {
+  color: var(--ink);
+}
+input::placeholder {
+  color: var(--faint);
+}
+option {
+  background: #121a30;
+  color: var(--ink);
+}
+
+/* Buttons and controls. */
+.btn,
+.pl-btn,
+.hq-icon,
+.gx-iconbtn,
+.round,
+.chip,
+.pl-speed,
+.tp-btn,
+.gbtn,
+.gbtn.soft,
+.gbtn.white,
+.gbtn.line,
+.opt,
+.hq-guest,
+.hq-demo-label,
+.sim-chip,
+.room-highlights button {
+  background: var(--btn-glass);
+  box-shadow: var(--btn-shadow);
+  color: var(--ink);
+}
+.btn::before,
+.pl-btn::before,
+.hq-guest::before,
+.gbtn::before,
+.round::before {
+  background: radial-gradient(80px circle at var(--lx, 18%) var(--ly, -40px), rgba(160, 200, 255, 0.16), transparent 80%);
+}
+.btn:hover,
+.pl-btn:hover,
+.hq-icon:hover,
+.chip:hover,
+.opt:hover,
+.room-highlights button:hover {
+  box-shadow: var(--btn-glow);
+}
+.btn.ai,
+.pl-btn.main,
+.pl-demo,
+.gbtn.brass,
+.gbtn.navy,
+.chip.on,
+.seg button.on.ai-on {
+  background: var(--tint-glass);
+  box-shadow: var(--tint-shadow);
+  color: #fff;
+}
+.pl-speed {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239babc2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right 11px center/10px 6px no-repeat, var(--btn-glass);
+}
+.hq-count,
+.count {
+  background: var(--accent);
+  color: #fff;
+}
+.opt.on {
+  box-shadow: inset 0 0 0 1px var(--accent-line), var(--btn-shadow);
+}
+
+/* The sliding glass lens behind the current choice (navigation, segmented controls, tabs). */
+.slide::before,
+.hq-nav.slide::before,
+.layer-seg.slide::before,
+.seg.slide::before,
+.gx-tabs.slide::before {
+  background: linear-gradient(160deg, rgba(77, 155, 255, 0.3), rgba(77, 155, 255, 0.16));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 0 0 0.5px rgba(140, 194, 255, 0.35), 0 4px 14px -6px rgba(40, 120, 255, 0.5);
+}
+.hq-nav {
+  background: none;
+  box-shadow: none;
+}
+.hq-nav a {
+  color: var(--ink-2);
+}
+.hq-nav a.active,
+.hq-nav a:hover {
+  color: #fff;
+  background: none;
+}
+.seg button,
+.layer-seg a,
+.layer-seg button {
+  color: var(--muted);
+}
+.seg button.on,
+.layer-seg a.on,
+.layer-seg a.active,
+.layer-seg button.on {
+  color: #fff;
+}
+.gx-tab {
+  color: var(--muted);
+}
+.gx-tab.on {
+  color: #fff;
+}
+.skip-nav {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── Type ──────────────────────────────────────────────────────────────────────── */
+h1,
+h2,
+h3,
+h4,
+b,
+strong,
+.card h2,
+.bd-title h2,
+.rail-brand,
+.hq-mobile-brand,
+.pl-clock,
+.sim-head h1,
+.hq-head h1 {
+  color: var(--ink);
+}
+.page-subtitle,
+.bd-title p,
+.bd-stat-label,
+.summary-metric > div > span,
+.hl-when,
+.legend,
+.fl-n,
+.floor-label,
+.sc-ends,
+.rs-note,
+.gx-muted,
+.muted,
+.rail-property span,
+.rail-footer span,
+.gc-sub,
+.gc-count,
+.hq-date,
+.hq-breadcrumb,
+.eta-by,
+.rt-mid span,
+.gx-row-label small,
+.gx-row-detail,
+.gx-foot,
+.cd-left {
+  color: var(--muted);
+}
+.page-eyebrow,
+.board-eyebrow,
+.rail-label {
+  color: var(--faint);
+}
+.hq-breadcrumb b,
+.rail-property b,
+.rail-footer b {
+  color: var(--ink);
+}
+a {
+  color: var(--accent-ink);
+}
+.ai-line,
+.why-toggle {
+  color: var(--accent-ink);
+}
+
+/* ── Pills ─────────────────────────────────────────────────────────────────────── */
+.pill {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-2);
+}
+.pill.ai {
+  background: rgba(77, 155, 255, 0.18);
+  color: var(--accent-ink);
+}
+.pill.green {
+  background: rgba(48, 209, 88, 0.16);
+  color: var(--st-ready-ink);
+}
+.pill.amber {
+  background: rgba(255, 159, 10, 0.16);
+  color: var(--st-dirty-ink);
+}
+.pill.red {
+  background: rgba(255, 69, 58, 0.16);
+  color: var(--st-ooo-ink);
+}
+.pill.slate {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-2);
+}
+.pill.teal {
+  background: rgba(64, 200, 224, 0.15);
+  color: var(--st-eco-ink);
+}
+
+/* ── The two boards ────────────────────────────────────────────────────────────── */
+.board .board-eyebrow {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-2);
+}
+.board.ai .board-eyebrow {
+  background: rgba(77, 155, 255, 0.18);
+  color: var(--accent-ink);
+}
+.board.ai {
+  background: linear-gradient(160deg, rgba(36, 56, 104, 0.74), rgba(18, 28, 56, 0.68));
+  box-shadow: var(--glass-rim), 0 0 0 1px rgba(77, 155, 255, 0.45), 0 0 40px -10px rgba(77, 155, 255, 0.25), var(--glass-drop);
+}
+.board.ai .bd-stat-num b {
+  color: var(--accent-ink);
+}
+.bd-progress,
+.sc-track,
+.cb-track,
+.cd-bar,
+.aa-bar,
+.gx-step i {
+  background: rgba(255, 255, 255, 0.1);
+}
+.building::before,
+.roof {
+  background: none;
+}
+
+/* Rooms on the boards. */
+.rm {
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+}
+.rm::before {
+  background: none;
+}
+.rm.s-occupied,
+.rm.s-stayover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #93a1b6;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+}
+.rm.s-ready {
+  background: rgba(48, 209, 88, 0.24);
+  color: var(--st-ready-ink);
+  box-shadow: inset 0 0 0 1px rgba(48, 209, 88, 0.6);
+}
+.rm.s-cleaning {
+  background: rgba(157, 135, 255, 0.26);
+  color: var(--st-cleaning-ink);
+  box-shadow: inset 0 0 0 1px rgba(157, 135, 255, 0.62);
+}
+.rm.s-inspection {
+  background: rgba(255, 214, 10, 0.22);
+  color: var(--st-check-ink);
+  box-shadow: inset 0 0 0 1px rgba(255, 214, 10, 0.6);
+}
+.rm.s-dirty {
+  background: rgba(255, 159, 10, 0.24);
+  color: var(--st-dirty-ink);
+  box-shadow: inset 0 0 0 1px rgba(255, 159, 10, 0.6);
+}
+.rm.s-ooo {
+  background: rgba(255, 69, 58, 0.24);
+  color: var(--st-ooo-ink);
+  box-shadow: inset 0 0 0 1px rgba(255, 69, 58, 0.6);
+}
+.rm.wed::after {
+  background: var(--ink);
+  opacity: 0.8;
+}
+.lb-num b {
+  color: var(--ink);
+}
+
+/* Room tiles (Rooms tab). */
+.tile {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+  color: var(--ink-2);
+}
+.tile:hover {
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2), 0 6px 16px -8px rgba(0, 0, 0, 0.7);
+}
+.tile::before {
+  width: 3px;
+  background: var(--tile-accent, transparent);
+}
+.tile .num {
+  color: var(--ink);
+}
+.tile .st,
+.tile .eta {
+  font-weight: 600;
+}
+.tile .grp {
+  background: var(--ink-2);
+}
+.tile.s-occupied,
+.tile.s-stayover,
+.tile.h-comfort {
+  background: rgba(255, 255, 255, 0.06);
+  color: #93a1b6;
+  --tile-accent: var(--st-occupied);
+}
+.tile.s-ready {
+  background: linear-gradient(160deg, rgba(48, 209, 88, 0.26), rgba(48, 209, 88, 0.12));
+  color: var(--st-ready-ink);
+  --tile-accent: var(--st-ready);
+}
+.tile.s-cleaning {
+  background: linear-gradient(160deg, rgba(157, 135, 255, 0.28), rgba(157, 135, 255, 0.13));
+  color: var(--st-cleaning-ink);
+  --tile-accent: var(--st-cleaning);
+}
+.tile.s-inspection {
+  background: linear-gradient(160deg, rgba(255, 214, 10, 0.24), rgba(255, 214, 10, 0.1));
+  color: var(--st-check-ink);
+  --tile-accent: var(--st-check);
+}
+.tile.s-dirty {
+  background: linear-gradient(160deg, rgba(255, 159, 10, 0.26), rgba(255, 159, 10, 0.11));
+  color: var(--st-dirty-ink);
+  --tile-accent: var(--st-dirty);
+}
+.tile.s-ooo {
+  background: linear-gradient(160deg, rgba(255, 69, 58, 0.24), rgba(255, 69, 58, 0.1));
+  color: var(--st-ooo-ink);
+  --tile-accent: var(--st-ooo);
+}
+.tile.risk {
+  box-shadow: inset 0 0 0 2px var(--st-ooo), 0 0 18px -6px rgba(255, 69, 58, 0.6);
+}
+.tile.sel {
+  box-shadow: 0 0 0 2px var(--accent), 0 8px 20px -8px rgba(77, 155, 255, 0.6);
+}
+.tile.dimmed {
+  opacity: 0.32;
+}
+
+/* Temperature. */
+.cg-room {
+  background: rgba(255, 255, 255, 0.06);
+  color: #93a1b6;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+}
+.cg-room::before {
+  background: none;
+}
+.cg-room.h-eco,
+.tile.h-eco {
+  background: rgba(64, 200, 224, 0.2);
+  color: var(--st-eco-ink);
+  box-shadow: inset 0 0 0 1px rgba(64, 200, 224, 0.5);
+  --tile-accent: var(--st-eco);
+}
+.cg-room.h-precool,
+.tile.h-precool {
+  background: rgba(77, 155, 255, 0.22);
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1px rgba(77, 155, 255, 0.55);
+  --tile-accent: var(--accent);
+}
+.cg-room.h-running,
+.tile.h-running {
+  background: rgba(255, 69, 58, 0.22);
+  color: var(--st-ooo-ink);
+  box-shadow: inset 0 0 0 1px rgba(255, 69, 58, 0.55);
+  --tile-accent: var(--st-ooo);
+}
+.energy-hero strong {
+  color: var(--st-eco-ink);
+}
+
+/* Legends: same colours as the rooms. */
+.legend i.s-occupied {
+  background: var(--st-occupied);
+}
+.legend i,
+.legend .dot {
+  width: 8px;
+  height: 8px;
+}
+.versus .legend {
+  justify-self: start;
+  align-self: start;
+  width: max-content;
+  max-width: 100%;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  gap: 4px 14px;
+  color: var(--ink-2);
+  background: linear-gradient(160deg, rgba(34, 45, 74, 0.72), rgba(17, 24, 44, 0.66));
+  box-shadow: var(--glass-rim);
+}
+
+/* Before vs after: slate for the previous method, blue for FHN AI. */
+.cb.today .cb-track i {
+  background: #6f7f98;
+}
+.cb.ai .cb-track i {
+  background: linear-gradient(90deg, #7cb6ff, #3f8cff);
+}
+.cb-who {
+  color: var(--muted);
+  font-weight: 600;
+}
+.cb.ai .cb-who {
+  color: var(--accent-ink);
+}
+.cb-val {
+  color: var(--ink);
+}
+.cb.open .cb-track i {
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.22) 0 5px, rgba(255, 255, 255, 0.07) 5px 10px);
+}
+
+/* Overview cards. */
+.summary-metric-note {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: rgba(77, 155, 255, 0.16);
+}
+.summary-metric-icon,
+.win-ic {
+  color: var(--accent-2);
+}
+/* The QR code keeps a white tile: phones read dark-on-light codes most reliably. */
+.guest-card img {
+  background: #fff;
+  border-radius: 12px;
+  padding: 4px;
+}
+.qr-blank {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Player. */
+.sc-fill {
+  background: linear-gradient(90deg, #7cb6ff, #3f8cff);
+}
+.sc-knob {
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(77, 155, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.sc-tick {
+  background: rgba(255, 255, 255, 0.35);
+}
+.sc-tick.done {
+  background: var(--accent);
+}
+
+/* Status chips. */
+.hq-demo-label i {
+  background: #6b7a92;
+}
+.hq-demo-label.sync-live i {
+  background: var(--st-ready);
+}
+.hq-demo-label.sync-offline i {
+  background: var(--st-dirty);
+}
+.sync-sep {
+  background: rgba(255, 255, 255, 0.16);
+}
+input.switch {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+}
+input.switch:checked {
+  background: linear-gradient(150deg, #3f8cff, #1a62e0);
+}
+
+/* Toasts. */
+.toast.good {
+  box-shadow: var(--glass-rim), inset 3px 0 0 var(--st-ready), var(--glass-drop);
+}
+.toast.bad {
+  box-shadow: var(--glass-rim), inset 3px 0 0 var(--st-ooo), var(--glass-drop);
+}
+
+/* ── Guest app ─────────────────────────────────────────────────────────────────── */
+.gx-device,
+.gx-screen,
+.gx-app {
+  background-color: var(--bg);
+}
+.room-timer::before {
+  background: radial-gradient(circle at 35% 22%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04) 70%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 8px 18px -10px rgba(0, 0, 0, 0.7);
+}
+.rt-track {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+.gx-step {
+  color: var(--faint);
+}
+.gx-step.done,
+.gx-step.active {
+  color: var(--ink);
+}
+.ready-card {
+  background: linear-gradient(160deg, rgba(30, 90, 60, 0.6), rgba(17, 40, 34, 0.62));
+  box-shadow: var(--glass-rim), 0 0 0 1px rgba(48, 209, 88, 0.4), var(--glass-drop);
+}
+.ready-card .rs-k,
+.ready-early {
+  color: var(--st-ready-ink);
+}
+.ready-early {
+  background: rgba(48, 209, 88, 0.16);
+  box-shadow: inset 0 0 0 0.5px rgba(48, 209, 88, 0.4);
+}
+.choosing {
+  background: linear-gradient(150deg, rgba(77, 155, 255, 0.2), rgba(77, 155, 255, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 0.5px rgba(77, 155, 255, 0.35);
+}
+.app-arrivals li {
+  background: linear-gradient(90deg, rgba(77, 155, 255, 0.12), transparent 70%);
+}
+.aa-room {
+  color: var(--ink);
+}
+
+/* ── Leftovers found by the theme audit ───────────────────────────────────────── */
+.rail-property-icon {
+  background: rgba(77, 155, 255, 0.16);
+  color: var(--accent-ink);
+}
+.hl.ai .hl-text span {
+  color: #a9c9ee;
+}
+.hl.ai .hl-ic {
+  background: rgba(77, 155, 255, 0.16);
+  color: var(--accent-ink);
+}
+.gx-sub,
+.onboard-hero p,
+.gx-page-head p {
+  color: var(--muted);
+}
+.hvac-badge.eco {
+  background: rgba(64, 200, 224, 0.16);
+  color: var(--st-eco-ink);
+}
+.hvac-badge.precool {
+  background: rgba(77, 155, 255, 0.18);
+  color: var(--accent-ink);
+}
+.hvac-badge.comfort {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+}
+.hvac-badge.running {
+  background: rgba(255, 69, 58, 0.16);
+  color: var(--st-ooo-ink);
+}
+
+/* Messages in the guest app. */
+.bubble {
+  background: linear-gradient(160deg, rgba(40, 52, 84, 0.78), rgba(24, 32, 56, 0.72));
+  box-shadow: var(--glass-rim), 0 8px 20px -12px rgba(0, 0, 0, 0.7);
+  color: var(--ink);
+}
+.bubble.eta {
+  background: linear-gradient(160deg, rgba(38, 70, 130, 0.78), rgba(22, 40, 80, 0.72));
+}
+.bubble.ready {
+  background: linear-gradient(160deg, rgba(30, 92, 60, 0.78), rgba(18, 52, 38, 0.72));
+}
+.bubble.request {
+  background: linear-gradient(160deg, rgba(62, 52, 120, 0.78), rgba(34, 28, 72, 0.72));
+}
+
+/* Phones drawn on screen (the attendant's phone, the stage's text-message phone): dark, like iOS at night. */
+.phone,
+.att-phone .phone {
+  background: #0b0f1a;
+  box-shadow: inset 0 0 0 1.5px #2c3446, 0 0 0 1px rgba(255, 255, 255, 0.06), 0 30px 60px -24px rgba(0, 0, 0, 0.85);
+}
+.phone-screen,
+.att-phone .phone-screen {
+  background: linear-gradient(180deg, #111a2e, #0b1120 50%);
+  color: var(--ink);
+}
+.phone-top {
+  background: linear-gradient(150deg, rgba(77, 155, 255, 0.22), rgba(77, 155, 255, 0.06));
+  box-shadow: inset 0 -1px 0 var(--line);
+  color: var(--ink);
+}
+.phone-top.today {
+  background: rgba(255, 255, 255, 0.05);
+}
+.task {
+  background: var(--inner-glass);
+  box-shadow: var(--inner-rim);
+  color: var(--ink);
+}
+.task.current {
+  background: linear-gradient(160deg, rgba(77, 155, 255, 0.16), rgba(77, 155, 255, 0.06));
+  box-shadow: var(--inner-rim), inset 0 0 0 1.5px var(--accent);
+}
+.task.muted {
+  opacity: 0.75;
+}
+.qitem {
+  background: var(--inner-glass);
+  box-shadow: var(--inner-rim);
+  color: var(--ink);
+}
+.qitem.now {
+  background: rgba(77, 155, 255, 0.18);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+  color: var(--accent-ink);
+}
+.privacy-note {
+  background: var(--inner-glass);
+  box-shadow: var(--inner-rim);
+  color: var(--ink-2);
+}
+.phone-screen.sms {
+  background: #000;
+  color: #f2f2f7;
+}
+.sms-head {
+  border-bottom-color: #1c1c1e;
+}
+.sms-avatar {
+  background: #2c2c2e;
+}
+.sms-bubble {
+  background: #26252a;
+  color: #f2f2f7;
+}
+.sms-bubble.ready {
+  background: #1f3a2a;
+}
+.sms-banner {
+  background: rgba(40, 40, 44, 0.92);
+  color: #f2f2f7;
+}
+.sms-banner-head {
+  color: #98989f;
+}
+
+/* The guest app on a laptop: a dark phone on the night sky. */
+.gx-device {
+  background: #070b19;
+}
+.gx-device::before {
+  background:
+    radial-gradient(500px 420px at 10% -10%, rgba(64, 98, 255, 0.26), transparent 62%),
+    radial-gradient(420px 380px at 110% 30%, rgba(0, 170, 210, 0.14), transparent 60%),
+    radial-gradient(520px 480px at 50% 120%, rgba(124, 74, 255, 0.18), transparent 62%),
+    linear-gradient(180deg, #070b19, #0a1024 50%, #060914);
+}
+.gx-statusbar,
+.gx-statusbar.dark {
+  color: #fff;
+}
+.gx-aside p,
+.gx-aside ul {
+  color: var(--ink-2);
+}
+.live-pill {
+  background: var(--btn-glass);
+  box-shadow: var(--btn-shadow);
+  color: var(--ink-2);
+}
+.gx-aside li {
+  color: var(--ink-2);
+}

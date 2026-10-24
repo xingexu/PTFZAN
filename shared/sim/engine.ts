@@ -8,6 +8,7 @@ import type {
   NotificationKind, PlanProposal, Room, RoomStatus, SimState,
 } from '../types.js';
 import { fmtRange, fmtTime } from '../types.js';
+import { walkMin } from './layout.js';
 import { diffPlans, findRecurringFaults, forecastStaffing, knownAvailableAt, needBy, needsWork, planQueues, predictedDuration, predictEtas } from './model.js';
 import {
   buildSeed, ELEVATOR_PENALTY, GROUP, HISTORY_AS_OF, IN_HOUSE_CODE, INSPECTION_MIN, KW_ECO, KW_RUNNING, MAINTENANCE_HISTORY, SIM_END,
@@ -513,6 +514,7 @@ export class Simulation {
       a.wastedMin += lost;
       a.busyUntil = now + lost;
       a.lastFloor = r.floor;
+      a.lastRoom = r.id;
       a.activity = `Knocked on ${r.id} — guest still in, route changed`;
       return;
     }
@@ -522,18 +524,20 @@ export class Simulation {
   private startRoom(a: Attendant, r: Room) {
     const now = this.state.now;
     const stay = r.status === 'stayover';
-    const travelMin = r.floor === a.lastFloor ? 1 : 4;
+    const travelMin = walkMin(a.lastRoom ?? a.lastFloor, r.id);
     const elev = this.state.elevatorDown && r.floor >= 5 ? ELEVATOR_PENALTY : 0;
     const base = stay ? STAYOVER_MIN : TRUE_BASE[r.type];
-    const dur = Math.round(base * this.condition[r.id]) + travelMin + elev;
+    const dur = Math.round(base * this.condition[r.id] + travelMin) + elev;
     r.status = 'cleaning';
     r.serviceKind = stay ? 'stayover' : 'full';
     r.cleaningBy = a.id;
     r.workStartedAt = now;
+    r.travelMin = Math.round(travelMin) + elev;
     r.workEndsAt = now + dur;
     a.currentRoom = r.id;
     a.busyUntil = now + dur;
     a.lastFloor = r.floor;
+    a.lastRoom = r.id;
     a.queue = a.queue.filter((q) => q !== r.id);
     a.activity = `${stay ? 'Tidying' : 'Cleaning'} ${r.id}`;
   }

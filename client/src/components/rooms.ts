@@ -23,13 +23,13 @@ export const TILE_LABEL: Record<RoomStatus, string> = {
 
 // Same colours on every screen (see the room tiles in styles.css).
 export const STATUS_COLOR: Record<RoomStatus, string> = {
-  occupied: '#8a99ad',
-  stayover: '#b7c2d0',
-  dirty: '#f06a1a',
-  cleaning: '#6d4fd8',
-  inspection: '#e2a500',
-  ready: '#1f9d55',
-  ooo: '#e0383e',
+  occupied: '#5d6b82',
+  stayover: '#7d8ca4',
+  dirty: '#ff9f0a',
+  cleaning: '#9d87ff',
+  inspection: '#ffd60a',
+  ready: '#30d158',
+  ooo: '#ff453a',
 };
 
 export const HVAC_LABEL: Record<Hvac, string> = {
@@ -39,7 +39,7 @@ export const HVAC_LABEL: Record<Hvac, string> = {
   precool: 'Getting ready for the guest',
 };
 export const HVAC_TILE: Record<Hvac, string> = { comfort: 'Comfort', running: 'Full on', eco: 'Saver', precool: 'Prepping' };
-export const HVAC_COLOR: Record<Hvac, string> = { comfort: '#8a99ad', running: '#e0383e', eco: '#0e9688', precool: '#0a66d6' };
+export const HVAC_COLOR: Record<Hvac, string> = { comfort: '#5d6b82', running: '#ff453a', eco: '#40c8e0', precool: '#4d9bff' };
 
 export const CONF_COLOR: Record<Confidence, string> = { high: '#34c759', medium: '#ff9500', low: '#ff3b30' };
 export const CONF_WIDTH: Record<Confidence, string> = { high: '100%', medium: '62%', low: '30%' };

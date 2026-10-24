@@ -109,8 +109,8 @@ describe('FHN AI check-in (server side)', () => {
     expect(p).toMatchObject({ type: 'King', position: 1 });
     expect(p.roomId).toMatch(/^[56]0[1-6]$/);
     expect(p.attendant).toBe(p.floor === 6 ? 'Attendant 4' : 'Backup attendant');
-    // Walk to the room, the King average, the final check.
-    expect(p.predictedMin).toBe(2 + HIST_AVG.King + INSPECTION_MIN);
+    // A short walk from the elevator lobby (under a minute), the King average, the final check.
+    expect(p.predictedMin).toBe(1 + HIST_AVG.King + INSPECTION_MIN);
   });
 
   it('never gives two waiting guests the same room, and spreads the work across the team', () => {
@@ -123,7 +123,7 @@ describe('FHN AI check-in (server side)', () => {
     expect(fifth.position).toBe(2);
     expect(fifth.queueMin).toBeGreaterThan(20);
     expect(fifth.bandMin).toBeGreaterThan(stays[0].plan!.bandMin);
-    expect(fifth.reasons!.join(' ')).toMatch(/finishes 1 room first/);
+    expect(fifth.reasons!.join(' ')).toMatch(/after 1 room they’re finishing/);
   });
 
   it('keeps its promise for guests waiting behind others too', () => {
@@ -135,6 +135,20 @@ describe('FHN AI check-in (server side)', () => {
         expect(tl.ready).toBeLessThanOrEqual(tl.high);
       }
     }
+  });
+
+  it('gives the room that needs cleaning to the closest attendant', () => {
+    // Earlier today the backup attendant was sent to 512 and is still up there; everyone is free now.
+    const earlier: Stay = {
+      ...guest('FHNEARLY'),
+      checkInAt: T0 - 2 * 3600_000,
+      plan: { roomId: '512', floor: 5, type: 'Suite', queueMin: 1, cleanMin: 50, predictedMin: 59, bandMin: 10, position: 1, attendantId: 'A5', attendant: 'Backup attendant' },
+    };
+    // Floor 6's two-bed rooms are taken, so a party of four gets one of 507–510 — and 510 is two doors from 512.
+    const taken = ['607', '608', '609', '610'].map((roomId) => ({ ...earlier, plan: { ...earlier.plan!, roomId, floor: 6, attendantId: 'A2', attendant: 'Attendant 2' } }));
+    const p = checkIn(guest('FHNFOUR', 4), T0, [earlier, ...taken]).plan!;
+    expect(p).toMatchObject({ roomId: '510', attendant: 'Backup attendant', position: 1 });
+    expect(p.reasons![1]).toBe('Backup attendant is the closest attendant — 2 doors away on floor 5, free now');
   });
 
   it('gives a party of three or four a room with two beds or a suite', () => {

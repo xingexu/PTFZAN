@@ -51,6 +51,8 @@ export interface Room {
   /** Attendant currently cleaning (only room-level; no speed data is kept per person). */
   cleaningBy?: string;
   workStartedAt?: number;
+  /** Minutes it took the attendant to get there (the walk and any elevator wait) — known once they set off. */
+  travelMin?: number;
   workEndsAt?: number; // hidden ground truth
   readyAt?: number;
   eta?: Eta;
@@ -74,6 +76,8 @@ export interface Attendant {
   busyUntil: number; // sim minute when current task (cleaning, travel, wasted knock) ends
   currentRoom?: string;
   lastFloor: number;
+  /** The room they were last at (where they are, for "the closest attendant"); unset at the start of the shift. */
+  lastRoom?: string;
   activity: string;
   breakAt: number;
   hadBreak: boolean;

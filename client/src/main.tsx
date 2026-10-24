@@ -5,7 +5,7 @@ import App from './App';
 import { installGlassLight } from './components/glassLight';
 import './styles.css';
 import './liquid-glass.css';
-import './contrast.css';
+import './midnight.css';
 
 installGlassLight();
 
