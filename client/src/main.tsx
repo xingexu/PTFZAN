@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { installGlassLight } from './components/glassLight';
 import './styles.css';
+import './liquid-glass.css';
 
 installGlassLight();
 

@@ -97,7 +97,7 @@ function Insights({ insights }: { insights: MaintenanceInsight[] }) {
       <div className="card-head">
         <div className="title">
           <Icon name="sparkles" size={16} />
-          <h2 title="Repair notes are typed differently by different people. FHN AI reads each into what · where · problem so repeats stand out.">Repeat problems in old repair notes</h2>
+          <h2 title="Repair notes are typed differently by different people. FHN AI reads each into what · where · problem so repeats stand out.">Patterns worth a closer look</h2>
         </div>
         <span className="sub">Last 60 days</span>
       </div>
@@ -115,7 +115,7 @@ function Insights({ insights }: { insights: MaintenanceInsight[] }) {
               {i.occurrences} times in {i.windowDays} days
             </span>
           </div>
-          <ul className="raw">
+          <details className="repair-notes"><summary>View {i.examples.length} related repair notes</summary><ul className="raw">
             {i.examples.map((e) => (
               <li key={e.date + e.raw}>
                 <span className="muted num">{e.date.slice(5)}</span>
@@ -124,7 +124,7 @@ function Insights({ insights }: { insights: MaintenanceInsight[] }) {
                 </span>
               </li>
             ))}
-          </ul>
+          </ul></details>
         </div>
       ))}
       </div>
@@ -137,7 +137,7 @@ function Energy({ s }: { s: SimState }) {
   const floors = [6, 5, 4, 3];
   const count = (h: string) => s.rooms.filter((r) => r.hvac === h).length;
   return (
-    <section className="card fill" aria-label="Room climate">
+    <section className="card fill energy-card" aria-label="Room climate">
       <div className="card-head">
         <div className="title">
           <Icon name="leaf" size={16} />
@@ -145,11 +145,8 @@ function Energy({ s }: { s: SimState }) {
         </div>
         <span className={`pill ${s.mode === 'ai' ? 'teal' : 'red'}`}>{s.mode === 'ai' ? 'Saves energy when empty' : 'Previous method: always on'}</span>
       </div>
+      <div className="energy-hero"><div><span className="page-eyebrow">SMALL ADJUSTMENTS. REAL SAVINGS.</span><strong>{ai?.kwhSaved ?? 0}<small> kWh</small></strong><p>saved today · previous method {today?.kwhSaved ?? 0} kWh</p></div><div className="energy-orb"><Icon name="leaf" size={38} /></div></div>
       <div className="estats">
-        <div className="fstat">
-          <b>{ai?.kwhSaved ?? 0} kWh</b>
-          <span>saved today · previous method {today?.kwhSaved ?? 0}</span>
-        </div>
         <div className="fstat">
           <b>{s.mode === 'ai' ? count('eco') : count('running')}</b>
           <span>{s.mode === 'ai' ? 'empty rooms saving energy now' : 'empty rooms with heat/AC on full'}</span>
@@ -159,6 +156,7 @@ function Energy({ s }: { s: SimState }) {
           <span>guests arrived to the right temperature</span>
         </div>
       </div>
+      <div className="climate-caption"><b>Every room, in balance.</b><span>Live temperature settings</span></div>
       <div className="climate-grid" aria-label="Rooms by temperature setting">
         {floors.map((f) => (
           <div className="cg-floor" key={f}>
@@ -182,6 +180,7 @@ function Energy({ s }: { s: SimState }) {
           ))}
         </div>
       </div>
+      <div className="energy-comfort-note"><Icon name="shield" size={16} /><span>{s.mode === 'ai' ? 'Energy saver when empty. Comfortable before arrival.' : 'Heating and cooling remain on, even when rooms are empty.'}</span></div>
     </section>
   );
 }

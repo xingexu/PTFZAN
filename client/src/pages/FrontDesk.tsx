@@ -20,11 +20,15 @@ export default function FrontDesk() {
   const { state } = useSim();
   const [sel, setSel] = useState<string | null>(null);
   const [layer, setLayer] = useState<Layer>('readiness');
+  const [highlight, setHighlight] = useState<'all' | 'wedding' | 'attention'>('all');
+  const [query, setQuery] = useState('');
   const layerRef = useSlide<HTMLDivElement>(layer);
   if (!state) return null;
   const ai = state.mode === 'ai';
   const floors = [6, 5, 4, 3];
   const selected = sel ? state.rooms.find((r) => r.id === sel) : undefined;
+  const matches = (r: Room) => r.id.includes(query.trim()) && (highlight === 'all' || (highlight === 'wedding' ? r.groupBlock : atRisk(state, r) || r.status === 'ooo'));
+  const matching = state.rooms.filter(matches).length;
 
   return (
     <main className="page fit">
@@ -41,6 +45,13 @@ export default function FrontDesk() {
 
       <div className="grid fd">
         <section className="card fd-map" aria-label="Room grid">
+          <div className="room-tools">
+            <div className="room-highlights" role="group" aria-label="Highlight rooms">
+              {([['all', 'All rooms'], ['wedding', 'Wedding'], ['attention', 'Needs attention']] as const).map(([key, label]) => <button key={key} className={highlight === key ? 'active' : ''} aria-pressed={highlight === key} onClick={() => setHighlight(key)}>{label}</button>)}
+            </div>
+            <label className="room-search"><Icon name="bed" size={14} /><input type="search" inputMode="numeric" placeholder="Find a room" aria-label="Find a room by number" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
+          </div>
+          <span className="sr-only" role="status">{matching} matching rooms highlighted</span>
           <div className="card-head">
             <Legend layer={layer} ai={ai} />
             {!ai && layer === 'readiness' && <span className="pill red">Last phone update · {fmtTime(state.frontDeskSnapshotAt)}</span>}
@@ -58,7 +69,7 @@ export default function FrontDesk() {
                 {state.rooms
                   .filter((r) => r.floor === f)
                   .map((r) => (
-                    <RoomTile key={r.id} s={state} r={r} layer={layer} selected={sel === r.id} onClick={() => fade(() => setSel(sel === r.id ? null : r.id))} />
+                    <RoomTile key={r.id} s={state} r={r} layer={layer} selected={sel === r.id} dimmed={!matches(r)} onClick={() => fade(() => setSel(sel === r.id ? null : r.id))} />
                   ))}
               </div>
             ))}
@@ -105,7 +116,7 @@ function Legend({ layer, ai }: { layer: Layer; ai: boolean }) {
   );
 }
 
-function RoomTile({ s, r, layer, selected, onClick }: { s: SimState; r: Room; layer: Layer; selected: boolean; onClick: () => void }) {
+function RoomTile({ s, r, layer, selected, dimmed, onClick }: { s: SimState; r: Room; layer: Layer; selected: boolean; dimmed: boolean; onClick: () => void }) {
   const st = visibleStatus(s, r);
   const ai = s.mode === 'ai';
   const risk = layer === 'readiness' && atRisk(s, r);
@@ -122,7 +133,7 @@ function RoomTile({ s, r, layer, selected, onClick }: { s: SimState; r: Room; la
 
   return (
     <button
-      className={`tile ${cls} ${selected ? 'sel' : ''} ${risk ? 'risk' : ''} ${!ai && layer === 'readiness' && st !== 'ready' ? 'unknown' : ''}`}
+      className={`tile ${cls} ${selected ? 'sel' : ''} ${dimmed ? 'dimmed' : ''} ${risk ? 'risk' : ''} ${!ai && layer === 'readiness' && st !== 'ready' ? 'unknown' : ''}`}
       onClick={onClick}
       aria-pressed={selected}
       aria-label={`Room ${r.id}, ${layer === 'climate' ? HVAC_LABEL[r.hvac] : STATUS_LABEL[st]}${etaText ? `, ${etaText}` : ''}${r.groupBlock ? ', wedding block' : ''}`}

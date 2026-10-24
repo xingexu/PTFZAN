@@ -25,9 +25,9 @@ export default function Supervisor() {
       <div className="grid sup">
         <div className="col">
           {ai && (pending ? <ProposalCard p={pending} s={state} /> : <NoPending s={state} />)}
-          <section className="card fill" aria-label="Attendant queues">
+          <section className="card fill queues-card" aria-label="Attendant queues">
             <div className="card-head">
-              <h2>Attendant lists</h2>
+              <h2>Your team today</h2>
               <span className="sub">Tracks rooms, never people</span>
             </div>
             <div className="queues card-scroll">
@@ -35,6 +35,7 @@ export default function Supervisor() {
                 const items = [...(a.currentRoom ? [a.currentRoom] : []), ...a.queue];
                 return (
                   <div key={a.id} className={`queue ${a.present ? '' : 'absent'}`}>
+                    <div className="queue-avatar"><Icon name={a.present ? 'user' : 'moon'} size={18} /></div>
                     <h4>
                       {a.label}
                       {a.present ? (
@@ -62,11 +63,12 @@ export default function Supervisor() {
                       );
                     })}
                     {items.length > 9 && <div className="muted" style={{ fontSize: 12 }}>+{items.length - 9} more</div>}
-                    {a.present && items.length === 0 && <div className="muted" style={{ fontSize: 12.5 }}>Nothing assigned</div>}
+                    {a.present && items.length === 0 && <div className="queue-complete"><Icon name="check" size={14} />All caught up</div>}
                   </div>
                 );
               })}
             </div>
+            <div className="team-progress"><div><span className="page-eyebrow">A SHARED SENSE OF PROGRESS</span><b>{state.rooms.filter((r) => r.status === 'ready').length} rooms ready for their next guest</b><span>Room progress, never individual performance.</span></div><Icon name="shield" size={28} /></div>
           </section>
         </div>
 
@@ -179,7 +181,7 @@ function NoPending({ s }: { s: SimState }) {
         <Icon name="check" size={16} />
       </span>
       <div>
-        <h2>No decision needed right now</h2>
+        <h2>You’re all caught up</h2>
         <p className="muted" style={{ margin: '4px 0 0' }}>
           {last ? `Last change: “${last.trigger}” at ${fmtTime(last.createdAt)} (${DECIDED[last.status].toLowerCase()}).` : 'FHN AI is watching room status, checkouts, absences and repairs.'}
         </p>

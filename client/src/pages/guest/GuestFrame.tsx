@@ -19,8 +19,8 @@ export function GuestFrame({
         <aside className="gx-aside">
           <Brand />
           <span className="eyebrow">Guest view · FHN Toronto Downtown</span>
-          <h1>What a guest sees</h1>
-          <p>Register, check in, and get a ready time you can plan around — then a message the moment the room is ready.</p>
+          <h1>A little less waiting.<br />A lot more welcome.</h1>
+          <p>Your room, your key, and a little peace of mind. Everything for a seamless stay, right at your fingertips.</p>
           {demoPace && (
             <span className="live-pill on">
               <span className="dot" /> Demo speed · one hotel minute every {SECONDS_PER_HOTEL_MINUTE} seconds

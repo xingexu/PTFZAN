@@ -6,6 +6,7 @@ import { SimContext, ToastContext, useToast, type Toast } from './api';
 import { ActivityContext, useActivityFeed } from './hotel/activity';
 import { hotel, useHotel } from './hotel/host';
 import { Icon, type IconName } from './components/Icon';
+import { Logo } from './components/Logo';
 import { fade } from './components/fade';
 import { useSlide } from './components/slide';
 import { GUEST_TAB, guestUrl, hasServer, HOTEL_TAB, isGuestView, separateSites } from './links';
@@ -96,7 +97,7 @@ function Away({ to }: { to: string }) {
 }
 
 const NAV: { to: string; label: string; icon: IconName; also?: string }[] = [
-  { to: '/', label: 'Live', icon: 'gauge' },
+  { to: '/', label: 'Live overview', icon: 'gauge' },
   { to: '/front-desk', label: 'Rooms', icon: 'bed' },
   { to: '/supervisor', label: 'Team', icon: 'users', also: '/attendant' },
   { to: '/engineering', label: 'Building', icon: 'building' },
@@ -108,6 +109,7 @@ function HotelShell() {
   const { pathname } = useLocation();
   const navRef = useSlide<HTMLElement>(pathname);
   const pending = state.proposals.some((p) => p.status === 'pending');
+  const current = NAV.find((n) => n.to === pathname || n.also === pathname)?.label ?? 'Live overview';
 
   useEffect(() => {
     document.title = 'FHN · Hotel view';
@@ -120,21 +122,34 @@ function HotelShell() {
       <ActivityContext.Provider value={activity}>
         <div className={`shell hq ${state.mode === 'baseline' ? 'mode-today' : 'mode-ai'}`}>
           <div className="backdrop" aria-hidden="true" />
+          <a className="skip-nav" href="#hotel-content">Skip to content</a>
+          <aside className="hq-rail glass" aria-label="Hotel workspace">
+            <NavLink to="/" className="rail-brand" aria-label="FHN · hotel view home" viewTransition>
+              <Logo /><span>FHN<small>Founders Hotel Network</small></span>
+            </NavLink>
+            <div className="rail-property"><span className="rail-property-icon"><Icon name="building" size={19} /></span><div><b>Toronto Downtown</b><span>48 rooms · One connected team</span></div></div>
+            <span className="rail-label">WORKSPACE</span>
+            <nav className="hq-nav slide" aria-label="Screens" ref={navRef}>
+              {NAV.map((n) => (
+                <NavLink key={n.to} to={n.to} end={n.to === '/'} viewTransition title={n.label} aria-label={n.label} className={({ isActive }) => (isActive || pathname === n.also ? 'active' : '')}>
+                  <Icon name={n.icon} size={18} /><span>{n.label}</span>
+                  {n.to === '/supervisor' && pending && <span className="badge" aria-label="decision needed" />}
+                </NavLink>
+              ))}
+            </nav>
+            <div className="rail-bottom">
+              <div className="rail-note"><Icon name="sparkles" size={19} /><b>A little more in sync.</b><p>Rooms, people, and guest comfort.<br />One shared view of the day.</p></div>
+              <a className="rail-guest" href={guestUrl('/')} target={GUEST_TAB}><span><Icon name="phoneDevice" size={17} />Guest experience</span><Icon name="external" size={14} /></a>
+              <div className="rail-footer"><span className="rail-avatar"><Icon name="shield" size={17} /></span><div><b>FHN Operations</b><span>Pitch the Future · 2026</span></div></div>
+            </div>
+          </aside>
           <header className="hq-top">
             <div className="hq-bar glass">
-              <NavLink to="/" className="hq-brand" aria-label="FHN · hotel view home" viewTransition>
-                FHN
-              </NavLink>
-              <nav className="hq-nav slide" aria-label="Screens" ref={navRef}>
-                {NAV.map((n) => (
-                  <NavLink key={n.to} to={n.to} end={n.to === '/'} viewTransition className={({ isActive }) => (isActive || pathname === n.also ? 'active' : '')}>
-                    <Icon name={n.icon} size={16} />
-                    <span>{n.label}</span>
-                    {n.to === '/supervisor' && pending && <span className="badge" aria-label="decision needed" />}
-                  </NavLink>
-                ))}
-              </nav>
+              <NavLink to="/" className="hq-mobile-brand" aria-label="FHN home">FHN</NavLink>
+              <div className="hq-breadcrumb"><span>Hotel workspace</span><Icon name="right" size={13} /><b>{current}</b></div>
               <div className="hq-actions">
+                <span className="hq-date">Friday, October 16</span>
+                <span className="hq-demo-label"><i />Simulation</span>
                 {hasServer && (
                   <NavLink className="hq-icon" to="/stage" title="Live text-message demo" aria-label="Live text-message demo">
                     <Icon name="monitor" size={16} />
@@ -148,7 +163,7 @@ function HotelShell() {
               </div>
             </div>
           </header>
-          <Outlet />
+          <div id="hotel-content" className="hotel-content" tabIndex={-1}><Outlet /></div>
           <DecisionCard state={state} />
           <Player state={state} />
         </div>
@@ -206,7 +221,7 @@ function Player({ state }: { state: SimState }) {
           Previous
         </button>
         <button className={state.mode === 'ai' ? 'on ai-on' : ''} disabled={busy} onClick={() => call('reset', { mode: 'ai' })} title="The new AI method">
-          New AI
+          FHN AI
         </button>
       </div>
       <div className="pl-buttons">
