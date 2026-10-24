@@ -5,7 +5,7 @@
 // POST { action: 'end', id }                    → deletes the guest's data
 import type { ServerResponse } from 'node:http';
 import { activityFor, apply, cleanRegistration, newCode, STAY_ACTIONS, type Stay } from '../shared/guest/stay.js';
-import { queryOf, readBody, send, type Req } from './_lib/http.js';
+import { queryOf, readBody, send, withDeadline, type Req } from './_lib/http.js';
 import { store } from './_lib/store.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -20,7 +20,7 @@ function changed(before: Stay, after: Stay, action: string) {
   return false;
 }
 
-export default async function handler(req: Req, res: ServerResponse) {
+export default withDeadline(async function guest(req: Req, res: ServerResponse) {
   try {
     const db = store();
     if (req.method === 'GET') {
@@ -76,4 +76,4 @@ export default async function handler(req: Req, res: ServerResponse) {
     console.error('guest api', e);
     return send(res, 503, { ok: false, message: 'The hotel’s system didn’t answer. Please try again in a moment.' });
   }
-}
+});

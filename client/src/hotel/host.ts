@@ -186,8 +186,13 @@ class HotelHost {
     const payload = { ...body, action, minute, from: s.now, viewer: this.viewer };
     const logBefore = s.log.length;
     try {
-      const sentAt = Date.now();
-      const r = await api<HotelReply>('/api/hotel', payload);
+      let sentAt = Date.now();
+      const r = await api<HotelReply>('/api/hotel', payload).catch((e) => {
+        // One more try if the server was momentarily unreachable (it reconnects to the database on its own).
+        if (!(e instanceof ApiError && (e.status === 0 || e.status >= 500))) throw e;
+        sentAt = Date.now();
+        return api<HotelReply>('/api/hotel', payload);
+      });
       this.measure(sentAt, r.serverNow);
       this.ownVersions.add(r.control.version);
       this.adopt(r, true);

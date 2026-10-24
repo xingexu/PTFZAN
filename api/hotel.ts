@@ -7,7 +7,7 @@
 import type { ServerResponse } from 'node:http';
 import { fmtTime } from '../shared/types.js';
 import { ActionError, applyAction, Replay, type Control } from '../shared/sim/timeline.js';
-import { queryOf, readBody, send, type Req } from './_lib/http.js';
+import { queryOf, readBody, send, withDeadline, type Req } from './_lib/http.js';
 import { store, type HotelStore, type RoomRow } from './_lib/store.js';
 
 const SNAPSHOT_EVERY_MS = 4000;
@@ -47,7 +47,7 @@ async function refreshTables(db: HotelStore, control: Control) {
   });
 }
 
-export default async function handler(req: Req, res: ServerResponse) {
+export default withDeadline(async function hotel(req: Req, res: ServerResponse) {
   try {
     const db = store().hotel;
     if (req.method === 'GET') {
@@ -56,7 +56,8 @@ export default async function handler(req: Req, res: ServerResponse) {
       const run = Number(q.get('run'));
       const after = run === control.run ? Math.max(0, Number(q.get('after')) || 0) : 0;
       const viewer = q.get('viewer') ?? '';
-      const [events, viewers] = await Promise.all([db.events(control.run, after), VIEWER.test(viewer) ? db.seen(viewer) : Promise.resolve(undefined)]);
+      const events = await db.events(control.run, after);
+      const viewers = VIEWER.test(viewer) ? await db.seen(viewer) : undefined;
       await refreshTables(db, control).catch((e) => console.error('hotel tables', e));
       return send(res, 200, { ok: true, control, events, serverNow: Date.now(), viewers, saved: store().kind });
     }
@@ -94,4 +95,4 @@ export default async function handler(req: Req, res: ServerResponse) {
     console.error('hotel api', e);
     return send(res, 503, { ok: false, message: 'The hotel’s system didn’t answer. Please try again in a moment.' });
   }
-}
+});

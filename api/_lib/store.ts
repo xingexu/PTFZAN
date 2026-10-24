@@ -57,6 +57,8 @@ export interface HotelStore {
 export interface Store {
   readonly kind: 'postgres' | 'memory';
   readonly hotel: HotelStore;
+  /** Drops the connection (used when it stopped answering). */
+  close(): Promise<void>;
   create(stay: Omit<Stay, 'id'>): Promise<Stay>;
   get(id: string): Promise<Stay | null>;
   /** Saves the guest's changes and any requests added since `knownRequests`. */
@@ -207,10 +209,11 @@ function postgresHotel(sql: postgres.Sql): HotelStore {
 
 function postgresStore(url: string): Store {
   // One connection per function instance, through Supabase's transaction pooler (no prepared statements).
-  const sql = postgres(url, { prepare: false, max: 1, idle_timeout: 20, connect_timeout: 10 });
+  const sql = postgres(url, { prepare: false, max: 1, idle_timeout: 10, connect_timeout: 8 });
   return {
     kind: 'postgres',
     hotel: postgresHotel(sql),
+    close: () => sql.end({ timeout: 3 }),
     async create(s) {
       const [g] = await sql<GuestRow[]>`
         insert into fhn.guests (code, name, email, party, created_at, housekeeping, setpoint)
@@ -305,6 +308,9 @@ function memoryStore(): Store {
   return {
     kind: 'memory',
     hotel: memoryHotel(),
+    async close() {
+      /* nothing to close */
+    },
     async create(s) {
       const stay = { ...copy(s as Stay), id: crypto.randomUUID() };
       guests.set(stay.id, stay);
@@ -335,5 +341,25 @@ function memoryStore(): Store {
   };
 }
 
+/**
+ * A serverless function can be frozen between requests, and the pooler may drop its socket meanwhile without
+ * telling it; a query written to that socket then waits for minutes. So a connection left unused this long is
+ * replaced before the next request rather than trusted.
+ */
+const STALE_MS = 10_000;
 let current: Store | null = null;
-export const store = () => (current ??= process.env.DATABASE_URL ? postgresStore(process.env.DATABASE_URL) : memoryStore());
+let lastUsed = 0;
+export const store = () => {
+  const now = Date.now();
+  if (now - lastUsed > STALE_MS) resetStore();
+  lastUsed = now;
+  return (current ??= process.env.DATABASE_URL ? postgresStore(process.env.DATABASE_URL) : memoryStore());
+};
+
+/** Starts over with a new connection; queries still waiting on the old one fail rather than hang. */
+export function resetStore() {
+  const old = current;
+  if (old?.kind !== 'postgres') return; // memory keeps its data
+  current = null;
+  void old.close().catch(() => undefined);
+}

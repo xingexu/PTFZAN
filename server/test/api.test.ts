@@ -51,3 +51,20 @@ describe('guest API', () => {
     expect((await call(activity, 'GET', '/api/activity?after=0')).data.items).toHaveLength(0);
   });
 });
+
+describe('deadline', () => {
+  it('answers 503 when the database stops responding, and ignores a reply that comes too late', async () => {
+    const { send, withDeadline } = await import('../../api/_lib/http.js');
+    let release!: () => void;
+    const stuck = withDeadline(async (_req, res) => {
+      await new Promise<void>((r) => (release = r));
+      send(res, 200, { ok: true });
+    }, 30);
+    const res = { statusCode: 0, body: '', headersSent: false, setHeader: () => undefined, end(s: string) { this.body = s; this.headersSent = true; } };
+    await stuck({ method: 'GET', url: '/api/hotel' } as never, res as never);
+    expect(res.statusCode).toBe(503);
+    release();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(res.statusCode).toBe(503);
+  });
+});
