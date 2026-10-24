@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import type { GuestRequest, GuestView, HousekeepingPref, Hvac, RoomStatus } from '../../../../shared/types';
 import { fmtRange, fmtTime } from '../../../../shared/types';
 import { ToastContext, useToast, type Toast } from '../../api';
@@ -9,7 +9,7 @@ import { Icon, type IconName } from '../../components/Icon';
 import { Brand } from '../../components/Logo';
 import { useSlide } from '../../components/slide';
 import { serverNow, useJourney } from '../../guest/journey';
-import { guestPath, HOTEL_TAB, hotelUrl } from '../../links';
+import { guestPath } from '../../links';
 import { GuestFrame } from './GuestFrame';
 import { GuestLogoutDialog } from './GuestAccess';
 import { logOutGuest } from '../../guest/access';
@@ -300,16 +300,16 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
 
         <section className="gx-group" aria-label="FHN AI">
           <div className="gx-list">
-            <a className="gx-row" href={hotelUrl('/')} target={HOTEL_TAB}>
+            <Link className="gx-row" to="/login">
               <span className="gx-row-ic hot">
                 <Icon name="sparkles" size={16} />
               </span>
               <span className="gx-row-label">
-                See the hotel’s day
-                <small>Explore the operations demo</small>
+                Hotel team workspace
+                <small>Staff sign-in</small>
               </span>
               <Icon name="right" size={15} className="gx-row-go" />
-            </a>
+            </Link>
           </div>
         </section>
 

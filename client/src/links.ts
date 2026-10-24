@@ -1,47 +1,10 @@
-// Two views of one hotel: the hotel view (staff) and the guest view (the hotel's app).
-// - Locally, the server hosts each on its own port and tells the page which one it is.
-// - On Vercel, each is its own project: VITE_VIEW picks the view at build time, and
-//   VITE_HOTEL_URL / VITE_GUEST_URL say where the other one lives.
-// - With neither (Vite dev), both share one origin and the guest app lives under /guest.
+// One site, with guest access under /guest and the hotel workspace under /overview.
+// Legacy VITE_VIEW / VITE_*_URL settings no longer split the app into separate sites.
+const injected = (window as unknown as { __FHN__?: { server?: boolean; guestQr?: string } }).__FHN__;
 
-export type View = 'hotel' | 'guest';
-
-interface ViewLinks {
-  view: View;
-  hotel: string;
-  guest: string;
-  guestQr: string;
-  /** Served by the local server, so the live text-message demo is available. */
-  server?: boolean;
-}
-
-const injected = (window as unknown as { __FHN__?: ViewLinks }).__FHN__;
-const here = window.location.origin;
-const env = import.meta.env;
-const trim = (u?: string) => (u ? u.replace(/\/$/, '') : undefined);
-
-const view: View = injected?.view ?? (env.VITE_VIEW === 'guest' ? 'guest' : 'hotel');
-const hotel = injected?.hotel ?? trim(env.VITE_HOTEL_URL) ?? here;
-const guest = injected?.guest ?? trim(env.VITE_GUEST_URL) ?? here;
-
-export const LINKS: ViewLinks = { view, hotel, guest, guestQr: injected?.guestQr ?? guest, server: injected?.server };
-
-/** True when this tab is the guest view on its own site. */
-export const isGuestView = view === 'guest';
-/** True when the two views live on different sites (each in its own tab). */
-export const separateSites = hotel !== guest;
 /** The live text-message demo needs the local server. */
 export const hasServer = !!injected?.server;
-
-/** Where the guest app's pages live on this site. */
-export const GUEST_BASE = isGuestView ? '' : '/guest';
-export const guestPath = (path = '/') => `${GUEST_BASE}${path === '/' && GUEST_BASE ? '' : path}` || '/';
-/** A link to the guest app, wherever it lives. */
-export const guestUrl = (path = '/') => (separateSites ? LINKS.guest + path : here + guestPath(path));
-export const hotelUrl = (path = '/') => (separateSites ? LINKS.hotel + path : here + path);
-/** What a QR code should open: the guest app, reachable from a phone on the same network when served locally. */
-export const guestQrUrl = () => (LINKS.guestQr !== LINKS.guest ? `${LINKS.guestQr}/` : guestUrl('/'));
-
-/** Named tabs, so links from one view reuse the other view's tab where the browser allows it. */
-export const GUEST_TAB = 'fhn-guest';
-export const HOTEL_TAB = 'fhn-hotel';
+export const guestPath = (path = '/') => `/guest${path === '/' ? '' : path}`;
+export const guestUrl = (path = '/') => window.location.origin + guestPath(path);
+/** On the local server, let phones reach the same site over Wi-Fi. */
+export const guestQrUrl = () => (injected?.guestQr ?? window.location.origin) + guestPath();

@@ -3,7 +3,7 @@ import { fmtTime } from '../../../../shared/types';
 import { Icon } from '../../components/Icon';
 import { Brand } from '../../components/Logo';
 import { SECONDS_PER_HOTEL_MINUTE } from '../../../../shared/guest/stay';
-import { HOTEL_TAB, hotelUrl } from '../../links';
+import { Link } from 'react-router-dom';
 
 /**
  * Phones get the app full-screen. On a laptop or projector the app sits in a phone frame,
@@ -39,9 +39,7 @@ export function GuestFrame({
             </li>
           </ul>
           <p style={{ marginTop: 18, fontSize: 13 }}>
-            <a href={hotelUrl('/')} target={HOTEL_TAB}>
-              Hotel view ↗
-            </a>
+            <Link to="/">Back to Welcome</Link>
           </p>
         </aside>
         <div className="gx-device">
@@ -59,7 +57,7 @@ export function GuestFrame({
           </div>
           {banners}
           <div className="gx-scroll">
-            {onLogout && <nav className="guest-session-bar" aria-label="Your stay account"><span>Your stay</span><div className="guest-session-actions">{onAccessCode && <button type="button" onClick={onAccessCode}>Access code</button>}<button type="button" onClick={onLogout}><Icon name="logout" size={15} />Log out</button></div></nav>}
+            <nav className="guest-session-bar" aria-label="Your stay account"><Link to="/" className="guest-welcome-link" aria-label="Back to Welcome"><Icon name="home" size={16} />Welcome</Link>{onLogout && <div className="guest-session-actions">{onAccessCode && <button type="button" onClick={onAccessCode}>Access code</button>}<button type="button" onClick={onLogout}><Icon name="logout" size={15} />Log out</button></div>}</nav>
             {children}
           </div>
           {tabs}

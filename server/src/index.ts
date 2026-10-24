@@ -126,8 +126,6 @@ app.use('/api', (_req, res) => bad(res, 404, 'Not found'));
 // ───────────── Two views: hotel (staff) and guest ─────────────
 // Locally the hotel view runs on PORT and the guest app on PORT+1, so each opens in its own tab.
 // On a single public URL both live side by side under one origin (guest app at /guest).
-const GUEST_PORT = Number(process.env.GUEST_PORT ?? PORT + 1);
-let guestListening = false;
 
 /** IPv4 addresses phones on the same Wi-Fi can reach. */
 const lanHosts = () =>
@@ -136,35 +134,12 @@ const lanHosts = () =>
     .filter((n): n is NonNullable<typeof n> => !!n && n.family === 'IPv4' && !n.internal)
     .map((n) => n.address);
 
-interface ViewLinks {
-  /** Which view this tab is: decides the routes the client shows. */
-  view: 'hotel' | 'guest';
-  /** Served by this server, so the live text demo is available. */
-  server: true;
-  hotel: string;
-  guest: string;
-  /** What the QR code points at — a Wi-Fi address when the presenter is on localhost. */
-  guestQr: string;
-}
-
-function linksFor(req: Request): ViewLinks {
-  const host = req.get('host') ?? '';
-  const named = host.match(/^(.+):(\d+)$/);
-  if (PUBLIC_URL || !named || !guestListening) {
-    const origin = originOf(req);
-    return { view: 'hotel', server: true, hotel: origin, guest: origin, guestQr: origin };
-  }
-  const name = named[1];
-  const at = (port: number) => `${req.protocol}://${name}:${port}`;
-  const local = name === 'localhost' || name === '127.0.0.1';
-  const lan = lanHosts()[0];
-  return {
-    view: req.socket.localPort === GUEST_PORT ? 'guest' : 'hotel',
-    server: true,
-    hotel: at(PORT),
-    guest: at(GUEST_PORT),
-    guestQr: local && lan ? `http://${lan}:${GUEST_PORT}` : at(GUEST_PORT),
-  };
+/** Guest QR codes use this same site's Wi-Fi address during a local demo. */
+function linksFor(req: Request) {
+  const origin = originOf(req);
+  const local = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+  const lan = local && !PUBLIC_URL ? lanHosts()[0] : undefined;
+  return { server: true, guestQr: lan ? `http://${lan}:${PORT}` : origin };
 }
 
 // ───────────── Static client (production) ─────────────
@@ -174,7 +149,7 @@ const indexFile = path.join(dist, 'index.html');
 if (existsSync(indexFile)) {
   app.use(express.static(dist, { index: false, maxAge: '1h' }));
   app.get('*', (req, res) => {
-    // Tell the page which view it is and where the other view lives.
+    // Enable local-only tools and make guest QR codes reachable over Wi-Fi.
     const links = linksFor(req);
     const html = readFileSync(indexFile, 'utf8').replace('</head>', `<script>window.__FHN__=${JSON.stringify(links)}</script></head>`);
     res.setHeader('Cache-Control', 'no-cache');
@@ -195,7 +170,7 @@ if (existsSync(indexFile)) {
   );
 }
 
-/** Opens both views in the default browser (`npm run demo`). */
+/** Opens the single welcome page in the default browser (`npm run demo`). */
 function openTabs(urls: string[]) {
   const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
   for (const u of urls) execFile(cmd, process.platform === 'win32' ? ['/c', 'start', '', u] : [u], () => undefined);
@@ -205,24 +180,15 @@ const portBusy = (port: number) =>
   `\nPort ${port} is already in use (another copy of the FHN server or another dev server).\nStop it, or start on different ports:  PORT=8790 npm start\n`;
 
 const server = app.listen(PORT, () => {
-  const guest = app.listen(GUEST_PORT, () => {
-    guestListening = true;
-    const m = messenger.status;
-    console.log(`\nFHN is running`);
-    console.log(`  Hotel view (staff):  http://localhost:${PORT}`);
-    console.log(`  Guest view (app):    http://localhost:${GUEST_PORT}`);
-    for (const h of lanHosts()) console.log(`  phones on the same Wi-Fi: guest app http://${h}:${GUEST_PORT} · stage remote http://${h}:${PORT}/stage/remote`);
-    console.log(`Hotel day and guest stays saved to: ${store().kind === 'postgres' ? 'Postgres (DATABASE_URL)' : 'memory — set DATABASE_URL in .env to use the database'}`);
-    console.log(`Messaging: ${m.provider} — ${m.note}`);
-    console.log(`Stage guest "${STAGE.name}" · room ${STAGE.room} · phone ${STAGE.phone ? maskPhone(normalizePhone(STAGE.phone)) || 'invalid' : 'not set'}${STAGE.pin ? ' · PIN on' : ''}`);
-    console.log('Press Ctrl+C to stop.\n');
-    if (process.argv.includes('--open')) openTabs([`http://localhost:${PORT}`, `http://localhost:${GUEST_PORT}`]);
-  });
-  guest.on('error', (e: NodeJS.ErrnoException) => {
-    // Still usable on one port: the guest app lives at /guest.
-    console.warn(e.code === 'EADDRINUSE' ? portBusy(GUEST_PORT) : String(e));
-    console.log(`Hotel view: http://localhost:${PORT} · guest app on the same port at /guest`);
-  });
+  const m = messenger.status;
+  console.log(`\nFounders Hotel Network is running at http://localhost:${PORT}`);
+  console.log('  Welcome → Guest access or Hotel team sign-in');
+  for (const h of lanHosts()) console.log(`  Phones on the same Wi-Fi: http://${h}:${PORT}`);
+  console.log(`Hotel day and guest stays saved to: ${store().kind === 'postgres' ? 'Postgres (DATABASE_URL)' : 'memory — set DATABASE_URL in .env to use the database'}`);
+  console.log(`Messaging: ${m.provider} — ${m.note}`);
+  console.log(`Stage guest "${STAGE.name}" · room ${STAGE.room} · phone ${STAGE.phone ? maskPhone(normalizePhone(STAGE.phone)) || 'invalid' : 'not set'}${STAGE.pin ? ' · PIN on' : ''}`);
+  console.log('Press Ctrl+C to stop.\n');
+  if (process.argv.includes('--open')) openTabs([`http://localhost:${PORT}`]);
 });
 
 server.on('error', (e: NodeJS.ErrnoException) => {
