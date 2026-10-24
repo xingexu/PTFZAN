@@ -3,10 +3,16 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useSlide } from './slide';
 
 /** One-line page header for the hotel view: a title and the page's own controls. */
+const SUBTITLES: Record<string, string> = {
+  Rooms: 'Room status, ready times and arrivals.',
+  Team: 'Housekeeping assignments and staffing.',
+  Building: 'Repairs, maintenance and room temperature.',
+};
+
 export function PageHead({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="hq-head">
-      <h1>{title}</h1>
+      <div><span className="page-eyebrow">TORONTO DOWNTOWN</span><h1>{title}</h1>{SUBTITLES[title] && <p className="page-subtitle">{SUBTITLES[title]}</p>}</div>
       {children && <div className="hq-head-actions">{children}</div>}
     </div>
   );

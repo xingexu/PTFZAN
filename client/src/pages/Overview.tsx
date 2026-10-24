@@ -37,11 +37,14 @@ export default function Overview() {
   return (
     <main className="page live">
       <header className="sim-head">
-        <span className="sim-chip">
-          <Icon name="play" size={11} /> Simulation
-        </span>
-        <h1>FHN Toronto Downtown · Friday, October 16</h1>
+        <div><span className="page-eyebrow">TORONTO DOWNTOWN</span><h1>Today’s overview</h1><p className="page-subtitle">Room readiness and guest arrivals for Friday, October 16.</p></div>
+        <span className="sim-chip"><Icon name={state.finished ? 'check' : 'clock'} size={13} />{state.finished ? 'Shift complete' : 'Friday, October 16 · Live simulation'}</span>
       </header>
+      <section className="live-summary" aria-label="Shift at a glance">
+        <div className="summary-metric glass"><span className="summary-metric-icon"><Icon name="bed" size={20} /></span><div><span>Rooms ready</span><b><Num value={aiRooms.filter((r) => r.status === 'ready').length} /><small> / 48</small></b></div><span className="summary-metric-note">FHN AI</span></div>
+        <div className="summary-metric glass"><span className="summary-metric-icon"><Icon name="users" size={20} /></span><div><span>Guests waiting</span><b><Num value={ai?.lobbyWaiting ?? 0} /><small> in the lobby</small></b></div><span className="summary-metric-note">FHN AI</span></div>
+        <div className="summary-metric glass"><span className="summary-metric-icon"><Icon name="leaf" size={20} /></span><div><span>Energy saved</span><b><Num value={ai?.kwhSaved ?? 0} /><small> kWh</small></b></div><span className="summary-metric-note">Today</span></div>
+      </section>
       <section className="versus" aria-label="Every room, side by side">
         <Board kind="today" rooms={todayRooms} m={today} />
         <Board kind="ai" rooms={aiRooms} m={ai} />
@@ -83,8 +86,9 @@ function Board({ kind, rooms, m }: { kind: 'today' | 'ai'; rooms: BoardRoom[]; m
     <div className={`board glass ${kind}`}>
       <header className="bd-head">
         <div className="bd-title">
-          <h2>{kind === 'ai' ? 'New AI' : 'Previous method'}</h2>
-          <p>{kind === 'ai' ? 'One live plan for every room' : 'Paper lists and phone calls'}</p>
+          <span className="board-eyebrow">{kind === 'ai' ? 'AI-ASSISTED PLAN' : 'MANUAL PLAN'}</span>
+          <h2>{kind === 'ai' ? 'With FHN AI' : 'Previous method'}</h2>
+          <p>{kind === 'ai' ? 'Live room status and updated assignments.' : 'Paper lists and phone updates.'}</p>
         </div>
         <div className="bd-stat" aria-label={`${ready} of ${total} wedding rooms ready`}>
           <span className="bd-stat-label">Wedding rooms ready</span>

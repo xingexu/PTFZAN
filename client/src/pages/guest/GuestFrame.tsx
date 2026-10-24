@@ -18,9 +18,9 @@ export function GuestFrame({
       <div className="gx-stage">
         <aside className="gx-aside">
           <Brand />
-          <span className="eyebrow">Guest view · FHN Toronto Downtown</span>
-          <h1>What a guest sees</h1>
-          <p>Register, check in, and get a ready time you can plan around — then a message the moment the room is ready.</p>
+          <span className="eyebrow">Toronto Downtown · Guest app</span>
+          <h1>Welcome to<br />Toronto Downtown.</h1>
+          <p>Check in, see when your room is ready, and use your mobile key.</p>
           {demoPace && (
             <span className="live-pill on">
               <span className="dot" /> Demo speed · one hotel minute every {SECONDS_PER_HOTEL_MINUTE} seconds
@@ -31,19 +31,19 @@ export function GuestFrame({
               <Icon name="clock" size={16} /> Check in online and see when your room will be ready
             </li>
             <li>
-              <Icon name="bell" size={16} /> A message the moment it&rsquo;s ready — no waiting in the lobby
+              <Icon name="bell" size={16} /> Get a message when your room is ready
             </li>
             <li>
               <Icon name="key" size={16} /> Mobile key on the door and elevator
             </li>
             <li>
-              <Icon name="wrench" size={16} /> Report a problem once and see who&rsquo;s fixing it
+              <Icon name="wrench" size={16} /> Report a problem and follow the repair
             </li>
             <li>
-              <Icon name="leaf" size={16} /> Saves energy while you&rsquo;re out, comfortable when you&rsquo;re back
+              <Icon name="leaf" size={16} /> Set your room temperature
             </li>
             <li>
-              <Icon name="calendar" size={16} /> Skipping cleaning helps the hotel plan tomorrow&rsquo;s staff
+              <Icon name="calendar" size={16} /> Choose whether you need housekeeping tomorrow
             </li>
           </ul>
           <p style={{ marginTop: 18, fontSize: 13 }}>

@@ -5,7 +5,7 @@ import { fmtRange, fmtTime } from '../../../shared/types';
 import { ApiError, getStagePin, setStagePin, stageApi, useEventStream, useToast } from '../api';
 import { chime } from '../components/chime';
 import { Icon } from '../components/Icon';
-import { Brand, Logo } from '../components/Logo';
+import { Brand } from '../components/Logo';
 import { latestFor, PinDialog } from '../components/stageShared';
 
 /** Projector screen for the live "Mike gets a text" moment. Space / → / PageDown = next step, Shift+R = reset. */
@@ -267,10 +267,7 @@ function PhoneMock({ s }: { s: StageState }) {
           <span aria-hidden="true">▂▄▆ ▮</span>
         </div>
         <div className="sms-head">
-          <div className="sms-avatar" aria-hidden="true">
-            <Logo className="brand-mark" />
-          </div>
-          <div className="sms-name">FHN Toronto</div>
+          <div className="sms-name">Founders Hotel Network</div>
           <div className="muted" style={{ fontSize: 12 }}>Text Message</div>
         </div>
         <div className="sms-thread" aria-live="polite">
@@ -292,7 +289,7 @@ function PhoneMock({ s }: { s: StageState }) {
               <span className="sms-banner-app">MESSAGES</span>
               <span>now</span>
             </div>
-            <b>FHN Toronto</b>
+            <b>Founders Hotel Network</b>
             <div>{banner.text}</div>
           </div>
         )}

@@ -6,7 +6,7 @@ import { fmtRange, fmtTime } from '../../../../shared/types';
 import { ToastContext, useToast, type Toast } from '../../api';
 import { chime } from '../../components/chime';
 import { Icon, type IconName } from '../../components/Icon';
-import { Brand, Logo } from '../../components/Logo';
+import { Brand } from '../../components/Logo';
 import { useSlide } from '../../components/slide';
 import { useJourney } from '../../guest/journey';
 import { guestPath, HOTEL_TAB, hotelUrl } from '../../links';
@@ -135,7 +135,7 @@ export default function GuestApp() {
     setPerm(p);
     if (p === 'granted') {
       void run('prefs', { notifyBrowser: true }).catch(() => undefined);
-      toast({ title: 'Notifications on', body: 'We’ll tell you the moment your room is ready.', tone: 'good' });
+      toast({ title: 'Notifications on', body: 'We’ll let you know when your room is ready.', tone: 'good' });
     }
   };
 
@@ -199,12 +199,9 @@ function PhoneBanners({ items }: { items: Banner[] }) {
     <div className="gx-banners" role="status" aria-live="polite">
       {items.map((b) => (
         <div key={b.id} className={`gx-banner ${b.tone ?? ''} ${b.leaving ? 'leaving' : ''}`}>
-          <span className="app-ic">
-            <Logo className="brand-mark" />
-          </span>
           <div className="grow">
             <div className="meta">
-              <span>FHN</span>
+              <span>Founders Hotel Network</span>
               <span>now</span>
             </div>
             <b>{b.title}</b>
@@ -231,7 +228,7 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
     <>
       <header className="gx-hero">
         <div className="gx-top">
-          <span className="gx-mark">FHN</span>
+          <Brand />
           <button className="gx-iconbtn" onClick={() => go('chat')} aria-label={`Messages${unread ? `, ${unread} new` : ''}`}>
             <Icon name="bell" size={19} />
             {unread > 0 && <span className="badge" />}
@@ -354,7 +351,7 @@ function RoomStatusCard({ v, go, act }: { v: GuestView; go: (t: Tab) => void; ac
             <Icon name="clock" size={17} /> See exactly when your room will be ready
           </li>
           <li>
-            <Icon name="bell" size={17} /> Get a message the moment it is
+            <Icon name="bell" size={17} /> Notify me when it’s ready
           </li>
           <li>
             <Icon name="key" size={17} /> Go straight up with your mobile key
@@ -380,7 +377,7 @@ function RoomStatusCard({ v, go, act }: { v: GuestView; go: (t: Tab) => void; ac
         <span className="rs-k">You&rsquo;re in</span>
         <h2>Welcome to room {r.id}</h2>
         <p className="rs-note">
-          Floor {r.floor} · {r.type}. Anything not right? Report it once below and you&rsquo;ll see who&rsquo;s on it.
+          Floor {r.floor} · {r.type}. Need anything? Send a request or contact the front desk below.
         </p>
       </section>
     );
@@ -505,7 +502,7 @@ function KeyTab({ v, act }: { v: GuestView; act: Act }) {
     <>
       <div className="gx-page-head gx-top-pad">
         <h1>Mobile key</h1>
-        <p>{live ? 'Hold your phone near the lock.' : 'Your key activates the moment your room is ready.'}</p>
+        <p>{live ? 'Hold your phone near the lock.' : 'Your key will activate when your room is ready.'}</p>
       </div>
       <div className="key-wrap">
         <div className={`key-card ${live ? '' : 'locked'}`}>
@@ -626,7 +623,7 @@ function ChatTab({ v }: { v: GuestView }) {
     <>
       <div className="gx-page-head gx-top-pad">
         <h1>Messages</h1>
-        <p>From FHN Toronto Downtown</p>
+        <p>From the front desk · Toronto Downtown</p>
       </div>
       <div className="chat">
         <span className="chat-day">Today</span>
@@ -790,7 +787,7 @@ function IssueSheet({ v, act, onClose }: { v: GuestView; act: Act; onClose: () =
   }
   return (
     <>
-      <SheetHead title="Report a problem" sub={`Room ${v.room.id} · one report is enough — you’ll see who’s fixing it and when.`} onClose={onClose} />
+      <SheetHead title="Report a problem" sub={`Room ${v.room.id} · Tell us what needs attention. You can follow the repair here.`} onClose={onClose} />
       <div className="chips">
         {ISSUES.map((i) => (
           <button key={i.label} className={`chip ${pick === i.label ? 'on' : ''}`} onClick={() => setPick(i.label)}>
