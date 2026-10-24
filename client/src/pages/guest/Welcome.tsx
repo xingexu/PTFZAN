@@ -1,92 +1,59 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { cleanRegistration } from '../../../../shared/guest/stay';
 import { Icon } from '../../components/Icon';
 import { Brand } from '../../components/Logo';
-import { register, savedStayId } from '../../guest/journey';
+import { register, resumeStay, savedStayId } from '../../guest/journey';
+import { legacyStayId } from '../../guest/access';
 import { guestPath, HOTEL_TAB, hotelUrl } from '../../links';
 import { GuestFrame } from './GuestFrame';
 
-/** Where a guest starts: register for the stay, then continue in the app. */
+/** New visits open here; returning guests choose to open their stay explicitly. */
 export default function Welcome() {
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  const [mode, setMode] = useState<'new' | 'return'>(params.get('access') === 'return' ? 'return' : 'new');
   const [name, setName] = useState('Felix Qin');
   const [email, setEmail] = useState('');
   const [party, setParty] = useState(2);
+  const [code, setCode] = useState('');
+  const [legacy] = useState(legacyStayId);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    document.title = 'Welcome · Founders Hotel Network';
-  }, []);
-
+  useEffect(() => { document.title = 'Guest access · Founders Hotel Network'; }, []);
   if (savedStayId()) return <Navigate to={guestPath('/stay')} replace />;
 
-  const join = async (e: FormEvent) => {
-    e.preventDefault();
-    setErr(null);
+  const enter = async (event?: FormEvent, savedCode?: string) => {
+    event?.preventDefault();
+    setErr(null); setBusy(true);
     try {
-      // Same checks the hotel's server makes, so mistakes show before anything is sent.
-      const input = cleanRegistration({ name, email, party });
-      setBusy(true);
-      await register(input);
+      if (mode === 'return' || savedCode) await resumeStay(savedCode ?? code);
+      else await register(cleanRegistration({ name, email, party }));
       nav(guestPath('/stay'), { viewTransition: true });
-    } catch (e2) {
-      setErr((e2 as Error).message);
-      setBusy(false);
-    }
+    } catch (error) { setErr((error as Error).message); setBusy(false); }
   };
-
   return (
-    <GuestFrame guestName={name}>
-      <header className="onboard-hero gx-hero">
-        <Brand />
-        <h1>Good Evening<br />{name.trim() || 'Felix Qin'}</h1>
-        <p>Welcome to Toronto Downtown. Register to begin your stay.</p>
-      </header>
+    <GuestFrame guestName={mode === 'new' ? name : 'Felix Qin'}>
+      <header className="onboard-hero gx-hero"><Brand /><span className="guest-access-label">GUEST ACCESS</span><h1>Good Evening<br />{mode === 'new' ? name.trim() || 'Felix Qin' : 'Felix Qin'}</h1><p>Welcome to Toronto Downtown.</p></header>
       <div className="gx-body">
-        <form className="gx-card pad" onSubmit={join} noValidate>
-          <div className="field">
-            <label htmlFor="name">Full name</label>
-            <input id="name" className="input" autoComplete="name" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Jordan Lee" />
+        <section className="gx-card pad guest-entry-card">
+          <div className="guest-access-tabs" aria-label="Guest access options">
+            <button type="button" aria-pressed={mode === 'new'} onClick={() => { setMode('new'); setErr(null); }} disabled={busy}>New stay</button>
+            <button type="button" aria-pressed={mode === 'return'} onClick={() => { setMode('return'); setErr(null); }} disabled={busy}>Returning guest</button>
           </div>
-          <div className="field" style={{ marginTop: 14 }}>
-            <label htmlFor="email">
-              Email <span className="gx-muted" style={{ fontWeight: 500 }}>(optional)</span>
-            </label>
-            <input id="email" className="input" type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-          </div>
-          <div className="field" style={{ marginTop: 14 }}>
-            <span className="label" id="party-label">
-              Guests in your room
-            </span>
-            <div className="stepper" role="group" aria-labelledby="party-label">
-              <button type="button" className="round" onClick={() => setParty(Math.max(1, party - 1))} disabled={party <= 1} aria-label="One fewer guest">
-                <Icon name="minus" size={16} />
-              </button>
-              <b aria-live="polite">{party}</b>
-              <button type="button" className="round" onClick={() => setParty(Math.min(4, party + 1))} disabled={party >= 4} aria-label="One more guest">
-                <Icon name="plus" size={16} />
-              </button>
-            </div>
-          </div>
-          {err && (
-            <p role="alert" style={{ color: 'var(--red-ink)', fontWeight: 600, margin: '12px 0 0', fontSize: 13.5 }}>
-              {err}
-            </p>
-          )}
-          <button className="gbtn navy" style={{ marginTop: 18 }} disabled={busy}>
-            {busy ? 'Registering…' : 'Register'} <Icon name="arrow" size={17} />
-          </button>
-          <p className="gx-muted" style={{ fontSize: 12, margin: '10px 0 0' }}>Demo only. Saved with the hotel so staff can see your stay; ending your stay deletes it.</p>
-        </form>
-        <div className="gx-foot">
-          Founders Hotel Network · 42 hotels across Ontario, British Columbia and Alberta
-          <br />
-          <a href={hotelUrl('/')} target={HOTEL_TAB} style={{ display: 'inline-block', marginTop: 8 }}>
-            Open the hotel view
-          </a>
-        </div>
+          <form onSubmit={(e) => void enter(e)} noValidate>
+            {mode === 'new' ? <>
+              <div className="field"><label htmlFor="name">Full name</label><input id="name" className="input" autoComplete="name" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" /></div>
+              <div className="field"><label htmlFor="email">Email <span className="gx-muted">(optional)</span></label><input id="email" className="input" type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></div>
+              <div className="guest-party-field"><span className="label" id="party-label">Guests in your room</span><div className="stepper" role="group" aria-labelledby="party-label"><button type="button" className="round" onClick={() => setParty(Math.max(1, party - 1))} disabled={party <= 1} aria-label="One fewer guest"><Icon name="minus" size={16} /></button><b aria-live="polite">{party}</b><button type="button" className="round" onClick={() => setParty(Math.min(4, party + 1))} disabled={party >= 4} aria-label="One more guest"><Icon name="plus" size={16} /></button></div></div>
+            </> : <div className="field"><label htmlFor="guest-code">Private access code</label><input id="guest-code" className="input" type="password" autoComplete="off" spellCheck={false} value={code} onChange={(e) => setCode(e.target.value)} placeholder="Paste your access code" /><p className="guest-entry-note">Use the code you saved before logging out. Your room and requests will be waiting.</p></div>}
+            {err && <p role="alert" className="admin-error">{err}</p>}
+            <button className="gbtn navy" disabled={busy}>{busy ? 'Opening your stay…' : mode === 'new' ? 'Begin your stay' : 'Open my stay'}<Icon name="arrow" size={17} /></button>
+            {legacy && <button type="button" className="access-secondary" disabled={busy} onClick={() => void enter(undefined, legacy)}>Use this device’s saved stay</button>}
+            <p className="guest-entry-note guest-entry-foot">{mode === 'new' ? 'Demo stay · Your details are saved with the hotel.' : 'Your access code is private. Keep it somewhere safe.'}</p>
+          </form>
+        </section>
+        <div className="gx-foot"><span>Founders Hotel Network</span><a className="access-secondary" href={hotelUrl('/')} target={HOTEL_TAB} rel="noopener">Hotel team sign-in <Icon name="arrow" size={14} /></a></div>
       </div>
     </GuestFrame>
   );

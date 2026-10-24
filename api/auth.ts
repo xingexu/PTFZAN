@@ -1,5 +1,5 @@
 import type { ServerResponse } from 'node:http';
-import { adminConfig, adminSession, isAdmin, loginLimit, sameOrigin, SESSION_SECONDS, verifyPassword } from './_lib/admin-auth.js';
+import { adminConfig, adminSession, isAdmin, loginLimit, sameOrigin, SESSION_SECONDS, tabHash, verifyPassword } from './_lib/admin-auth.js';
 import { readBody, send, type Req } from './_lib/http.js';
 
 export default async function auth(req: Req, res: ServerResponse) {
@@ -7,7 +7,7 @@ export default async function auth(req: Req, res: ServerResponse) {
     const config = adminConfig();
     if (!config) return send(res, 503, { ok: false, message: 'Admin sign-in is being configured. Please try again shortly.' });
     const session = await adminSession(req, res);
-    if (req.method === 'GET') return send(res, 200, { ok: true, authenticated: isAdmin(session), username: isAdmin(session) ? session.username : undefined });
+    if (req.method === 'GET') return send(res, 200, { ok: true, authenticated: isAdmin(session, req), username: isAdmin(session, req) ? session.username : undefined });
     if (req.method !== 'POST') return send(res, 405, { ok: false, message: 'Use GET or POST' });
     if (!sameOrigin(req)) return send(res, 403, { ok: false, message: 'Please sign in from the hotel website.' });
     if (!String(req.headers['content-type']).startsWith('application/json')) return send(res, 415, { ok: false, message: 'Use JSON' });
@@ -18,6 +18,7 @@ export default async function auth(req: Req, res: ServerResponse) {
       return send(res, 200, { ok: true, authenticated: false });
     }
     if (body.action !== 'login') return send(res, 400, { ok: false, message: 'Unknown action' });
+    if (!tabHash(req)) return send(res, 400, { ok: false, message: 'Refresh the page and try signing in again.' });
     const retry = loginLimit(req);
     if (retry) {
       res.setHeader('Retry-After', retry);
@@ -28,6 +29,7 @@ export default async function auth(req: Req, res: ServerResponse) {
     const valid = await verifyPassword(body.password, config.passwordHash);
     if (!valid || body.username.trim() !== config.username) return send(res, 401, { ok: false, message: 'The username or password is incorrect.' });
     session.username = config.username;
+    session.tabHash = tabHash(req);
     session.credentialVersion = config.version;
     session.expiresAt = Date.now() + SESSION_SECONDS * 1000;
     await session.save();

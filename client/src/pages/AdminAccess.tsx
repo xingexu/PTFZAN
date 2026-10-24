@@ -4,12 +4,24 @@ import { api } from '../api';
 import { Brand } from '../components/Logo';
 import { Icon } from '../components/Icon';
 import { stopHotel } from '../hotel/host';
+import { adminTabKey, clearAdminTab, startAdminTab } from '../session';
+import { guestUrl } from '../links';
 
 type SessionReply = { authenticated: boolean };
 const destination = (value: string | null) => value && /^\/(?!\/)/.test(value) && !value.includes('\\') && !/^\/(login|logout)/.test(value) ? value : '/';
 
 function AccessFrame({ children }: { children: ReactNode }) {
-  return <main className="admin-access"><div className="backdrop" aria-hidden="true" /><Link to="/login" className="admin-brand"><Brand /></Link><section className="card admin-access-card">{children}</section><p className="admin-access-foot">Toronto Downtown · Hotel operations</p></main>;
+  return (
+    <main className="admin-access">
+      <div className="backdrop" aria-hidden="true" />
+      <header className="access-header"><Link to="/login" className="admin-brand"><Brand /></Link><a href={guestUrl('/')} className="access-guest-link">Guest access <Icon name="arrow" size={16} /></a></header>
+      <div className="access-layout">
+        <section className="access-intro" aria-label="Toronto Downtown hotel"><span className="eyebrow">FOUNDERS HOTEL NETWORK</span><h2>Toronto<br /><em>Downtown.</em></h2><p>Rooms, housekeeping<br />and guest requests.</p><span className="access-location"><Icon name="building" size={16} /> Toronto, Ontario</span></section>
+        <section className="card admin-access-card">{children}</section>
+      </div>
+      <footer className="admin-access-foot"><span>Hotel team access</span><span>Toronto Downtown · Hotel operations</span></footer>
+    </main>
+  );
 }
 
 export function RequireAdmin() {
@@ -18,12 +30,15 @@ export function RequireAdmin() {
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
-    const check = () => api<SessionReply>('/api/auth').then((r) => {
+    const check = () => {
+      if (!adminTabKey()) { stopHotel(); setStatus('signed-out'); return; }
+      return api<SessionReply>('/api/auth').then((r) => {
       if (!active) return;
-      if (!r.authenticated) stopHotel();
+      if (!r.authenticated) { stopHotel(); clearAdminTab(); }
       setStatus(r.authenticated ? 'ready' : 'signed-out');
     }).catch(() => { if (active) setStatus((current) => current === 'ready' ? current : 'error'); });
-    const expired = () => { stopHotel(); setStatus('signed-out'); };
+    };
+    const expired = () => { stopHotel(); clearAdminTab(); setStatus('signed-out'); };
     void check();
     const timer = window.setInterval(check, 30_000);
     window.addEventListener('focus', check);
@@ -48,17 +63,34 @@ export function SignIn() {
   useEffect(() => {
     document.title = 'Sign in · Founders Hotel Network';
     let active = true;
-    void api<SessionReply>('/api/auth').then((r) => { if (active && r.authenticated) setSignedIn(true); }).catch(() => undefined);
+    if (adminTabKey()) void api<SessionReply>('/api/auth').then((r) => { if (active && r.authenticated) setSignedIn(true); }).catch(() => undefined);
     return () => { active = false; };
   }, []);
   if (signedIn) return <Navigate to={next} replace />;
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setError(''); setBusy(true);
+    startAdminTab();
     try { await api('/api/auth', { action: 'login', username, password }); setPassword(''); setSignedIn(true); }
-    catch (e) { setError((e as Error).message); }
+    catch (e) { clearAdminTab(); setError((e as Error).message); }
     finally { setBusy(false); }
   };
-  return <AccessFrame><span className="admin-access-icon"><Icon name="shield" size={25} /></span><span className="eyebrow">ADMIN ACCESS</span><h1>Welcome back.</h1><p>Sign in to manage your hotel.</p><form onSubmit={submit} className="admin-form"><div className="field"><label htmlFor="admin-username">Username</label><input id="admin-username" className="input" autoComplete="username" autoCapitalize="none" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} required maxLength={80} placeholder="Your admin username" /></div><div className="field"><label htmlFor="admin-password">Password</label><div className="admin-password"><input id="admin-password" className="input" type={show ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required maxLength={256} placeholder="Enter your password" /><button type="button" onClick={() => setShow((v) => !v)} aria-label={show ? 'Hide password' : 'Show password'} aria-pressed={show}>{show ? 'Hide' : 'Show'}</button></div></div>{error && <p className="admin-error" role="alert">{error}</p>}<button type="submit" className="gbtn navy" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}<Icon name="arrow" size={17} /></button></form></AccessFrame>;
+  return (
+    <AccessFrame>
+      <div className="access-card-heading"><span className="eyebrow">HOTEL TEAM</span><span className="admin-access-icon"><Icon name="lock" size={19} /></span></div>
+      <h1>Welcome back.</h1>
+      <p>Sign in to your hotel workspace.</p>
+      <form onSubmit={submit} className="admin-form">
+        <div className="field"><label htmlFor="admin-username">Username</label><input id="admin-username" className="input" autoComplete="username" autoCapitalize="none" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} required maxLength={80} placeholder="Enter your username" /></div>
+        <div className="field">
+          <label htmlFor="admin-password">Password</label>
+          <div className="admin-password"><input id="admin-password" className="input" type={show ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required maxLength={256} placeholder="Enter your password" /><button type="button" onClick={() => setShow((v) => !v)} aria-label={show ? 'Hide password' : 'Show password'} aria-pressed={show}>{show ? 'Hide' : 'Show'}</button></div>
+        </div>
+        {error && <p className="admin-error" role="alert">{error}</p>}
+        <button type="submit" className="gbtn navy" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}<Icon name="arrow" size={17} /></button>
+      </form>
+      <div className="access-card-footer"><Icon name="shield" size={14} /><span>Private access for the hotel team</span></div>
+    </AccessFrame>
+  );
 }
 
 export function SignOut() {
@@ -67,6 +99,7 @@ export function SignOut() {
   useEffect(() => {
     document.title = 'Signed out · Founders Hotel Network';
     stopHotel();
+    clearAdminTab();
     let active = true;
     void api('/api/auth', { action: 'logout' }).then(() => { if (active) setStatus('done'); }).catch(() => { if (active) setStatus('error'); });
     return () => { active = false; };

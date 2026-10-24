@@ -5,27 +5,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apply, timeline, viewOf, type Stay } from '../../../shared/guest/stay';
 import { api, ApiError } from '../api';
+import { activeStayId, rememberStay } from './access';
 
-const ID_KEY = 'fhn.guest.id';
 const SYNC_MS = 15000;
 /** Check-in shows "FHN AI is choosing your room" for at least this long, so the moment registers. */
 const CHOOSING_MS = 1300;
 
-export const savedStayId = () => {
-  try {
-    return localStorage.getItem(ID_KEY) ?? '';
-  } catch {
-    return '';
-  }
-};
-const remember = (id: string | null) => {
-  try {
-    if (id) localStorage.setItem(ID_KEY, id);
-    else localStorage.removeItem(ID_KEY);
-  } catch {
-    /* private mode: the stay lasts for this page only */
-  }
-};
+export const savedStayId = activeStayId;
+const remember = rememberStay;
 
 type Reply = { ok: boolean; stay: Stay; now: number };
 
@@ -38,6 +25,15 @@ export async function register(input: { name: string; email?: string; party: num
   const r = await api<Reply>('/api/guest', { action: 'register', ...input });
   remember(r.stay.id);
   return r.stay;
+}
+
+/** Returning guests explicitly present their private access code. No automatic device sign-in. */
+export async function resumeStay(code: string) {
+  const id = code.trim();
+  if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)) throw new Error('Enter the private access code from your stay.');
+  const reply = await api<Reply>(`/api/guest?id=${encodeURIComponent(id)}`);
+  remember(reply.stay.id);
+  return reply.stay;
 }
 
 export type StayStatus = 'loading' | 'ready' | 'none' | 'offline';

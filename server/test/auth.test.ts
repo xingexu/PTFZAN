@@ -50,6 +50,19 @@ describe('admin access', () => {
       expect(String(reply.cookie)).toContain('Path=/');
     } finally { vi.stubEnv('VERCEL', ''); }
   });
+  it('starts a fresh tab signed out even when the browser still has a cookie', async () => {
+    const cookie = await testLogin();
+    const fresh = { 'x-fhn-session': '' };
+    expect((await call(auth, 'GET', '/api/auth', undefined, cookie, fresh)).data.authenticated).toBe(false);
+    expect((await call(hotel, 'GET', '/api/hotel', undefined, cookie, fresh)).status).toBe(401);
+    expect((await call(hotel, 'GET', '/api/hotel', undefined, cookie, { 'x-fhn-session': 'b'.repeat(64) })).status).toBe(401);
+    expect((await call(hotel, 'GET', '/api/hotel', undefined, cookie)).status).toBe(200);
+  });
+  it('requires a tab key when creating an admin session', async () => {
+    const result = await call(auth, 'POST', '/api/auth', { action: 'login', username: testUsername, password: testPassword }, '', { 'x-fhn-session': '' });
+    expect(result.status).toBe(400);
+    expect(result.cookie).toBeUndefined();
+  });
   it('rejects cross-origin sign-in, sign-out and hotel mutations', async () => {
     const cookie = await testLogin();
     const origin = { origin: 'https://unrelated.test' };
