@@ -187,7 +187,8 @@ function usePhoneBanners(): [Banner[], (t: Omit<Toast, 'id'>) => void] {
   const seq = useRef(0);
   const push = useCallback((t: Omit<Toast, 'id'>) => {
     const id = ++seq.current;
-    setItems((x) => [...x.slice(-1), { ...t, id }]);
+    // The newest message takes the banner's place, like a phone: the one showing slides away underneath.
+    setItems((x) => [...x.slice(-1).map((y) => ({ ...y, leaving: true })), { ...t, id }]);
     setTimeout(() => setItems((x) => x.map((y) => (y.id === id ? { ...y, leaving: true } : y))), BANNER_MS - 200);
     setTimeout(() => setItems((x) => x.filter((y) => y.id !== id)), BANNER_MS);
   }, []);
