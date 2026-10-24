@@ -60,14 +60,16 @@ The start-up log prints the addresses phones on the same Wi-Fi can use; the QR c
 
 ## Screens
 
-| Route | Who | What it shows |
+The hotel view is a dark, cinematic console with five screens and a video-style player bar at the bottom (Today / FHN AI, play, skip, the day's moments on a scrubber, the clock, the 30-sec demo). Each moment of the day appears as a subtitle as the playhead passes it; supervisor decisions float above the player.
+
+| Route | Screen | What it shows |
 |---|---|---|
-| `/` | Duty manager / judges | Four live challenge cards (FHN AI vs today's process), the wedding lobby side by side, QR code to the guest app, shift log |
-| `/front-desk` | Front-desk agents | Room grid with predicted ready time, confidence, at-risk flags and "why this estimate"; toggle to the **Room climate** layer; arrivals; report an issue |
-| `/supervisor` | Housekeeping supervisor | Proposed re-plan with reasons and predicted impact, **Approve / Keep current plan**, attendant queues, **tomorrow's staffing forecast** |
-| `/attendant` | Room attendant | Phone view: current room, next rooms (always actually vacant), one-tap issue reporting |
-| `/engineering` | Maintenance / engineering | **Repairs & energy**: repair requests with who has them and promised times, repeat problems found in old repair notes, live room-temperature map and energy saved |
-| `/plan` | Judges | The business case: why readiness first (Exhibit 1), how it works, same data four wins, guardrails, $500K roadmap, success measures, value case, risks |
+| `/` | **Live** | Today's way vs FHN AI, head to head: a 40-seat lobby per side that lights up as guests wait, go out or reach their rooms; one number per challenge; QR code; live feed |
+| `/front-desk` | **Rooms** | Room grid with expected ready time, how sure, "why this time", a temperature layer, arrivals, report a problem |
+| `/supervisor` | **Team** · Supervisor | Plan to approve, attendant lists, tomorrow's staffing forecast, decision history |
+| `/attendant` | **Team** · Attendant phone | What an attendant sees: current room, what's next, one-tap problem reports |
+| `/engineering` | **Building** | Repairs with who has them and when, repeat problems in old repair notes, live room-temperature map |
+| `/plan` | **Plan** | The business case: why rooms first (Exhibit 1), how it works, four wins, guardrails, $500K roadmap, measures, value, risks |
 | `/join` (guest view) | Guests (QR code target) | Hotel-app welcome: find a wedding-guest reservation |
 | `/guest/:code` (guest view) | Guests | The guest app: online check-in, live ready time, mobile key, temperature, housekeeping (skip cleaning), report a problem, request items, messages — with in-phone notification banners |
 | `/stage` | Projector | **Live SMS moment**: Mike's phone, behind-the-scenes steps, live delivery status |
@@ -79,7 +81,7 @@ Example guest codes: `WED602`, `WED509`, `STAY411` (in-house guest whose AC fail
 
 ## The 30-second demo
 
-Press **30-sec demo** (gold button, top left). It replays the whole shift with FHN AI hands-free in about **28 seconds**:
+Press **30-sec demo** (gold button in the player bar). It replays the whole shift with FHN AI hands-free in about **28 seconds**:
 
 - races through the morning (sick call, late checkouts, elevator failure) at 30 sim-min/s,
 - holds for 2 seconds at **1:15 PM** while the supervisor approves the wedding re-plan,
@@ -93,10 +95,10 @@ Any manual control (play, pause, speed, step, reset) hands control back to you. 
 1. **QR code first.** Judges scan, enter a first name and tap **Check in now** in the guest app. They immediately see a predicted ready-time range.
 2. **30-sec demo.** Narrate the four cards as they diverge: at 3:45, 40 wedding guests waiting today vs 0; attendant time lost knocking 155 → 0 min and 222 staff-minutes pulled off other jobs → 0; the 411 AC fixed in 32 vs 100 min with one report instead of two; 168 kWh saved.
 3. Judges' phones buzz with "Room … is ready" and the mobile key unlocks.
-4. **Front desk** → click a room → *why this estimate*; flip to **Room climate**.
+4. **Rooms** → click a room → *why this time*; flip to **Temperature**.
 5. **The plan** for the money questions: $500K phases, success measures, value case.
 
-Manual alternative: **Next event** steps through the day; at 1:15 PM the banner offers **Approve** inline (or open **Supervisor** to show the full re-plan). Tick **Auto-approve** on the Supervisor screen for an unattended loop.
+Manual alternative: the skip button steps through the day's moments; at 1:15 PM a decision card offers **Approve** (or **See plan** for the full list on **Team**). Tick **Auto-approve** on **Team** for an unattended loop.
 
 ---
 ## Live SMS moment ("Mike")

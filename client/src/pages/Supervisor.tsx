@@ -3,6 +3,7 @@ import type { PlanProposal, SimState, StaffingForecast } from '../../../shared/t
 import { fmtTime } from '../../../shared/types';
 import { api, useSim, useToast } from '../api';
 import { Icon } from '../components/Icon';
+import { PageHead, TeamTabs } from '../components/PageHead';
 
 const DECIDED: Record<PlanProposal['status'], string> = { pending: 'Waiting', approved: 'Approved', 'auto-applied': 'Automatic', dismissed: 'Kept old plan' };
 
@@ -15,17 +16,10 @@ export default function Supervisor() {
 
   return (
     <main className="page">
-      <div className="page-head">
-        <div>
-          <h1>Housekeeping supervisor</h1>
-          <p>
-            {ai
-              ? 'FHN AI suggests; you decide. Small changes happen automatically. Anything that changes what guests were told waits for you.'
-              : 'Today: the supervisor rewrites the lists by hand and passes changes on by phone or in person.'}
-          </p>
-        </div>
+      <PageHead title="Team">
         {ai && <AutoApprove s={state} />}
-      </div>
+        <TeamTabs />
+      </PageHead>
 
       <div className="grid sup">
         <div className="grid">
@@ -76,7 +70,7 @@ export default function Supervisor() {
         </div>
 
         <aside className="side">
-          <StaffingCard f={state.staffing} ai={ai} />
+          <StaffingCard f={state.staffing} />
           {ai && (
             <section className="card" aria-label="Decision history">
               <div className="card-head">
@@ -108,7 +102,7 @@ export default function Supervisor() {
 }
 
 /** Labour: tomorrow's workload from reservations — staffed in advance instead of patched with overtime. */
-function StaffingCard({ f, ai }: { f: StaffingForecast; ai: boolean }) {
+function StaffingCard({ f }: { f: StaffingForecast }) {
   const max = Math.max(...f.blocks.map((b) => b.attendants), f.scheduled) + 1;
   return (
     <section className="card" aria-label="Tomorrow's staffing forecast">
@@ -147,20 +141,16 @@ function StaffingCard({ f, ai }: { f: StaffingForecast; ai: boolean }) {
               <span className="num">{b.attendants} needed</span>
             </div>
           ))}
-          <div className="muted" style={{ fontSize: 11.5 }}>Black line = {f.scheduled} attendants on the posted weekend schedule.</div>
+          <div className="muted" style={{ fontSize: 11.5 }}>Line = {f.scheduled} scheduled</div>
         </div>
         <div className={`banner ${f.overtimeHours > 0 ? 'ai' : 'done'}`} style={{ borderRadius: 10, marginTop: 12, border: 0 }}>
           <span className="grow">
             <Icon name={f.overtimeHours > 0 ? 'users' : 'check'} size={15} />
             <span>
               {f.recommendation}
-              {f.overtimeHours > 0 && !ai && ' (Today, this shows up as overtime on the day.)'}
             </span>
           </span>
         </div>
-        <p className="muted" style={{ fontSize: 12, margin: '10px 0 0' }}>
-          Built from bookings and how long each room type takes to clean — never from individual attendants. Guests who skip cleaning in the app lower it right away.
-        </p>
       </div>
     </section>
   );
@@ -175,7 +165,7 @@ function AutoApprove({ s }: { s: SimState }) {
         checked={s.autoApprove}
         onChange={(e) => api('/api/sim/auto-approve', { value: e.target.checked }).catch((err) => toast({ title: 'Error', body: (err as Error).message, tone: 'bad' }))}
       />
-      Approve automatically (hands-free demo)
+      Auto-approve
     </label>
   );
 }

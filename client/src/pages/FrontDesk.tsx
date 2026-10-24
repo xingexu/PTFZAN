@@ -3,6 +3,7 @@ import type { Guest, Hvac, Room, SimState } from '../../../shared/types';
 import { fmtRange, fmtTime } from '../../../shared/types';
 import { api, useSim, useToast } from '../api';
 import { Icon } from '../components/Icon';
+import { PageHead } from '../components/PageHead';
 import { GUEST_TAB, guestUrl } from '../links';
 import { atRisk, CONF_COLOR, CONF_WIDTH, HVAC_COLOR, HVAC_LABEL, HVAC_TILE, STATUS_COLOR, STATUS_LABEL, TILE_LABEL, visibleStatus } from '../components/rooms';
 
@@ -24,15 +25,7 @@ export default function FrontDesk() {
 
   return (
     <main className="page">
-      <div className="page-head">
-        <div>
-          <h1>Front desk</h1>
-          <p>
-            {ai
-              ? 'Everyone at the desk sees the same live status and expected ready time for every room. Click a room to see why.'
-              : `The desk only knows what the last phone call said — status as of ${fmtTime(state.frontDeskSnapshotAt)}.`}
-          </p>
-        </div>
+      <PageHead title="Rooms">
         <div className="layer-seg" role="tablist" aria-label="Map layer">
           <button role="tab" aria-selected={layer === 'readiness'} className={layer === 'readiness' ? 'on' : ''} onClick={() => setLayer('readiness')}>
             <Icon name="bed" size={14} /> Room status
@@ -41,7 +34,7 @@ export default function FrontDesk() {
             <Icon name="thermo" size={14} /> Temperature
           </button>
         </div>
-      </div>
+      </PageHead>
 
       <div className="grid fd">
         <section className="card" aria-label="Room grid">
@@ -268,9 +261,6 @@ function RoomDetail({ s, r, onClose }: { s: SimState; r: Room; onClose: () => vo
               <Icon name="wrench" size={14} /> Report
             </button>
           </div>
-          <p className="muted" style={{ fontSize: 12.5, margin: '6px 0 0' }}>
-            {ai ? 'Creates one repair request, moves the guest to the best free room and tells them who is fixing it.' : 'Today: maintenance gets a note; the guest isn’t told.'}
-          </p>
         </div>
       </div>
     </section>
@@ -422,18 +412,15 @@ function ShiftSummary({ s }: { s: SimState }) {
   const ready = s.rooms.filter((r) => r.status === 'ready').length;
   const done = open.length === 0;
   return (
-    <section className="card card-pad" aria-label="Shift summary" style={{ borderColor: done ? '#bfe5cf' : '#f2dcd3', background: done ? 'var(--green-soft)' : '#fbf3ef' }}>
-      <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
-        <span className={`pillar-icon ${done ? 'tone-teal' : 'tone-amber'}`}>
-          <Icon name={done ? 'check' : 'alert'} size={16} />
-        </span>
-        <div>
-          <h2>{done ? 'Shift complete — every room finished' : `Shift ends with ${open.length} rooms unfinished`}</h2>
-          <p className="muted" style={{ margin: '3px 0 0', fontSize: 13 }}>
-            {ready} rooms ready · {s.metrics.lobbyWaiting} guests waiting
-            {done ? ' · nothing handed over to the evening shift' : ` · handed to the evening shift: ${open.map((r) => r.id).join(', ')}`}
-          </p>
-        </div>
+    <section className={`card card-pad summary ${done ? 'good' : 'warn'}`} aria-label="End of shift">
+      <span className="pillar-icon">
+        <Icon name={done ? 'check' : 'alert'} size={16} />
+      </span>
+      <div>
+        <h2>{done ? 'Every room finished' : `${open.length} rooms left for tonight`}</h2>
+        <p className="muted">
+          {ready} ready · {s.metrics.lobbyWaiting} waiting{done ? '' : ` · ${open.map((r) => r.id).join(', ')}`}
+        </p>
       </div>
     </section>
   );

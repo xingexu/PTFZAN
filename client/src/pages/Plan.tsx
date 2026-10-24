@@ -130,10 +130,6 @@ export default function Plan() {
       <section className="plan-hero">
         <span className="eyebrow">Recommendation to Maya Patel, COO</span>
         <h1>Fix room readiness first. Then let the same live room data fix staffing, repairs and energy.</h1>
-        <p>
-          FHN AI works on top of the booking system FHN already has — nothing gets replaced. It works out when every room will be ready, changes the cleaning order when the
-          day changes, and tells guests the truth. One shared answer replaces the phone calls that failed on October 16.
-        </p>
         <div className="hero-stats">
           <div>
             <b>1 in 8 → 1 in 16</b>
@@ -156,10 +152,6 @@ export default function Plan() {
 
       <section className="section">
         <h2>Why room readiness goes first</h2>
-        <p className="lede">
-          All four challenges share one root cause — fragmented information and manual coordination. Room readiness is where that failure is most visible to guests, fastest to prove, and
-          creates the live data the other three need.
-        </p>
         <div className="card" style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>
@@ -196,15 +188,15 @@ export default function Plan() {
             </tbody>
           </table>
         </div>
-        <p className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>
-          Property type: <b>full-service hotels (11)</b> first — group blocks and event arrivals make coordination hardest there — then the 24 select-service hotels with concentrated weekday
-          arrivals. Primary users: <b>front-desk agents and housekeeping supervisors</b>; guests benefit through the app and texts.
-        </p>
+        <div className="row wrap" style={{ marginTop: 10, gap: 8 }}>
+          <span className="pill ai">Full-service hotels first (11)</span>
+          <span className="pill slate">Then select-service (24)</span>
+          <span className="pill slate">Users: front desk &amp; housekeeping supervisors</span>
+        </div>
       </section>
 
       <section className="section">
         <h2>How it works</h2>
-        <p className="lede">Three specific models, each tied to one decision — not a general-purpose chatbot.</p>
         <div className="flow">
           <div className="card card-pad">
             <span className="pill slate">1 · Data it uses</span>
@@ -255,7 +247,6 @@ export default function Plan() {
 
       <section className="section">
         <h2>Same data, four wins</h2>
-        <p className="lede">The live room state built for readiness is exactly what the other three challenges were missing.</p>
         <div className="pgrid">
           {PILLARS.map((p) => (
             <div className="card card-pad" key={p.title}>
@@ -283,16 +274,15 @@ export default function Plan() {
       <section className="section">
         <h2>Guardrails</h2>
         <div className="principles">
-          <Principle icon="users" title="People decide" text="Routine re-plans apply automatically. Anything that changes a guest promise needs a supervisor’s approval." />
-          <Principle icon="shield" title="Rooms, not people" text="No individual speed data, tracking or leaderboards. Union representatives sit on the steering group." />
-          <Principle icon="lock" title="Privacy built in" text="Texts only with consent. Each guest sees only their own booking. Guest data is never used to train AI. Meets Canada’s privacy law (PIPEDA)." />
-          <Principle icon="clock" title="Honest time windows" text="We quote a window and promise its late end. Guests forgive a wait; they don’t forgive conflicting answers." />
+          <Principle icon="users" title="People decide" text="Small changes are automatic. Anything guests see needs a supervisor." />
+          <Principle icon="shield" title="Rooms, not people" text="No tracking, no speed scores. The union helps run the pilot." />
+          <Principle icon="lock" title="Privacy built in" text="Texts only with consent. Meets Canada’s privacy law (PIPEDA)." />
+          <Principle icon="clock" title="Honest time windows" text="Guests get a window and we promise its later end." />
         </div>
       </section>
 
       <section className="section">
         <h2>Roadmap &amp; the $500K</h2>
-        <p className="lede">Short term proves readiness at one property; long term rolls the same layer across the portfolio. Each phase only starts if the last one worked.</p>
         <div className="phases">
           {PHASES.map((p) => (
             <div className="card phase" key={p.title}>
@@ -354,9 +344,6 @@ export default function Plan() {
               </tr>
             </tbody>
           </table>
-          <p className="muted" style={{ padding: '0 14px 14px', margin: 0, fontSize: 12.5 }}>
-            Also tracked: readiness phone calls per shift, repeat guest reports, energy per occupied room (adjusted for weather), and attendant satisfaction with schedule stability.
-          </p>
         </section>
         <section className="card">
           <div className="card-head">
@@ -394,10 +381,7 @@ export default function Plan() {
               </tr>
             </tbody>
           </table>
-          <p className="muted" style={{ padding: '0 14px 14px', margin: 0, fontSize: 12.5 }}>
-            ≈ $1.0M hard savings (overtime, repairs, energy) against $500K + ~$120K/yr to run → payback inside year two. Planning assumptions from the case; guest-experience gains counted as
-            upside.
-          </p>
+          <p className="muted" style={{ padding: '0 14px 14px', margin: 0, fontSize: 12.5 }}>≈ $1.0M a year in hard savings against $500K + $120K a year to run — paid back in year two.</p>
         </section>
       </div>
 
@@ -435,22 +419,13 @@ export default function Plan() {
       <section className="section">
         <h2>Industry context</h2>
         <div className="principles">
-          <Principle icon="chart" title="$30.0B, +4.1%" text="Canadian hotel operating revenue in 2024 — demand is there, but volatile across business, leisure and group travel." />
-          <Principle icon="trendDown" title="Costs +3.3%" text="Operating expenses rose in 2024; wages are 27.3% of them. Wasted labour hours are the most expensive inefficiency." />
-          <Principle icon="phoneDevice" title="Guests expect live status" text="Travellers track food, rides and parcels to the minute. “Your room will be ready 2:20–2:35” is the new baseline." />
-          <Principle icon="leaf" title="Emissions −25% by 2030" text="FHN’s own commitment. Occupancy-aware climate is the lowest-cost lever that doesn’t touch guest comfort." />
+          <Principle icon="chart" title="$30.0B, +4.1%" text="Canadian hotel revenue, 2024" />
+          <Principle icon="trendDown" title="Costs +3.3%" text="Wages are 27.3% of hotel costs" />
+          <Principle icon="phoneDevice" title="1 in 8 wait" text="FHN arrivals waiting past 3 PM" />
+          <Principle icon="leaf" title="Emissions −25% by 2030" text="FHN’s own target" />
         </div>
       </section>
 
-      <section className="card card-pad" style={{ marginTop: 28 }}>
-        <h2>About this prototype</h2>
-        <p className="muted" style={{ margin: '6px 0 0' }}>
-          All data is simulated, as the case permits. The simulation replays the October 16 shift record (Exhibit 4) minute by minute with identical physical events in both modes. Run
-          today&rsquo;s way it reproduces the log: 40 guests waiting and 12 rooms still being prepared at 3:45 PM, the manager stepping in, and the queue clearing by 5:00 PM with the elevator still
-          out. The forecast never sees the real cleaning times in advance, so “promises kept” is a genuine test, not a replay. Here it uses average cleaning times per room type; in the pilot it becomes a
-          model trained on 60–90 days of the hotel’s own room history.
-        </p>
-      </section>
     </main>
   );
 }

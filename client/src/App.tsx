@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { LogEntry, ScenarioEvent, SimState } from '../../shared/types';
 import { fmtTime } from '../../shared/types';
-import { api, getBooking, SimContext, ToastContext, useEventStream, useSim, useToast, type Toast } from './api';
-import { Icon } from './components/Icon';
+import { api, getBooking, SimContext, ToastContext, useEventStream, useToast, type Toast } from './api';
+import { Icon, type IconName } from './components/Icon';
 import { Brand } from './components/Logo';
 import { GUEST_TAB, guestUrl, HOTEL_TAB, isGuestView } from './links';
 import Engineering from './pages/Engineering';
@@ -83,59 +83,58 @@ export default function App() {
   );
 }
 
-const NAV: [string, string][] = [
-  ['/', 'Overview'],
-  ['/front-desk', 'Front desk'],
-  ['/supervisor', 'Supervisor'],
-  ['/attendant', 'Attendant'],
-  ['/engineering', 'Repairs & energy'],
-  ['/plan', 'The plan'],
+const NAV: { to: string; label: string; icon: IconName; also?: string }[] = [
+  { to: '/', label: 'Live', icon: 'gauge' },
+  { to: '/front-desk', label: 'Rooms', icon: 'bed' },
+  { to: '/supervisor', label: 'Team', icon: 'users', also: '/attendant' },
+  { to: '/engineering', label: 'Building', icon: 'building' },
+  { to: '/plan', label: 'Plan', icon: 'target' },
 ];
 
 function HotelShell() {
   const { data: state, conn } = useEventStream<SimState>('/api/stream');
+  const { pathname } = useLocation();
   const pending = state?.proposals.some((p) => p.status === 'pending');
   useGuestActivity(state);
 
   useEffect(() => {
     document.title = 'Hotel view · Founders';
+    document.body.classList.add('hq-body');
+    return () => document.body.classList.remove('hq-body');
   }, []);
 
   return (
     <SimContext.Provider value={{ state, conn }}>
-      <div className="shell">
-        <header className="topbar">
-          <div className="topbar-inner">
-            <NavLink to="/" className="brand" aria-label="Hotel view home" viewTransition>
-              <Brand sub="Hotel view · Toronto Downtown" />
-            </NavLink>
-            <nav className="nav" aria-label="Screens">
-              {NAV.map(([to, label]) => (
-                <NavLink key={to} to={to} end={to === '/'} viewTransition>
-                  {label}
-                  {to === '/supervisor' && pending && <span className="badge" aria-label="decision needed" />}
-                </NavLink>
-              ))}
-            </nav>
-            <div className="top-actions">
-              <a className="btn sm guest-link" href={guestUrl('/app')} target={GUEST_TAB} title="Open the guest app in its own tab">
-                <Icon name="phoneDevice" size={15} />
-                <span className="lbl">Guest view</span>
-                {!!state?.guestsOnline && (
-                  <span className="live-count" title={`${state.guestsOnline} guest app${state.guestsOnline === 1 ? '' : 's'} open right now`}>
-                    {state.guestsOnline}
-                  </span>
-                )}
-              </a>
-              <Link className="btn sm" to="/stage" title="The live text-message moment for the pitch">
-                <Icon name="monitor" size={15} /> <span className="lbl">Live text demo</span>
-              </Link>
-            </div>
+      <div className={`shell hq ${state?.mode === 'baseline' ? 'mode-today' : 'mode-ai'}`}>
+        <div className="hq-backdrop" aria-hidden="true" />
+        <header className="hq-top">
+          <NavLink to="/" className="brand light" aria-label="Hotel view home" viewTransition>
+            <Brand sub="Hotel view" tone="light" />
+          </NavLink>
+          <nav className="hq-nav" aria-label="Screens">
+            {NAV.map((n) => (
+              <NavLink key={n.to} to={n.to} end={n.to === '/'} viewTransition className={({ isActive }) => (isActive || pathname === n.also ? 'active' : '')}>
+                <Icon name={n.icon} size={16} />
+                <span>{n.label}</span>
+                {n.to === '/supervisor' && pending && <span className="badge" aria-label="decision needed" />}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="hq-actions">
+            <a className="hq-pill" href={guestUrl('/app')} target={GUEST_TAB} title="Open the guest app in its own tab">
+              <Icon name="phoneDevice" size={15} />
+              <span>Guest view</span>
+              {!!state?.guestsOnline && <span className="live-count">{state.guestsOnline}</span>}
+            </a>
+            <Link className="hq-icon" to="/stage" title="Live text-message demo" aria-label="Live text-message demo">
+              <Icon name="monitor" size={16} />
+            </Link>
           </div>
         </header>
-        {state && <Transport state={state} />}
-        {state && <Banners state={state} />}
         {!state ? <ShellSkeleton reconnecting={conn === 'reconnecting'} /> : <Outlet />}
+        {state && <Caption state={state} />}
+        {state && <DecisionCard state={state} />}
+        {state && <Player state={state} />}
       </div>
     </SimContext.Provider>
   );
@@ -165,14 +164,13 @@ function useGuestActivity(state: SimState | null) {
 function ShellSkeleton({ reconnecting }: { reconnecting: boolean }) {
   return (
     <div className="page" aria-busy="true">
-      <div className="skeleton" style={{ height: 22, width: 360, marginBottom: 14 }} />
-      <div className="pillars">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="card skeleton-card" />
-        ))}
+      <div className="versus">
+        <div className="skeleton-card" />
+        <div />
+        <div className="skeleton-card" />
       </div>
       <p className="muted" style={{ marginTop: 16 }}>
-        {reconnecting ? 'Reconnecting to the hotel system…' : 'Loading Friday, October 16…'}
+        {reconnecting ? 'Reconnecting…' : 'Loading Friday, October 16…'}
       </p>
     </div>
   );
@@ -206,193 +204,144 @@ const SPEEDS: [number, string][] = [
   [60, 'Fastest'],
 ];
 
-function Transport({ state }: { state: SimState }) {
-  const { conn } = useSim();
+/** The day as a film: mode, playback, the day's moments on a scrubber, and the clock. */
+function Player({ state }: { state: SimState }) {
   const { busy, call } = useAction();
   const pending = state.proposals.some((p) => p.status === 'pending');
   const auto = state.autopilot;
+  const clock = fmtTime(state.now).split(' ');
 
   return (
-    <div className="transport">
-      <div className="tp-controls">
-        <div className="seg" role="group" aria-label="How the hotel runs the day">
-          <button className={state.mode === 'baseline' ? 'on' : ''} disabled={busy} onClick={() => call('/api/sim/reset', { mode: 'baseline' })} title="Replay October 16 the way the hotel runs today">
-            Today
-          </button>
-          <button className={state.mode === 'ai' ? 'on ai-on' : ''} disabled={busy} onClick={() => call('/api/sim/reset', { mode: 'ai' })} title="Replay October 16 with FHN AI">
-            <Icon name="sparkles" size={14} /> FHN AI
-          </button>
-        </div>
-        <button
-          className={`tp-demo ${auto ? 'running' : ''}`}
-          disabled={busy}
-          onClick={() => (auto ? call('/api/sim/play', { playing: false }) : call('/api/sim/demo'))}
-          title="Play the whole day with FHN AI in about 30 seconds"
-        >
-          <Icon name={auto ? 'pause' : 'play'} size={14} /> {auto ? 'Stop demo' : '30-sec demo'}
+    <footer className="player">
+      <div className="seg mode" role="group" aria-label="How the hotel runs the day">
+        <button className={state.mode === 'baseline' ? 'on today-on' : ''} disabled={busy} onClick={() => call('/api/sim/reset', { mode: 'baseline' })} title="The way the hotel runs today">
+          Today
+        </button>
+        <button className={state.mode === 'ai' ? 'on ai-on' : ''} disabled={busy} onClick={() => call('/api/sim/reset', { mode: 'ai' })} title="With FHN AI">
+          <Icon name="sparkles" size={13} /> FHN AI
+        </button>
+      </div>
+      <div className="pl-buttons">
+        <button className="pl-btn" disabled={busy} onClick={() => call('/api/sim/reset', { mode: state.mode })} title="Start the day again" aria-label="Start again">
+          <Icon name="reset" size={16} />
         </button>
         <button
-          className="tp-btn play"
+          className="pl-btn main"
           disabled={busy || state.finished || pending}
           onClick={() => call('/api/sim/play', { playing: !state.playing })}
           aria-label={state.playing ? 'Pause' : 'Play'}
-          title={state.playing ? 'Pause' : 'Play'}
         >
-          <Icon name={state.playing ? 'pause' : 'play'} size={15} />
+          <Icon name={state.playing ? 'pause' : 'play'} size={18} />
         </button>
-        <button className="tp-btn" disabled={busy || state.finished || pending} onClick={() => call('/api/sim/next-event')} title="Skip to the next moment on the timeline" aria-label="Skip to next moment">
-          <Icon name="skip" size={15} />
+        <button className="pl-btn" disabled={busy || state.finished || pending} onClick={() => call('/api/sim/next-event')} title="Skip to the next moment" aria-label="Skip to next moment">
+          <Icon name="skip" size={16} />
         </button>
-        <button className="tp-btn" disabled={busy} onClick={() => call('/api/sim/reset', { mode: state.mode })} title="Start the day again at 8:00 AM" aria-label="Start again">
-          <Icon name="reset" size={15} />
-        </button>
-        <select className="tp-speed" aria-label="Playback speed" value={auto ? 'auto' : state.speed} onChange={(e) => call('/api/sim/speed', { speed: Number(e.target.value) })}>
-          {auto && <option value="auto">Demo speed</option>}
-          {SPEEDS.map(([s, label]) => (
-            <option key={s} value={s} title={`1 second = ${s} minutes of the day`}>
-              {label}
-            </option>
-          ))}
-        </select>
       </div>
-      <Timeline state={state} />
-      <div className="tp-clock" aria-live="off" title={conn === 'live' ? 'Live' : 'Reconnecting'}>
-        {fmtTime(state.now)}
+      <Scrubber state={state} />
+      <div className="pl-clock" aria-label={fmtTime(state.now)}>
+        {clock[0]}
+        <small>{clock[1]}</small>
       </div>
-    </div>
-  );
-}
-
-const LABEL_FONT = '700 10.5px "Plus Jakarta Sans", system-ui, sans-serif';
-const LABEL_GAP = 10;
-
-/**
- * Places each timeline label above or below the track, wherever it fits at the current width.
- * A label that can't fit in either row is left to its tooltip rather than overlapping a neighbour.
- */
-function layoutLabels(events: ScenarioEvent[], start: number, end: number, width: number) {
-  const ctx = document.createElement('canvas').getContext('2d');
-  if (ctx) ctx.font = LABEL_FONT;
-  const lastEnd = [-Infinity, -Infinity];
-  return events.map((e, i) => {
-    const text = `${fmtTime(e.at).replace(/:00| (AM|PM)/g, '')} · ${e.title}`;
-    const w = (ctx?.measureText(text).width ?? text.length * 6.2) + 2;
-    const x = ((e.at - start) / (end - start)) * width;
-    const align = i === 0 ? 'first' : e.at >= end ? 'last' : '';
-    const from = align === 'first' ? x - 4 : align === 'last' ? x + 4 - w : x - w / 2;
-    const preferred = i % 2;
-    const row = [preferred, 1 - preferred].find((r) => from >= lastEnd[r] + LABEL_GAP);
-    if (row !== undefined) lastEnd[row] = from + w;
-    return { text, align, row: row ?? 0, hidden: row === undefined };
-  });
-}
-
-function Timeline({ state }: { state: SimState }) {
-  const span = state.end - state.start;
-  const pct = (m: number) => `${Math.min(100, Math.max(0, ((m - state.start) / span) * 100))}%`;
-  const track = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const el = track.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const labels = useMemo(() => layoutLabels(state.events, state.start, state.end, width), [state.events, state.start, state.end, width]);
-  return (
-    <div className="timeline" aria-label="The day's timeline">
-      <div className="tl-track" ref={track}>
-        <div className={`tl-fill ${state.mode === 'ai' ? 'ai' : ''}`} style={{ width: pct(state.now) }} />
-        {state.events.map((e, i) => (
-          <div
-            key={e.id}
-            className={`tl-ev ${i < state.nextEventIndex ? 'done' : ''} ${i === state.nextEventIndex ? 'next' : ''} ${labels[i].row ? 'below' : ''} ${labels[i].align}`}
-            style={{ left: pct(e.at) }}
-            title={`${fmtTime(e.at)} — ${e.detail}`}
-          >
-            <span className="tl-dot" />
-            {width > 0 && !labels[i].hidden && <span className="tl-label">{labels[i].text}</span>}
-          </div>
+      <button className={`pl-demo ${auto ? 'running' : ''}`} disabled={busy} onClick={() => (auto ? call('/api/sim/play', { playing: false }) : call('/api/sim/demo'))} title="The whole day with FHN AI in about 30 seconds">
+        <Icon name={auto ? 'pause' : state.finished ? 'reset' : 'play'} size={13} /> {auto ? 'Stop' : state.finished ? 'Play again' : '30-sec demo'}
+      </button>
+      <select className="pl-speed" aria-label="Playback speed" value={auto ? 'auto' : state.speed} onChange={(e) => call('/api/sim/speed', { speed: Number(e.target.value) })}>
+        {auto && <option value="auto">Demo</option>}
+        {SPEEDS.map(([s, label]) => (
+          <option key={s} value={s}>
+            {label}
+          </option>
         ))}
+      </select>
+    </footer>
+  );
+}
+
+function Scrubber({ state }: { state: SimState }) {
+  const pct = (m: number) => `${Math.min(100, Math.max(0, ((m - state.start) / (state.end - state.start)) * 100))}%`;
+  return (
+    <div className="scrubber" aria-label="The day, 8 AM to 5 PM">
+      <div className="sc-track">
+        <div className="sc-fill" style={{ width: pct(state.now) }} />
+        {state.events.map((e, i) => (
+          <span
+            key={e.id}
+            className={`sc-tick ${i < state.nextEventIndex ? 'done' : ''} ${i === state.nextEventIndex ? 'next' : ''}`}
+            style={{ left: pct(e.at) }}
+            title={`${fmtTime(e.at)} · ${e.title} — ${state.mode === 'ai' ? e.ai : e.today}`}
+          />
+        ))}
+        <span className="sc-knob" style={{ left: pct(state.now) }} />
+      </div>
+      <div className="sc-ends" aria-hidden="true">
+        <span>8 AM</span>
+        <span>5 PM</span>
       </div>
     </div>
   );
 }
 
-function Banners({ state }: { state: SimState }) {
+const CAPTION_MS = 3400;
+
+/** A film-style caption for each moment of the day as the playhead passes it. */
+function Caption({ state }: { state: SimState }) {
+  const [shown, setShown] = useState<ScenarioEvent | null>(null);
+  const last = useRef(state.nextEventIndex);
+  useEffect(() => {
+    const i = state.nextEventIndex;
+    if (i > last.current && i > 0) setShown(state.events[i - 1]);
+    if (i < last.current) setShown(null);
+    last.current = i;
+  }, [state.nextEventIndex, state.events]);
+  useEffect(() => {
+    if (!shown) return;
+    const t = setTimeout(() => setShown(null), CAPTION_MS);
+    return () => clearTimeout(t);
+  }, [shown]);
+  if (!shown) return null;
+  return (
+    <div className={`caption ${state.mode === 'ai' ? 'ai' : 'today'}`} key={shown.id} role="status">
+      <span className="cap-time">{fmtTime(shown.at)}</span>
+      <b>{shown.title}</b>
+      <span className="cap-line">
+        {state.mode === 'ai' && <Icon name="sparkles" size={13} />}
+        {state.mode === 'ai' ? shown.ai : shown.today}
+      </span>
+    </div>
+  );
+}
+
+/** A decision floats above the player while the supervisor's approval is needed. */
+function DecisionCard({ state }: { state: SimState }) {
   const nav = useNavigate();
   const { busy, call } = useAction();
   const pending = state.proposals.find((p) => p.status === 'pending');
-  const change = pending?.impact.split(': ')[1];
-
-  if (pending && state.autopilot) {
-    return (
-      <div className="banner auto" role="status" key="hold">
-        <span className="grow">
-          <Icon name="sparkles" size={16} />
-          <span>
-            <b>{pending.trigger}</b> — FHN AI suggests a new cleaning order for {pending.changes.length} rooms{change ? ` (wedding rooms ready by 3 PM: ${change})` : ''}. Supervisor approving…
-          </span>
-        </span>
-        <span className="hold-bar" aria-hidden="true">
-          <i />
-        </span>
-      </div>
-    );
-  }
   if (pending) {
     return (
-      <div className="banner ai" role="alert" key="pending">
-        <span className="grow">
+      <div className="decision" role="alert" key="pending">
+        <span className="dc-ic">
           <Icon name="sparkles" size={16} />
-          <span>
-            Paused at {fmtTime(state.now)} — <b>{pending.trigger}</b>. FHN AI suggests a new cleaning order for {pending.changes.length} rooms; a supervisor decides.
+        </span>
+        <div className="dc-text">
+          <span className="dc-k">Supervisor decides</span>
+          <b>
+            {pending.trigger} <span>· new cleaning order for {pending.changes.length} rooms</span>
+          </b>
+        </div>
+        {state.autopilot ? (
+          <span className="dc-hold" aria-label="Approving">
+            <i />
           </span>
-        </span>
-        <button className="btn sm" onClick={() => nav('/supervisor', { viewTransition: true })}>
-          See the plan
-        </button>
-        <button className="btn sm ai" disabled={busy} onClick={() => call(`/api/proposals/${pending.id}/approve`)}>
-          <Icon name="check" size={14} /> Approve
-        </button>
-      </div>
-    );
-  }
-  if (state.autopilot) {
-    return (
-      <div className="banner auto" key="auto">
-        <span className="grow">
-          <Icon name="play" size={13} />
-          <span>
-            <b>30-second demo</b> · the real October 16 shift record, with FHN AI on the right and today&rsquo;s way on the left.
-          </span>
-        </span>
-      </div>
-    );
-  }
-  if (state.finished) {
-    return (
-      <div className="banner done" key="done">
-        <span className="grow">
-          <Icon name="check" size={16} />
-          <span>The day is over. Every number here is compared with the same day {state.mode === 'baseline' ? 'with FHN AI' : 'run today’s way'}.</span>
-        </span>
-        <button className="btn sm" disabled={busy} onClick={() => call('/api/sim/demo')}>
-          <Icon name="reset" size={14} /> Play the demo again
-        </button>
-      </div>
-    );
-  }
-  if (state.mode === 'baseline') {
-    return (
-      <div className="banner base" key="base">
-        <span className="grow">
-          <Icon name="phone" size={15} />
-          <span>
-            <b>Today&rsquo;s way:</b> paper lists, phone calls, and nobody can see when rooms will be ready. Same events, same staff.
-          </span>
-        </span>
+        ) : (
+          <>
+            <button className="btn sm" onClick={() => nav('/supervisor', { viewTransition: true })}>
+              See plan
+            </button>
+            <button className="btn sm ai" disabled={busy} onClick={() => call(`/api/proposals/${pending.id}/approve`)}>
+              <Icon name="check" size={14} /> Approve
+            </button>
+          </>
+        )}
       </div>
     );
   }

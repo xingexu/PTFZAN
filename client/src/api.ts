@@ -118,11 +118,24 @@ export function useEventStream<T>(url: string | null): { data: T | null; conn: C
         timer = setTimeout(() => !closed && open(), delay);
       };
     };
+    // A page that is left (or parked in the back/forward cache) must let go of its stream: browsers allow
+    // only six connections per site, so leaked streams would eventually block every new page load.
+    const onHide = () => {
+      es?.close();
+      if (timer) clearTimeout(timer);
+    };
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted && !closed) open();
+    };
+    window.addEventListener('pagehide', onHide);
+    window.addEventListener('pageshow', onShow);
     open();
     return () => {
       closed = true;
       es?.close();
       if (timer) clearTimeout(timer);
+      window.removeEventListener('pagehide', onHide);
+      window.removeEventListener('pageshow', onShow);
     };
   }, [url]);
 

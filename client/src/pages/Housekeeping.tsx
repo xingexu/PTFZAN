@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { fmtTime } from '../../../shared/types';
 import { api, useSim, useToast } from '../api';
 import { Icon } from '../components/Icon';
+import { PageHead, TeamTabs } from '../components/PageHead';
 
 export default function Housekeeping() {
   const { state } = useSim();
@@ -28,21 +29,22 @@ export default function Housekeeping() {
 
   return (
     <main className="page">
-      <div className="page-head">
-        <div>
-          <h1>Room attendant phone</h1>
-          <p>What an attendant sees on their phone. One tap when a room is started, done, or has a problem — that’s all FHN AI collects.</p>
-        </div>
-        <div className="layer-seg" role="tablist" aria-label="Attendant">
-          {state.attendants.map((x) => (
-            <button key={x.id} role="tab" aria-selected={who === x.id} className={who === x.id ? 'on' : ''} onClick={() => setWho(x.id)}>
-              {x.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <PageHead title="Team">
+        <TeamTabs />
+      </PageHead>
 
-      <div className="grid hk">
+      <div className="attendant-stage">
+        <label className="att-pick">
+          <span className="sr-only">Attendant</span>
+          <select className="input" value={who} onChange={(e) => setWho(e.target.value)}>
+            {state.attendants.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.label}
+                {x.present ? '' : x.onCall ? ' · on call' : x.helper ? ' · back to own job' : ' · off sick'}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="phone" aria-label={`${a.label}'s phone`}>
           <div className="phone-screen">
             <div className={`phone-top ${ai ? '' : 'today'}`}>
@@ -107,49 +109,12 @@ export default function Housekeeping() {
                   ))}
                   <div className="privacy-note" style={{ marginTop: 'auto' }}>
                     <Icon name="shield" size={16} />
-                    <span>FHN AI measures rooms, not people. No location tracking, no personal speed scores, no leaderboards.</span>
+                    <span>Rooms, not people — no tracking, no speed scores.</span>
                   </div>
                 </>
               )}
             </div>
           </div>
-        </div>
-
-        <div className="grid">
-          <section className="card card-pad">
-            <h2>What changes for attendants</h2>
-            <div className="compare" style={{ marginTop: 12 }}>
-              <div className="col b">
-                <h4>Today</h4>
-                <ul>
-                  <li>Paper list in room-number order, fixed at 8:00 AM</li>
-                  <li>Knock on rooms that are still occupied — {state.mode === 'baseline' ? `${state.metrics.wastedVisits} wasted visits (${state.metrics.attendantMinLost} min)` : 'dozens of wasted visits'} so far</li>
-                  <li>Priority changes arrive by phone, after cleaning starts</li>
-                  <li>Maintenance issues reported twice</li>
-                </ul>
-              </div>
-              <div className="col r">
-                <h4>With FHN AI</h4>
-                <ul>
-                  <li>Next room is always one that is actually empty</li>
-                  <li>Route updates instantly when plans change</li>
-                  <li>Fewer floor changes when an elevator is down</li>
-                  <li>One tap reports a problem and moves the guest</li>
-                  <li>Tomorrow&rsquo;s schedule is set from the forecast, not patched with overtime</li>
-                </ul>
-              </div>
-            </div>
-          </section>
-          <section className="card card-pad">
-            <h2>Designed with the union, not around it</h2>
-            <ul className="why">
-              <li>Only room events are recorded (started, done, problem) — never how fast a person works.</li>
-              <li>Cleaning times are averaged by room type, never by person.</li>
-              <li>No location tracking, cameras or wearables.</li>
-              <li>Union representatives help run the pilot and approve the list of what is recorded.</li>
-              <li>Time saved goes to deep cleans and guest requests — not cut from schedules.</li>
-            </ul>
-          </section>
         </div>
       </div>
     </main>

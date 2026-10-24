@@ -2,38 +2,22 @@ import type { GuestRequest, MaintenanceInsight, SimState } from '../../../shared
 import { fmtTime } from '../../../shared/types';
 import { useSim } from '../api';
 import { Icon } from '../components/Icon';
+import { PageHead } from '../components/PageHead';
 import { HVAC_COLOR, HVAC_LABEL, sides } from '../components/rooms';
 
 export default function Engineering() {
   const { state } = useSim();
   if (!state) return null;
-  const ai = state.mode === 'ai';
 
   return (
     <main className="page">
-      <div className="page-head">
-        <div>
-          <h1>Repairs &amp; energy</h1>
-          <p>Repairs and room temperature use the same live room information as housekeeping: every repair knows which rooms and guests it affects, and every empty room knows when someone is due.</p>
-        </div>
-      </div>
+      <PageHead title="Building" />
       <div className="grid eng">
         <div className="grid">
           <Tickets s={state} />
           <Insights insights={state.insights} />
         </div>
-        <div className="grid">
-          <Energy s={state} />
-          <section className="card card-pad">
-            <h2>Comfort first, then savings</h2>
-            <ul className="why">
-              <li>A room only saves energy when nobody is in it — checked out, not arrived yet, or the guest told the app they&rsquo;re out.</li>
-              <li>It returns to the guest&rsquo;s temperature 20 minutes before the readiness forecast says someone can walk in.</li>
-              <li>Guests can override from the app at any time; staff can override from the front desk.</li>
-              <li>{ai ? 'Starts at the 9 hotels that already have smart thermostats — no new hardware in year one.' : 'Today vacant rooms keep heating or cooling at the last guest’s setting all day.'}</li>
-            </ul>
-          </section>
-        </div>
+        <Energy s={state} />
       </div>
     </main>
   );
@@ -113,7 +97,7 @@ function Insights({ insights }: { insights: MaintenanceInsight[] }) {
       <div className="card-head">
         <div className="title">
           <Icon name="sparkles" size={16} />
-          <h2>Repeat problems found in old repair notes</h2>
+          <h2 title="Repair notes are typed differently by different people. FHN AI reads each into what · where · problem so repeats stand out.">Repeat problems in old repair notes</h2>
         </div>
         <span className="sub">Last 60 days</span>
       </div>
@@ -142,10 +126,6 @@ function Insights({ insights }: { insights: MaintenanceInsight[] }) {
           </ul>
         </div>
       ))}
-      <div className="card-pad muted" style={{ fontSize: 12, borderTop: '1px solid var(--line)' }}>
-        Repair notes are typed differently by different people (“rm 411 ac not cold”, “411 PTAC no cooling”). FHN AI reads each one into the same three things — what, where and the
-        problem — so repeats stand out. This demo uses simple rules; the pilot uses an AI model, with a person checking anything new.
-      </div>
     </section>
   );
 }

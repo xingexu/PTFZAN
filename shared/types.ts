@@ -204,6 +204,9 @@ export interface ScenarioEvent {
   id: string;
   title: string;
   detail: string;
+  /** One-line caption for each way of running the day. */
+  today: string;
+  ai: string;
 }
 
 export interface Metrics {

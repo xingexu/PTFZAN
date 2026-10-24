@@ -201,15 +201,16 @@ export function buildSeed(): Seed {
 
   // Exhibit 4 — the Toronto property's shift record, 08:00–17:00, verbatim times.
   const events: ScenarioEvent[] = [
-    { at: t(8, 0), id: 'absence', title: 'Absence', detail: 'Employee absence reported after assignments are issued.' },
-    { at: t(10, 30), id: 'late', title: 'Late checkouts', detail: 'Late checkouts recorded (505, 509, 606).' },
-    { at: t(12, 0), id: 'elevator', title: 'Elevator out', detail: 'Elevator taken out of service. Carts and guests share the remaining elevator.' },
-    { at: t(13, 15), id: 'group', title: 'Wedding at 3', detail: 'The wedding group confirms arrivals around 15:00 (20 rooms, 40 guests).' },
-    { at: t(14, 30), id: 'calls', title: 'Calls', detail: 'Calls made for readiness updates.' },
-    { at: t(15, 0), id: 'arrivals', title: 'Arrivals', detail: 'Wedding guests begin arriving.' },
-    { at: t(15, 45), id: 'checkpoint', title: 'Checkpoint', detail: 'Today: 40 guests waiting, 12 rooms still being prepared — escalated to the duty manager.' },
-    { at: t(17, 0), id: 'release', title: 'Shift ends', detail: 'Remaining group rooms released; check-in queue clears; elevator fault still open.' },
+    { at: t(8, 0), id: 'absence', title: 'Attendant calls in sick', detail: 'Employee absence reported after assignments are issued.', today: 'Rooms tacked onto everyone’s paper list', ai: 'New plan in seconds · backup attendant booked' },
+    { at: t(10, 30), id: 'late', title: 'Three late checkouts', detail: 'Late checkouts recorded (505, 509, 606).', today: 'Attendants knock on occupied rooms', ai: 'Empty rooms cleaned first' },
+    { at: t(12, 0), id: 'elevator', title: 'Elevator B out of service', detail: 'Elevator taken out of service. Carts and guests share the remaining elevator.', today: 'Carts and guests share one elevator', ai: 'Floors 5–6 grouped · ready times updated' },
+    { at: t(13, 15), id: 'group', title: 'Wedding now arrives at 3 PM', detail: 'The wedding group confirms arrivals around 15:00 (20 rooms, 40 guests).', today: 'Priorities change after cleaning has started', ai: 'Supervisor approves a new cleaning order' },
+    { at: t(14, 30), id: 'calls', title: 'Front desk starts calling', detail: 'Calls made for readiness updates.', today: 'Nobody can see which rooms are left', ai: 'No calls — every ready time is on screen' },
+    { at: t(15, 0), id: 'arrivals', title: 'The wedding arrives', detail: 'Wedding guests begin arriving.', today: 'Rooms not ready, no answers', ai: 'Ready rooms · mobile keys' },
+    { at: t(15, 45), id: 'checkpoint', title: '3:45 PM', detail: 'Today: 40 guests waiting, 12 rooms still being prepared — escalated to the duty manager.', today: '40 guests waiting · 12 rooms not ready', ai: 'Nobody waiting' },
+    { at: t(17, 0), id: 'release', title: 'End of shift', detail: 'Remaining group rooms released; check-in queue clears; elevator fault still open.', today: 'Queue finally clears · rooms left for tonight', ai: 'Every room ready' },
   ];
+
 
 
   return { rooms, guests, attendants, events, condition };
