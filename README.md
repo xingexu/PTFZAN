@@ -38,7 +38,7 @@ Requires **Node 20+**.
 
 ```bash
 npm install
-cp .env.example .env   # then set DATABASE_URL (optional locally — without it, guest stays are kept in memory)
+cp .env.example .env   # then set DATABASE_URL (optional locally — without it, the shared day and guest stays are kept in memory)
 npm run demo           # builds, starts, and opens both views in their own tabs
 ```
 
@@ -59,9 +59,10 @@ The start-up log prints the addresses phones on the same Wi-Fi can use, and wher
 
 ### How it fits together
 
-- **The hotel day runs in the browser.** The hotel view replays October 16 on the presenter's screen, with a shadow run of the same day in the other mode for the side-by-side comparison.
+- **One hotel day, shared by every screen, kept in PostgreSQL.** The database holds the day's clock (method, play/pause, speed, the 30-second demo) and a log of every decision (plan approvals, problem reports). The simulation is deterministic, so each open hotel screen rebuilds exactly the same October 16 from those two things and follows it as time passes — the laptop, the projector and a phone all show the same rooms at the same minute, and any of them can drive. Changes made on one screen appear on the others within about a second, with a short note. The top bar shows **Synced · N screens**; if the database can't be reached, the day keeps running on that screen only and rejoins on its own. While anyone is watching, the server also writes the live hotel to `fhn.rooms` and `fhn.hotel_snapshot`, so the current state of every room can be read straight from the database.
 - **Guest stays are saved in PostgreSQL** (a Supabase project in Canada, `ca-central-1`). Registering, checking in and everything a guest does in the app goes through two small API functions (`api/guest.ts`, `api/activity.ts`) — Vercel serverless functions in production, mounted by the local server on a laptop.
-- **The calculated wait.** At check-in the server works out the wait the same way the hotel forecast does — the attendant's current room, the room type's clean time (King 35, Double Queen 39, Suite 52 min) and the 6-minute final check — and promises the late end of a window that widens with the room's place in the list. Messages then arrive when each moment comes: checked in with the ready time, cleaning started, final check, room ready (with the key active). The guest app runs at demo speed — one hotel minute every 2 seconds — so a wait is about 1½–2 minutes.
+- **FHN AI chooses the room at check-in — on the server.** When a guest taps *Check in now*, the phone sends the request to the server, which decides in one locked step (Postgres `pg_advisory_xact_lock`, so two guests checking in at the same moment never get the same room or the same place in an attendant's list). It reads every guest still holding a room, gives each free room to the closest of the four attendants on duty — measured door to door from wherever each one is (the last room they were sent to; at first, their floor's elevator lobby: Attendant 4 on floor 6, the backup covering floor 5 for the sick Attendant 3, Attendants 1–2 on floors 3–4) — and picks the room that will be ready soonest that way: the wedding block first, two beds or a suite for a party of three or four. The forecast uses the hotel model's numbers: the attendant's list ahead, the walk there, the room type's average clean (King 35, Double Queen 39, Suite 52 min) and the 6-minute final check. The guest is promised the late end of a window that widens with the room's place in that list, and the reasons are saved with the decision (*How FHN AI worked this out*). Messages then arrive when each moment comes: checked in with the ready time, cleaning started, final check, room ready (with the key active). The guest app runs at demo speed — one hotel minute every 2 seconds — so a wait is about 1½–3 minutes, shown as a countdown ring on the phone and, to the second, on the hotel's Rooms tab.
+- **Midnight theme.** Both views share one dark theme (`client/src/midnight.css`): pure black, white text, neutral gray panels, blue only for actions and FHN AI, and one clear colour per room status — green ready, purple being cleaned, yellow final check, orange needs cleaning, gray guest inside, red repair — the same on every board, tile and legend.
 - **Both views stay linked.** The hotel view reads the guests' activity every few seconds: new registrations, check-ins, phone-key unlocks and problem reports pop up on the hotel screen and in its **Hotel log**, and the Guest app button shows how many people have registered.
 - **Privacy.** The hotel screen shows first names only. A guest's phone keeps just a secret id for their stay; **End this stay** in the app deletes their details from the database.
 
@@ -191,8 +192,8 @@ Honest limits: SMS usually lands in 2–10 seconds but carriers give no guarante
 **1. Readiness forecast** (`shared/sim/model.ts → predictEtas`)
 Simulates each attendant's queue forward using learned room-type averages, checkout availability, travel and elevator penalties, and break timing. Outputs a ready-time **range** whose width grows with queue depth and disruption, plus a confidence level and plain-language drivers.
 
-**2. Constraint-aware sequencing** (`planQueues`)
-List scheduling: whoever frees up first takes the room with the best score — earliest need-by time (3:00 PM promise; group blocks first once confirmed), least waiting on a checkout, fewest floor changes (weighted higher when an elevator is down), with stickiness so plans don't churn.
+**2. The next room goes to the closest attendant** (`planQueues`, `shared/sim/layout.ts`)
+Room by room: take the next room that needs cleaning — the most urgent (earliest need-by: the 3:00 PM promise, group blocks first once confirmed), passing over rooms whose guest won't be out before anyone is free — and give it to the closest attendant: the one who can be at its door soonest from wherever they are, counted door to door along the corridor (12 rooms per floor, elevators in the middle) plus the elevator ride for another floor, after whatever they're finishing. Rooms near each other stay with the same person, which saves floor changes (and matters more while an elevator is down). A room stays with whoever already has it unless someone else can be there clearly sooner, so plans don't churn; when a plan does move a room, the supervisor sees why (e.g. *Closest attendant — 2 doors away on floor 5*). The time to walk there is known as soon as an attendant sets off, so ready-time promises count it.
 
 **3. Human in the loop** — routine re-plans auto-apply; changes that affect guest promises pause for supervisor approval.
 
@@ -245,11 +246,12 @@ How today's process reproduces the log (modelling choices, all from the case tex
 
 ```
 api/                 serverless functions (Vercel); the local server mounts the same handlers
+  hotel.ts           the shared hotel day: its clock and decision log; refreshes the live room tables
   guest.ts           a guest's stay: register, read, every action in the app, end (delete)
   activity.ts        what guests are doing, for the hotel screen
   _lib/store.ts      PostgreSQL (DATABASE_URL) or memory; _lib/http.ts small request helpers
 client/  React + Vite + TypeScript
-  hotel/host.ts      runs the hotel day in the browser (main run + shadow run, 30-second autopilot)
+  hotel/host.ts      follows the shared day: polls the clock and decisions, corrects for clock drift, runs it locally if offline
   hotel/activity.ts  reads guest activity for the hotel view every few seconds
   guest/journey.ts   the guest app's link to its stay (optimistic actions, server clock)
   pages/             Overview (Live), FrontDesk, Supervisor, Housekeeping (attendant), Engineering, Stage, StageRemote
@@ -257,40 +259,49 @@ client/  React + Vite + TypeScript
   components/        Icon (inline SVG set), Logo (the FHN mark), rooms (labels/colours), PageHead
   links.ts           which view this tab is (hotel or guest) and where the other view lives
 shared/
-  guest/stay.ts      one guest's stay: the calculated wait, timed messages, requests — used by server and phone
+  guest/assign.ts    FHN AI's check-in decision: which room, which attendant, the promised window (run on the server)
+  guest/stay.ts      one guest's stay: the timeline, timed messages, requests — used by server and phone
   sim/seed.ts        Oct 16 scenario data, maintenance history, tomorrow's reservations
   sim/model.ts       forecast + planner + plan diff + staffing forecast + recurring faults
   sim/engine.ts      minute-by-minute simulation (readiness, labour, maintenance, climate)
   sim/demo.ts        30-second autopilot speed profile
+  sim/timeline.ts    the shared day: controls → clock + decision log, and Replay, which rebuilds the hotel from them
   types.ts           domain types used everywhere
 server/  Express + TypeScript (run with tsx), local only
   src/index.ts       serves both views on two ports, the API, the live SMS moment
   src/messaging.ts   Twilio SMS / your own phone / ntfy push / simulated, with delivery tracking
   src/stage.ts       the on-cue "Mike" scene
-  test/              Vitest: simulation, four challenges, demo timing, guest stay, API, messaging, stage
+  test/              Vitest: simulation, four challenges, demo timing, shared day, guest stay, APIs, messaging
 ```
 
 ### Database
 
-Three tables in their own `fhn` schema (not exposed through Supabase's public Data API):
+Everything lives in its own `fhn` schema (not exposed through Supabase's public Data API):
 
 | Table | What's in it |
 |---|---|
-| `fhn.guests` | One row per registration: name, optional email, party size, check-in time, the room and calculated wait (`plan`), preferences |
+| `fhn.hotel_control` | The shared day's clock — one row: run, method, playing, speed, 30-second demo, where the clock was set and when, version |
+| `fhn.hotel_events` | Every decision made on any screen, in order: plan approved or kept, auto-approve on/off, problem reported (with the minute of the day) |
+| `fhn.rooms` | Live status of all 48 rooms in the shared day: status, wedding block, expected ready time and range, temperature mode, attendant |
+| `fhn.hotel_snapshot` | The day at a glance: clock, both methods' numbers, the latest hotel log |
+| `fhn.hotel_viewers` | Hotel screens open right now (for "Synced · N screens") |
+| `fhn.guests` | One row per registration: name, optional email, party size, preferences; at check-in, FHN AI's decision — `room_id`, `attendant`, `ready_at`, `promised_at`, and the full `plan` with its reasons |
 | `fhn.requests` | Problems reported and items requested, per guest |
 | `fhn.activity` | The lines shown in the hotel's log (first names only) |
 
-The app connects as `fhn_app`, a login that can only read and write these three tables, through Supabase's connection pooler (port 6543). Browse the data in the Supabase dashboard → project **fhn-ai** → Table Editor → schema `fhn`. The schema is in `supabase/migrations/` (the login's password is set separately and never stored in the repository).
+Two screens pressing a control at the same moment can't overwrite each other: the clock row carries a version, and the server re-reads and re-applies on a clash.
 
-The guest app re-reads its stay every 15 seconds and whenever it comes back into view; the hotel view reads guest activity every 4 seconds.
+The app connects as `fhn_app`, a login that can only read and write these tables, through Supabase's connection pooler (port 6543). Browse the data in the Supabase dashboard → project **fhn-ai** → Table Editor → schema `fhn`. The schema is in `supabase/migrations/` (the login's password is set separately and never stored in the repository).
+
+Hotel screens check the shared day every second while it plays (every few seconds when paused, less often in a background tab); the guest app re-reads its stay every 15 seconds and whenever it comes back into view; the hotel view reads guest activity every 4 seconds.
 
 ### Environment variables
 
-See `.env.example`. Everything is optional locally; with nothing set, guest stays live in memory and messages are simulated on screen.
+See `.env.example`. Everything is optional locally; with nothing set, the shared day and guest stays live in memory and messages are simulated on screen.
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection string for guest stays (Supabase transaction pooler, `fhn_app` login) |
+| `DATABASE_URL` | PostgreSQL connection string for the shared hotel day and guest stays (Supabase transaction pooler, `fhn_app` login) |
 | `VITE_VIEW`, `VITE_HOTEL_URL`, `VITE_GUEST_URL` | Vercel builds: which view this site is, and where the other one lives |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (or `TWILIO_MESSAGING_SERVICE_SID`) | Real SMS |
 | `TWILIO_TRIAL_TEMPLATE` | Trial accounts: send a Twilio template instead of custom text |
@@ -307,11 +318,14 @@ See `.env.example`. Everything is optional locally; with nothing set, guest stay
 
 | Method | Path | Body |
 |---|---|---|
+| GET | `/api/hotel?run=&after=<event id>&viewer=` | — → `{ control, events, serverNow, viewers }` (only decisions this screen hasn't seen) |
+| POST | `/api/hotel` | `{ action: "reset" \| "demo" \| "play" \| "speed" \| "next-event" \| "approve" \| "dismiss" \| "auto-approve" \| "issue", minute, … }` → `{ control, events, serverNow }` |
 | POST | `/api/guest` | `{ action: "register", name, email?, party }` → `{ stay }` |
 | GET | `/api/guest?id=…` | — → `{ stay }` |
-| POST | `/api/guest` | `{ action: "check-in" \| "unlock" \| "issue" \| "request" \| "climate" \| "housekeeping" \| "prefs", id, … }` → `{ stay }` |
+| POST | `/api/guest` | `{ action: "check-in", id }` → `{ stay }` — the server chooses the room and attendant (`shared/guest/assign.ts`) |
+| POST | `/api/guest` | `{ action: "unlock" \| "issue" \| "request" \| "climate" \| "housekeeping" \| "prefs", id, … }` → `{ stay }` |
 | POST | `/api/guest` | `{ action: "end", id }` — deletes the guest's data |
-| GET | `/api/activity?after=<id>` | — → `{ items, counts }` (first names only) |
+| GET | `/api/activity?after=<id>` | — → `{ items, counts, arrivals }` (first names only; arrivals carry the same timer as each guest's phone) |
 | GET | `/api/messaging/status` | — (local server) |
 | GET | `/api/stage/state`, `/api/stage/stream` | — (local server) |
 | POST | `/api/stage/next` · `check-in` · `ready` · `reset` · `test` | header `x-stage-pin` when `STAGE_PIN` is set (local server) |

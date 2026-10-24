@@ -1,44 +1,102 @@
-// The hotel day runs right here in the browser, so the hotel view works as a static site.
-// It replays October 16 twice in lockstep: the way shown on screen, and a shadow run in the other mode
-// that every screen compares against.
+// The hotel day, shared by every screen. The server keeps one timeline in Postgres (a clock and a log of
+// decisions); this screen rebuilds the same day from it and follows it as time passes, so every open hotel
+// view shows the same rooms at the same moment and any of them can drive. Without the server (no network,
+// or `vite` on its own) the day still runs here, on this screen only.
 import { useSyncExternalStore } from 'react';
-import { DEMO_HOLD_MS, demoSpeedAt } from '../../../shared/sim/demo';
-import { Simulation } from '../../../shared/sim/engine';
-import type { Mode, SimState } from '../../../shared/types';
+import { applyAction, initialControl, Replay, type Control, type TimelineEvent } from '../../../shared/sim/timeline';
+import type { SimState } from '../../../shared/types';
+import { api, ApiError } from '../api';
+import { fade } from '../components/fade';
 
 const FRAME_MS = 100;
-const SPEEDS = [5, 10, 20, 30, 60];
+const POLL_PLAYING_MS = 1000;
+const POLL_IDLE_MS = 2500;
+const POLL_HIDDEN_MS = 8000;
+const RETRY_OFFLINE_MS = 5000;
+/** Ids for decisions made while offline, above anything the database hands out. */
+const LOCAL_IDS = 1_000_000_000;
+
+export type SyncStatus = 'connecting' | 'live' | 'offline';
+export interface SyncInfo {
+  status: SyncStatus;
+  /** Screens with the hotel view open right now, this one included. */
+  viewers: number;
+}
+interface HotelReply {
+  control: Control;
+  events: TimelineEvent[];
+  serverNow: number;
+  viewers?: number;
+}
+
+/** A name for this tab, so the server can count open screens. */
+const viewerId = () => {
+  const make = () => Array.from({ length: 16 }, () => 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 32)]).join('');
+  try {
+    const id = sessionStorage.getItem('fhn.viewer') ?? make();
+    sessionStorage.setItem('fhn.viewer', id);
+    return id;
+  } catch {
+    return make();
+  }
+};
+
+/** Describes a change another screen made, for a short notice on this one. */
+function describe(prev: Control, next: Control): string | null {
+  if (next.run !== prev.run) return next.autopilot ? 'Another screen started the 30-second demo' : `Another screen restarted the day${next.mode === 'baseline' ? ' with the previous method' : ' with FHN AI'}`;
+  if (next.playing !== prev.playing) return next.playing ? 'Another screen pressed play' : 'Another screen paused the day';
+  if (next.speed !== prev.speed && !next.autopilot) return 'Another screen changed the speed';
+  return null;
+}
 
 class HotelHost {
-  private sim = new Simulation('ai');
-  private shadow = new Simulation('baseline');
-  private carry = 0;
-  /** Demo autopilot: when the pending plan appeared (epoch ms). */
-  private holdSince = 0;
+  private replay = new Replay(true);
+  private control: Control = initialControl(Date.now());
+  private events: TimelineEvent[] = [];
+  /** Server clock minus this device's clock, from the most precise recent measurement. */
+  private offset = 0;
+  private bestRtt = Infinity;
+  private ownVersions = new Set<number>();
+  private localSeq = 0;
+  private viewer = viewerId();
+  private pollTimer = 0;
   private listeners = new Set<() => void>();
+  private syncListeners = new Set<() => void>();
+  private remoteListeners = new Set<(text: string) => void>();
   private snap: SimState;
+  private sync: SyncInfo = { status: 'connecting', viewers: 1 };
 
   constructor() {
-    this.shadow.state.autoApprove = true;
+    this.replay.sync(this.control, this.events, this.now());
     this.snap = this.snapshot();
     window.setInterval(() => this.frame(), FRAME_MS);
+    document.addEventListener('visibilitychange', () => !document.hidden && void this.poll());
+    void this.poll();
   }
 
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
+    return () => void this.listeners.delete(fn);
   };
   getState = () => this.snap;
+  subscribeSync = (fn: () => void) => {
+    this.syncListeners.add(fn);
+    return () => void this.syncListeners.delete(fn);
+  };
+  getSync = () => this.sync;
+  onRemote(fn: (text: string) => void) {
+    this.remoteListeners.add(fn);
+    return () => void this.remoteListeners.delete(fn);
+  }
+
+  private now() {
+    return Date.now() + this.offset;
+  }
 
   private snapshot(): SimState {
-    const s = structuredClone(this.sim.state);
-    const o = this.shadow.state;
-    s.compare = {
-      mode: o.mode,
-      now: o.now,
-      metrics: structuredClone(o.metrics),
-      rooms: o.rooms.map((r) => ({ id: r.id, status: r.status, groupBlock: r.groupBlock })),
-    };
+    const s = structuredClone(this.replay.sim.state);
+    const o = this.replay.shadow?.state;
+    if (o) s.compare = { mode: o.mode, now: o.now, metrics: structuredClone(o.metrics), rooms: o.rooms.map((r) => ({ id: r.id, status: r.status, groupBlock: r.groupBlock })) };
     return s;
   }
 
@@ -48,115 +106,109 @@ class HotelHost {
   }
 
   private frame() {
-    const s = this.sim.state;
-    if (s.autopilot && !s.finished) {
-      const p = this.sim.pendingProposal;
-      if (p) {
-        // Leave the decision on screen for a beat, then the supervisor approves.
-        if (!this.holdSince) this.holdSince = Date.now();
-        else if (Date.now() - this.holdSince >= DEMO_HOLD_MS) {
-          this.holdSince = 0;
-          this.sim.approve(p.id);
-          s.playing = true;
-          this.emit();
-        }
-        return;
+    if (this.replay.sync(this.control, this.events, this.now())) this.emit();
+  }
+
+  private setSync(status: SyncStatus, viewers = this.sync.viewers) {
+    if (status === this.sync.status && viewers === this.sync.viewers) return;
+    this.sync = { status, viewers };
+    for (const fn of this.syncListeners) fn();
+  }
+
+  private measure(sentAt: number, serverNow: number) {
+    const rtt = Date.now() - sentAt;
+    // Keep the estimate from the quickest round trip; it is the least distorted by the network.
+    if (rtt <= this.bestRtt * 1.5 || Math.abs(serverNow + rtt / 2 - Date.now() - this.offset) > 1500) {
+      this.bestRtt = Math.min(this.bestRtt, rtt);
+      this.offset = serverNow + rtt / 2 - Date.now();
+    }
+  }
+
+  /** Takes the server's timeline as the truth. `full` = the reply has every event of its run. */
+  private adopt(r: HotelReply, full: boolean) {
+    const prev = this.control;
+    const newer = r.control.run !== prev.run || r.control.version >= prev.version || this.sync.status !== 'live';
+    if (newer) {
+      if (this.sync.status === 'live' && r.control.version !== prev.version && !this.ownVersions.has(r.control.version)) {
+        const text = describe(prev, r.control);
+        if (text) for (const fn of this.remoteListeners) fn(text);
       }
-      s.speed = demoSpeedAt(s.now);
+      this.control = r.control;
     }
-    if (!s.playing || s.finished) return;
-    this.carry += (s.speed * FRAME_MS) / 1000;
-    let moved = false;
-    while (this.carry >= 1) {
-      this.carry -= 1;
-      if (!this.sim.tick()) {
-        this.carry = 0;
-        break;
-      }
-      moved = true;
-    }
-    this.syncShadow();
-    if (moved || !s.playing) this.emit();
-  }
-
-  /** Bring the shadow run to the same minute as the main run. */
-  private syncShadow() {
-    const main = this.sim.state;
-    while (!this.shadow.state.finished && (this.shadow.state.now < main.now || main.finished)) {
-      if (!this.shadow.tick()) break;
+    const sameRun = this.events.filter((e) => e.run === this.control.run && e.id < LOCAL_IDS);
+    const incoming = r.events.filter((e) => e.run === this.control.run);
+    if (full) this.events = incoming;
+    else {
+      const known = new Set(sameRun.map((e) => e.id));
+      this.events = [...sameRun, ...incoming.filter((e) => !known.has(e.id))];
     }
   }
 
-  private resetBoth(mode: Mode) {
-    this.sim.reset(mode, { speed: this.sim.state.speed, autoApprove: this.sim.state.autoApprove });
-    this.shadow.reset(mode === 'ai' ? 'baseline' : 'ai', { autoApprove: true });
-    this.carry = 0;
-    this.holdSince = 0;
-  }
-
-  /** Any manual control hands playback back to the presenter. */
-  private manual() {
-    if (this.sim.state.autopilot) this.sim.state.speed = 20;
-    this.sim.state.autopilot = false;
-    this.holdSince = 0;
+  private async poll() {
+    window.clearTimeout(this.pollTimer);
+    const sentAt = Date.now();
+    const run = this.control.run;
+    const after = Math.max(0, ...this.events.filter((e) => e.run === run && e.id < LOCAL_IDS).map((e) => e.id));
+    try {
+      const r = await api<HotelReply>(`/api/hotel?run=${run}&after=${after}&viewer=${this.viewer}`);
+      this.measure(sentAt, r.serverNow);
+      const wasOffline = this.sync.status !== 'live';
+      this.adopt(r, r.control.run !== run || wasOffline);
+      this.setSync('live', r.viewers ?? 1);
+      // Joining the shared day, or a new day started on another screen, cross-fades rather than jumps.
+      if (wasOffline || this.control.run !== run) fade(() => this.frame());
+      else this.frame();
+    } catch {
+      this.setSync('offline', 1);
+    }
+    const busy = this.control.playing || this.control.autopilot;
+    const wait = this.sync.status === 'offline' ? RETRY_OFFLINE_MS : document.hidden ? POLL_HIDDEN_MS : busy ? POLL_PLAYING_MS : POLL_IDLE_MS;
+    this.pollTimer = window.setTimeout(() => void this.poll(), wait);
   }
 
   /** The hotel's controls. Throws with a readable message when an action isn't possible right now. */
-  run(action: string, body: Record<string, unknown> = {}): string | undefined {
-    const s = this.sim.state;
-    let message: string | undefined;
-    switch (action) {
-      case 'reset':
-        this.manual();
-        this.resetBoth(body.mode === 'baseline' ? 'baseline' : 'ai');
-        break;
-      case 'demo':
-        this.resetBoth('ai');
-        this.sim.state.autopilot = true;
-        this.sim.state.speed = demoSpeedAt(this.sim.state.now);
-        this.sim.state.playing = true;
-        break;
-      case 'play':
-        if (s.finished) throw new Error('The day is over. Start again to replay it.');
-        if (this.sim.pendingProposal && body.playing) throw new Error('Approve or keep the current plan first.');
-        this.manual();
-        s.playing = !!body.playing;
-        if (s.playing) s.pausedReason = undefined;
-        break;
-      case 'speed': {
-        const speed = Number(body.speed);
-        if (!SPEEDS.includes(speed)) throw new Error('Unsupported speed');
-        this.manual();
-        s.speed = speed;
-        break;
-      }
-      case 'next-event':
-        this.manual();
-        s.playing = false;
-        this.sim.nextEvent();
-        this.syncShadow();
-        break;
-      case 'auto-approve':
-        s.autoApprove = !!body.value;
-        if (s.autoApprove && this.sim.pendingProposal) this.sim.approve(this.sim.pendingProposal.id);
-        break;
-      case 'approve':
-        if (!this.sim.approve(String(body.id))) throw new Error('That plan is no longer waiting.');
-        break;
-      case 'dismiss':
-        if (!this.sim.dismiss(String(body.id))) throw new Error('That plan is no longer waiting.');
-        break;
-      case 'issue': {
-        const r = this.sim.reportIssue(String(body.roomId), String(body.issue ?? '').trim().slice(0, 60) || 'Maintenance issue');
-        if (!r.ok) throw new Error(r.message);
-        message = r.message;
-        break;
-      }
-      default:
-        throw new Error(`Unknown action: ${action}`);
+  async run(action: string, body: Record<string, unknown> = {}): Promise<string | undefined> {
+    const sim = this.replay.sim;
+    const s = sim.state;
+    if (action === 'play' && body.playing && s.finished) throw new Error('The day is over. Start again to replay it.');
+    if (action === 'play' && body.playing && sim.pendingProposal) throw new Error('Approve or keep the current plan first.');
+    if ((action === 'approve' || action === 'dismiss') && !s.proposals.some((p) => p.id === body.id && p.status === 'pending'))
+      throw new Error('That plan is no longer waiting.');
+    let minute = s.now;
+    if (action === 'next-event') {
+      // Where "skip" lands: just past the next moment of the day (or at a decision, if one comes up).
+      const probe = new Replay(false);
+      const c = this.control;
+      probe.sync({ ...c, playing: false, autopilot: false, anchorMinute: s.now, autoApproveUntil: c.autopilot ? s.now : c.autoApproveUntil }, this.events, this.now());
+      probe.sim.nextEvent();
+      minute = probe.sim.state.now;
     }
-    this.emit();
-    return message;
+    const payload = { ...body, action, minute, from: s.now, viewer: this.viewer };
+    const logBefore = s.log.length;
+    try {
+      let sentAt = Date.now();
+      const r = await api<HotelReply>('/api/hotel', payload).catch((e) => {
+        // One more try if the server was momentarily unreachable (it reconnects to the database on its own).
+        if (!(e instanceof ApiError && (e.status === 0 || e.status >= 500))) throw e;
+        sentAt = Date.now();
+        return api<HotelReply>('/api/hotel', payload);
+      });
+      this.measure(sentAt, r.serverNow);
+      this.ownVersions.add(r.control.version);
+      this.adopt(r, true);
+      this.setSync('live');
+    } catch (e) {
+      if (e instanceof ApiError && e.status >= 400 && e.status < 500) throw new Error(e.message);
+      // No server: run the day on this screen.
+      const { control, event } = applyAction(this.control, action, payload, this.now());
+      this.control = control;
+      if (event) this.events = [...this.events, { ...event, id: LOCAL_IDS + ++this.localSeq }];
+      this.setSync('offline', 1);
+    }
+    this.frame();
+    if (action === 'next-event' || action === 'play') void this.poll();
+    const log = this.replay.sim.state.log;
+    return action === 'issue' && log.length > logBefore ? log[0]?.text : undefined;
   }
 }
 
@@ -169,7 +221,16 @@ export function useHotel(): SimState {
   return useSyncExternalStore(h.subscribe, h.getState);
 }
 
+/** Whether this screen is in step with the others, and how many are open. */
+export function useHotelSync(): SyncInfo {
+  const h = getHost();
+  return useSyncExternalStore(h.subscribeSync, h.getSync);
+}
+
+/** Notices about changes made on other screens. Returns an unsubscribe function. */
+export const onRemoteChange = (fn: (text: string) => void) => getHost().onRemote(fn);
+
 /** Runs a hotel control (reset, demo, play, approve…). Resolves with an optional message. */
 export async function hotel(action: string, body: Record<string, unknown> = {}): Promise<{ message?: string }> {
-  return { message: getHost().run(action, body) };
+  return { message: await getHost().run(action, body) };
 }

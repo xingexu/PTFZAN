@@ -5,6 +5,7 @@
 // uncertainty band that widens with queue depth. In a pilot the averages become a gradient-boosted
 // model trained on 60–90 days of room-level (never person-level) clean durations.
 import type { Attendant, Confidence, Eta, Guest, MaintenanceInsight, PlanChange, Room, SimState, StaffingForecast } from '../types.js';
+import { distanceWords, walkMin, type Spot } from './layout.js';
 import { ELEVATOR_PENALTY, HIST_AVG, INSPECTION_MIN, STAYOVER_MIN, TOMORROW } from './seed.js';
 
 export const needsWork = (r: Room) =>
@@ -37,30 +38,40 @@ export function needBy(r: Room, s: Pick<SimState, 'guests' | 'groupConfirmed'>):
   return r.promisedBy !== undefined ? Math.min(base, r.promisedBy - 15) : base;
 }
 
-const travel = (from: number, to: number) => (from === to ? 1 : 4);
 /** A room that would start this close to a due break is assumed to wait for it (an overrun makes that likely). */
 const BREAK_SLACK = 20;
 const elevator = (r: Room, down: boolean) => (down && r.floor >= 5 ? ELEVATOR_PENALTY : 0);
 
 interface Cursor {
   t: number;
-  floor: number;
+  /** Where they will be: a room, or a floor's elevator lobby. */
+  at: Spot;
   breakAt: number;
   hadBreak: boolean;
 }
 
-/** Where an attendant will be once their current task finishes (prediction, not ground truth). */
+/** Where an attendant will be once their current task finishes, and when (prediction, not ground truth). */
 function startCursor(a: Attendant, rooms: Map<string, Room>, now: number): Cursor {
   let t = Math.max(now, a.busyUntil);
-  let floor = a.lastFloor;
+  let at: Spot = a.lastRoom ?? a.lastFloor;
   const cur = a.currentRoom ? rooms.get(a.currentRoom) : undefined;
   if (cur && cur.status === 'cleaning' && cur.workStartedAt !== undefined) {
     // We do not peek at the true end time; we predict it like a real system would.
-    const predEnd = cur.workStartedAt + predictedDuration(cur) + 2;
+    const predEnd = cur.workStartedAt + (cur.travelMin ?? 0) + predictedDuration(cur) + 2;
     t = Math.max(now + 2, predEnd);
-    floor = cur.floor;
+    at = cur.id;
   }
-  return { t, floor, breakAt: a.breakAt, hadBreak: a.hadBreak };
+  return { t, at, breakAt: a.breakAt, hadBreak: a.hadBreak };
+}
+
+/** When the attendant can start on the room: free, at its door, and the guest gone (a due break comes first). */
+function startAt(c: Cursor, r: Room, now: number, commit = false) {
+  let start = Math.max(c.t, knownAvailableAt(r, now));
+  if (!c.hadBreak && start >= c.breakAt - BREAK_SLACK) {
+    start = Math.max(start, c.breakAt) + 30;
+    if (commit) c.hadBreak = true;
+  }
+  return start;
 }
 
 function band(position: number, r: Room, elevatorDown: boolean): number {
@@ -80,7 +91,7 @@ export function predictEtas(s: SimState, queues?: Record<string, string[]>): Map
       out.set(r.id, { low: Math.max(now, r.workEndsAt - 1), high: r.workEndsAt + 2, confidence: 'high', drivers: ['Cleaned — final check under way'] });
     } else if (r.status === 'cleaning' && r.workStartedAt !== undefined) {
       const end =
-        Math.max(now + 2, r.workStartedAt + predictedDuration(r) + 2) + (r.serviceKind === 'stayover' ? 0 : INSPECTION_MIN);
+        Math.max(now + 2, r.workStartedAt + (r.travelMin ?? 0) + predictedDuration(r) + 2) + (r.serviceKind === 'stayover' ? 0 : INSPECTION_MIN);
       out.set(r.id, {
         low: end - 4,
         high: end + 5,
@@ -99,14 +110,10 @@ export function predictEtas(s: SimState, queues?: Record<string, string[]>): Map
       const r = rooms.get(id);
       if (!r || !needsWork(r) || r.status === 'ooo') continue;
       pos++;
-      let start = Math.max(c.t, knownAvailableAt(r, now));
-      if (!c.hadBreak && start >= c.breakAt - BREAK_SLACK) {
-        start = Math.max(start, c.breakAt) + 30;
-        c.hadBreak = true;
-      }
-      const end = start + travel(c.floor, r.floor) + elevator(r, s.elevatorDown) + predictedDuration(r);
+      const start = startAt(c, r, now, true);
+      const end = start + walkMin(c.at, r.id) + elevator(r, s.elevatorDown) + predictedDuration(r);
       c.t = end;
-      c.floor = r.floor;
+      c.at = r.id;
       const ready = end + (r.status === 'stayover' ? 0 : INSPECTION_MIN);
       const half = band(pos, r, s.elevatorDown);
       const drivers: string[] = [];
@@ -124,10 +131,15 @@ export function predictEtas(s: SimState, queues?: Record<string, string[]>): Map
 const fmt = (m: number) => `${((Math.floor(m / 60) + 11) % 12) + 1}:${String(m % 60).padStart(2, '0')}`;
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
+/** A room stays with the attendant who already has it unless someone else can be there this much sooner. */
+const KEEP_MIN = 3;
+
 /**
- * Constraint-aware list scheduling: the attendant who frees up first takes the room with the best
- * score — earliest need-by time, least waiting for a checkout, fewest floor changes (which matters
- * more when an elevator is down). Absent attendants receive nothing.
+ * Dispatching, room by room. Take the next room that needs cleaning — the most urgent (earliest need-by),
+ * passing over rooms whose guest won't be out before anyone is free — and give it to the closest attendant:
+ * the one who can be at its door soonest from wherever they will be, counting the corridor, the elevator and
+ * whatever they must finish first. Rooms near each other therefore stay with the same person, which saves
+ * floor changes (and matters more while an elevator is down). Absent attendants receive nothing.
  */
 export function planQueues(s: SimState): Record<string, string[]> {
   const rooms = new Map(s.rooms.map((r) => [r.id, r]));
@@ -135,36 +147,53 @@ export function planQueues(s: SimState): Record<string, string[]> {
   const queues: Record<string, string[]> = Object.fromEntries(s.attendants.map((a) => [a.id, [] as string[]]));
   const cursors = new Map(present.map((a) => [a.id, startCursor(a, rooms, s.now)]));
   const remaining = s.rooms.filter((r) => needsWork(r) && r.status !== 'ooo' && r.status !== 'cleaning');
-  const floorWeight = s.elevatorDown ? 10 : 4;
 
   while (remaining.length && present.length) {
-    const a = present.reduce((best, x) => (cursors.get(x.id)!.t < cursors.get(best.id)!.t ? x : best));
-    const c = cursors.get(a.id)!;
-    let bestIdx = 0;
-    let bestScore = Infinity;
+    // The next room that needs cleaning.
+    const free = Math.min(...present.map((a) => cursors.get(a.id)!.t));
+    let idx = 0;
+    let best = Infinity;
     remaining.forEach((r, i) => {
-      const avail = knownAvailableAt(r, s.now);
-      const wait = Math.max(0, avail - c.t);
-      // Stickiness: keep rooms with the attendant who already has them unless there is a real gain,
-      // so plans don't churn (attendants hate pointless reshuffles).
-      const sticky = a.queue.includes(r.id) ? -12 : 0;
-      const score = needBy(r, s) + 3 * wait + (r.floor !== c.floor ? floorWeight : 0) + sticky;
-      if (score < bestScore) {
-        bestScore = score;
-        bestIdx = i;
+      const score = needBy(r, s) + 3 * Math.max(0, knownAvailableAt(r, s.now) - free);
+      if (score < best) {
+        best = score;
+        idx = i;
       }
     });
-    const r = remaining.splice(bestIdx, 1)[0];
-    let start = Math.max(c.t, knownAvailableAt(r, s.now));
-    if (!c.hadBreak && start >= c.breakAt - BREAK_SLACK) {
-      start = Math.max(start, c.breakAt) + 30;
-      c.hadBreak = true;
-    }
-    c.t = start + travel(c.floor, r.floor) + elevator(r, s.elevatorDown) + predictedDuration(r);
-    c.floor = r.floor;
+    const r = remaining.splice(idx, 1)[0];
+    // …goes to the closest attendant.
+    const a = closestAttendant(present, cursors, r, s);
+    const c = cursors.get(a.id)!;
+    const start = startAt(c, r, s.now, true);
+    c.t = start + walkMin(c.at, r.id) + elevator(r, s.elevatorDown) + predictedDuration(r);
+    c.at = r.id;
     queues[a.id].push(r.id);
   }
   return queues;
+}
+
+/** The attendant who can be at the room's door soonest (the one who already has it, unless clearly beaten). */
+function closestAttendant(present: Attendant[], cursors: Map<string, Cursor>, r: Room, s: SimState): Attendant {
+  let pick = present[0];
+  let soonest = Infinity;
+  for (const a of present) {
+    const c = cursors.get(a.id)!;
+    const reach = startAt(c, r, s.now) + walkMin(c.at, r.id) - (a.queue.includes(r.id) ? KEEP_MIN : 0);
+    if (reach < soonest) {
+      soonest = reach;
+      pick = a;
+    }
+  }
+  return pick;
+}
+
+/** Where an attendant will be just before starting `roomId` in a plan: their previous room, or where they are now. */
+function spotBefore(s: SimState, queues: Record<string, string[]>, att: string, roomId: string): Spot {
+  const q = queues[att] ?? [];
+  const i = q.indexOf(roomId);
+  if (i > 0) return q[i - 1];
+  const a = s.attendants.find((x) => x.id === att);
+  return a?.currentRoom ?? a?.lastRoom ?? a?.lastFloor ?? 1;
 }
 
 /** Human-readable diff between the current plan and a proposed plan. */
@@ -194,6 +223,7 @@ export function diffPlans(s: SimState, proposed: Record<string, string[]>, trigg
     if (r.groupBlock && s.groupConfirmed && (!o || n.idx < o.idx || o.att !== n.att)) reason = 'Wedding party now arrives 3:00 PM';
     else if (r.lateReported && r.status === 'occupied') reason = 'Late checkout — empty rooms first';
     else if (o && !s.attendants.find((a) => a.id === o.att)?.present) reason = `Covering for ${label(o.att)} (off sick)`;
+    else if (!o || o.att !== n.att) reason = `Closest attendant — ${distanceWords(spotBefore(s, proposed, n.att, id), id)}`;
     else if (s.elevatorDown && r.floor >= 5) reason = `Grouped on floor ${r.floor} to save elevator trips`;
     else if (r.status === 'dirty') reason = 'Empty now — can start right away';
     else if (r.status === 'stayover') reason = 'Staying guest’s tidy-up moved after arrival rooms';

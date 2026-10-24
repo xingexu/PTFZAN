@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import activityHandler from '../../api/activity.js';
 import guestHandler from '../../api/guest.js';
+import hotelHandler from '../../api/hotel.js';
 import { store } from '../../api/_lib/store.js';
 import { Messenger } from './messaging.js';
 import { maskPhone, normalizePhone } from './phone.js';
@@ -18,6 +19,9 @@ const PORT = Number(process.env.PORT ?? 8787);
 
 const messenger = new Messenger(loadMessagingConfig(), () => broadcast());
 const stage = new Stage(messenger, STAGE, () => broadcast());
+
+// A database hiccup during the pitch is logged, never allowed to stop the server.
+process.on('unhandledRejection', (e) => console.error('unhandled', e));
 
 const app = express();
 app.set('trust proxy', true);
@@ -68,9 +72,10 @@ const stagePin = (req: Request, res: Response, next: NextFunction) =>
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, messaging: messenger.status.provider }));
 app.get('/api/messaging/status', (_req, res) => res.json(messenger.status));
-// Guest stays and the hotel's activity log: the same handlers Vercel runs as serverless functions.
+// Guest stays, the hotel's activity log and the shared hotel day: the same handlers Vercel runs as serverless functions.
 app.all('/api/guest', (req, res) => void guestHandler(req, res));
 app.get('/api/activity', (req, res) => void activityHandler(req, res));
+app.all('/api/hotel', (req, res) => void hotelHandler(req, res));
 
 // ───────────── Stage mode ─────────────
 app.get('/api/stage/state', (_req, res) => res.json(stage.state()));
@@ -203,7 +208,7 @@ const server = app.listen(PORT, () => {
     console.log(`  Hotel view (staff):  http://localhost:${PORT}`);
     console.log(`  Guest view (app):    http://localhost:${GUEST_PORT}`);
     for (const h of lanHosts()) console.log(`  phones on the same Wi-Fi: guest app http://${h}:${GUEST_PORT} · stage remote http://${h}:${PORT}/stage/remote`);
-    console.log(`Guest stays saved to: ${store().kind === 'postgres' ? 'Postgres (DATABASE_URL)' : 'memory — set DATABASE_URL in .env to use the database'}`);
+    console.log(`Hotel day and guest stays saved to: ${store().kind === 'postgres' ? 'Postgres (DATABASE_URL)' : 'memory — set DATABASE_URL in .env to use the database'}`);
     console.log(`Messaging: ${m.provider} — ${m.note}`);
     console.log(`Stage guest "${STAGE.name}" · room ${STAGE.room} · phone ${STAGE.phone ? maskPhone(normalizePhone(STAGE.phone)) || 'invalid' : 'not set'}${STAGE.pin ? ' · PIN on' : ''}`);
     console.log('Press Ctrl+C to stop.\n');

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, type ReactNode } from 'react';
 import { fmtTime } from '../../../../shared/types';
 import { Icon } from '../../components/Icon';
 import { Brand } from '../../components/Logo';
@@ -12,6 +12,7 @@ import { HOTEL_TAB, hotelUrl } from '../../links';
 export function GuestFrame({
   children, now, darkStatus, tabs, demoPace, banners,
 }: { children: ReactNode; now?: number; darkStatus?: boolean; tabs?: ReactNode; demoPace?: boolean; banners?: ReactNode }) {
+  useLayoutEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }, []);
   return (
     <div className="gx">
       <div className="backdrop" aria-hidden="true" />

@@ -1,22 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { activityFor, apply, cleanRegistration, planFor, SECONDS_PER_HOTEL_MINUTE, timeline, viewOf, type Stay } from '../../shared/guest/stay.js';
+import { chooseRoom } from '../../shared/guest/assign.js';
+import { activityFor, apply, cleanRegistration, liveArrival, SECONDS_PER_HOTEL_MINUTE, timeline, viewOf, type Stay } from '../../shared/guest/stay.js';
 import { HIST_AVG, INSPECTION_MIN } from '../../shared/sim/seed.js';
 
 const T0 = new Date(2026, 9, 16, 14, 0, 0).getTime();
 const hotelMin = (m: number) => m * SECONDS_PER_HOTEL_MINUTE * 1000;
-const guest = (code = 'FHNTEST1'): Stay => ({ id: 'test', code, name: 'Sam Lee', party: 2, createdAt: T0, housekeeping: 'standard', setpoint: 21, requests: [] });
-const checkedIn = (code?: string) => {
-  const j = guest(code);
-  apply(j, 'check-in', {}, T0);
+const guest = (code = 'FHNTEST1', party = 2): Stay => ({ id: code, code, name: 'Sam Lee', party, createdAt: T0, housekeeping: 'standard', setpoint: 21, requests: [] });
+/** Checks a guest in the way the server does: FHN AI chooses, given everyone already checked in. */
+const checkIn = (j: Stay, at = T0, others: Stay[] = []) => {
+  apply(j, 'check-in', { plan: chooseRoom(j, at, others) }, at);
   return j;
 };
+const checkedIn = (code?: string) => checkIn(guest(code));
 
 describe('guest stay', () => {
   it('calculates the wait from the room type, the attendant’s list and the final check', () => {
-    const p = planFor('FHNTEST1');
+    const p = checkedIn().plan!;
     expect(p.predictedMin).toBe(p.queueMin + HIST_AVG[p.type] + INSPECTION_MIN);
-    expect(planFor('FHNTEST1')).toEqual(p);
     expect(p.roomId).toMatch(/^[56]\d\d$/);
+    expect(p.reasons?.length).toBeGreaterThan(3);
+  });
+
+  it('only checks in with the hotel’s decision', () => {
+    expect(() => apply(guest(), 'check-in', {}, T0)).toThrow(/assigns your room/);
   });
 
   it('keeps every promise: the room is ready inside the window, never after its late end', () => {
@@ -85,7 +91,81 @@ describe('guest stay', () => {
 
   it('tells the hotel what happened in plain words, first name only', () => {
     const j = checkedIn();
-    expect(activityFor(j, 'check-in')?.text).toMatch(/^Sam checked in · room \d{3}, ready in about \d+ min$/);
+    expect(activityFor(j, 'check-in')?.text).toMatch(/^Sam checked in · FHN AI chose room \d{3} \(.+\), ready in about \d+ min$/);
     expect(activityFor(j, 'climate')).toBeNull();
+  });
+
+  it('gives the hotel screen the same clock as the guest’s phone', () => {
+    const j = checkedIn();
+    const a = liveArrival(j)!;
+    const p = viewOf(j, T0).progress!;
+    expect(a).toMatchObject({ first: 'Sam', roomId: j.plan!.roomId, startMs: p.startMs, cleanMs: p.cleanMs, checkMs: p.checkMs, readyMs: p.readyMs, highMs: p.highMs });
+  });
+});
+
+describe('FHN AI check-in (server side)', () => {
+  it('gives the first guest a room on the wedding floors, cleaned by the attendant on that floor', () => {
+    const p = checkedIn().plan!;
+    expect(p).toMatchObject({ type: 'King', position: 1 });
+    expect(p.roomId).toMatch(/^[56]0[1-6]$/);
+    expect(p.attendant).toBe(p.floor === 6 ? 'Attendant 4' : 'Backup attendant');
+    // A short walk from the elevator lobby (under a minute), the King average, the final check.
+    expect(p.predictedMin).toBe(1 + HIST_AVG.King + INSPECTION_MIN);
+  });
+
+  it('never gives two waiting guests the same room, and spreads the work across the team', () => {
+    const stays: Stay[] = [];
+    for (let i = 0; i < 6; i++) stays.push(checkIn(guest(`FHNQ${i}`), T0 + i * 1000, stays));
+    expect(new Set(stays.map((s) => s.plan!.roomId)).size).toBe(6);
+    expect(new Set(stays.slice(0, 4).map((s) => s.plan!.attendantId)).size).toBe(4);
+    // With all four attendants busy, the fifth guest waits behind someone — and is told so, with a wider window.
+    const fifth = stays[4].plan!;
+    expect(fifth.position).toBe(2);
+    expect(fifth.queueMin).toBeGreaterThan(20);
+    expect(fifth.bandMin).toBeGreaterThan(stays[0].plan!.bandMin);
+    expect(fifth.reasons!.join(' ')).toMatch(/after 1 room they’re finishing/);
+  });
+
+  it('keeps its promise for guests waiting behind others too', () => {
+    for (let n = 0; n < 40; n++) {
+      const stays: Stay[] = [];
+      for (let i = 0; i < 8; i++) stays.push(checkIn(guest(`FHN${n}x${i}`), T0 + i * 3000, stays));
+      for (const s of stays.filter((x) => x.plan!.position <= 3)) {
+        const tl = timeline(s)!;
+        expect(tl.ready).toBeLessThanOrEqual(tl.high);
+      }
+    }
+  });
+
+  it('gives the room that needs cleaning to the closest attendant', () => {
+    // Earlier today the backup attendant was sent to 512 and is still up there; everyone is free now.
+    const earlier: Stay = {
+      ...guest('FHNEARLY'),
+      checkInAt: T0 - 2 * 3600_000,
+      plan: { roomId: '512', floor: 5, type: 'Suite', queueMin: 1, cleanMin: 50, predictedMin: 59, bandMin: 10, position: 1, attendantId: 'A5', attendant: 'Backup attendant' },
+    };
+    // Floor 6's two-bed rooms are taken, so a party of four gets one of 507–510 — and 510 is two doors from 512.
+    const taken = ['607', '608', '609', '610'].map((roomId) => ({ ...earlier, plan: { ...earlier.plan!, roomId, floor: 6, attendantId: 'A2', attendant: 'Attendant 2' } }));
+    const p = checkIn(guest('FHNFOUR', 4), T0, [earlier, ...taken]).plan!;
+    expect(p).toMatchObject({ roomId: '510', attendant: 'Backup attendant', position: 1 });
+    expect(p.reasons![1]).toBe('Backup attendant is the closest attendant — 2 doors away on floor 5, free now');
+  });
+
+  it('gives a party of three or four a room with two beds or a suite', () => {
+    for (let i = 0; i < 20; i++) expect(checkIn(guest(`FHNP${i}`, 4)).plan!.type).not.toBe('King');
+  });
+
+  it('moves to the other floors once the wedding block is full', () => {
+    const stays: Stay[] = [];
+    for (let i = 0; i < 21; i++) stays.push(checkIn(guest(`FHNF${i}`), T0 + i * 1000, stays));
+    expect(stays.slice(0, 20).every((s) => /^[56]/.test(s.plan!.roomId))).toBe(true);
+    const last = stays[20].plan!;
+    expect(new Set(stays.map((s) => s.plan!.roomId)).size).toBe(21);
+    expect(last.reasons![0]).toMatch(/wedding floors are full/);
+  });
+
+  it('decides the same way every time for the same hotel', () => {
+    const a = chooseRoom(guest('FHNSAME'), T0, []);
+    expect(chooseRoom(guest('FHNSAME'), T0, [])).toEqual(a);
   });
 });

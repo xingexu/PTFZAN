@@ -1,11 +1,13 @@
 // A guest's stay: register, read it back, and every action in the guest app. Saved to Postgres.
 // GET  /api/guest?id=…                         → { stay, now }
 // POST { action: 'register', name, email?, party } → { stay, now }
+// POST { action: 'check-in', id }               → { stay, now } — FHN AI chooses the room here, on the server
 // POST { action: <stay action>, id, …details }  → { stay, now }
 // POST { action: 'end', id }                    → deletes the guest's data
 import type { ServerResponse } from 'node:http';
+import { chooseRoom } from '../shared/guest/assign.js';
 import { activityFor, apply, cleanRegistration, newCode, STAY_ACTIONS, type Stay } from '../shared/guest/stay.js';
-import { queryOf, readBody, send, type Req } from './_lib/http.js';
+import { queryOf, readBody, send, withDeadline, type Req } from './_lib/http.js';
 import { store } from './_lib/store.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -20,7 +22,7 @@ function changed(before: Stay, after: Stay, action: string) {
   return false;
 }
 
-export default async function handler(req: Req, res: ServerResponse) {
+export default withDeadline(async function guest(req: Req, res: ServerResponse) {
   try {
     const db = store();
     if (req.method === 'GET') {
@@ -60,6 +62,16 @@ export default async function handler(req: Req, res: ServerResponse) {
       await db.remove(stay.id);
       return send(res, 200, { ok: true });
     }
+    if (action === 'check-in') {
+      // The room, the attendant and the promised time are decided here, against every other guest waiting.
+      const done = await db.checkIn(stay.id, now, (s, others) => {
+        apply(s, 'check-in', { plan: chooseRoom(s, now, others) }, now);
+      });
+      if (!done) return send(res, 404, NOT_FOUND);
+      const line = changed(stay, done, action) ? activityFor(done, action) : null;
+      if (line) await db.log(done.id, line.kind, line.text, now);
+      return send(res, 200, { ok: true, stay: done, now });
+    }
     if (!STAY_ACTIONS.includes(action as never)) return send(res, 400, { ok: false, message: 'Unknown action' });
 
     const before = structuredClone(stay);
@@ -76,4 +88,4 @@ export default async function handler(req: Req, res: ServerResponse) {
     console.error('guest api', e);
     return send(res, 503, { ok: false, message: 'The hotel’s system didn’t answer. Please try again in a moment.' });
   }
-}
+});

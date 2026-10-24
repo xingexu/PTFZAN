@@ -216,3 +216,29 @@ describe('30-second demo', () => {
     expect(demoSpeedAt(t(15, 0))).toBeLessThan(demoSpeedAt(t(9, 0)));
   });
 });
+
+describe('dispatching', () => {
+  it('gives each room that needs cleaning to the closest attendant', async () => {
+    const { walkMin } = await import('../../shared/sim/layout.js');
+    expect(walkMin('504', '505')).toBeLessThan(walkMin('504', '510'));
+    expect(walkMin('504', '510')).toBeLessThan(walkMin('404', '505'));
+    expect(walkMin(5, '506')).toBeLessThan(walkMin(5, '501'));
+
+    // Two attendants free at the same moment, on different floors: each room goes to the one nearby.
+    const sim = new Simulation('ai');
+    const s = sim.state;
+    s.now = t(10, 0);
+    for (const a of s.attendants) Object.assign(a, { present: false, queue: [], currentRoom: undefined });
+    const [a, b] = s.attendants;
+    Object.assign(a, { present: true, busyUntil: s.now, lastFloor: 3, lastRoom: '303', hadBreak: true });
+    Object.assign(b, { present: true, busyUntil: s.now, lastFloor: 6, lastRoom: '611', hadBreak: true });
+    for (const r of s.rooms) {
+      r.status = ['305', '612'].includes(r.id) ? 'dirty' : 'ready';
+      r.lateReported = false;
+    }
+    const { planQueues } = await import('../../shared/sim/model.js');
+    const q = planQueues(s);
+    expect(q[a.id]).toEqual(['305']);
+    expect(q[b.id]).toEqual(['612']);
+  });
+});

@@ -51,3 +51,44 @@ describe('guest API', () => {
     expect((await call(activity, 'GET', '/api/activity?after=0')).data.items).toHaveLength(0);
   });
 });
+
+describe('check-in on the server', () => {
+  it('gives guests checking in at the same moment different rooms, and shows them to the hotel with their timers', async () => {
+    const ids: string[] = [];
+    for (const name of ['Ana One', 'Ben Two', 'Cy Three', 'Di Four', 'Ed Five']) {
+      ids.push((await call(guest, 'POST', '/api/guest', { action: 'register', name, party: 2 })).data.stay!.id);
+    }
+    const done = await Promise.all(ids.map((id) => call(guest, 'POST', '/api/guest', { action: 'check-in', id })));
+    const plans = done.map((r) => r.data.stay!.plan!);
+    expect(new Set(plans.map((p) => p.roomId)).size).toBe(5);
+    expect(plans.every((p) => p.attendant && p.reasons?.length)).toBe(true);
+    // The phone can't pick its own room.
+    const sneaky = await call(guest, 'POST', '/api/guest', { action: 'register', name: 'Fay Six', party: 1 });
+    const r = await call(guest, 'POST', '/api/guest', { action: 'check-in', id: sneaky.data.stay!.id, plan: { roomId: '501' } });
+    expect(r.data.stay!.plan!.roomId).not.toBe('501');
+    ids.push(sneaky.data.stay!.id);
+
+    const a = await call(activity, 'GET', '/api/activity?after=0');
+    const arrivals = (a.data as unknown as { arrivals: { roomId: string; highMs: number }[] }).arrivals;
+    expect(arrivals).toHaveLength(6);
+    expect(new Set(arrivals.map((x) => x.roomId))).toEqual(new Set([...plans.map((p) => p.roomId), r.data.stay!.plan!.roomId]));
+    for (const id of ids) await call(guest, 'POST', '/api/guest', { action: 'end', id });
+  });
+});
+
+describe('deadline', () => {
+  it('answers 503 when the database stops responding, and ignores a reply that comes too late', async () => {
+    const { send, withDeadline } = await import('../../api/_lib/http.js');
+    let release!: () => void;
+    const stuck = withDeadline(async (_req, res) => {
+      await new Promise<void>((r) => (release = r));
+      send(res, 200, { ok: true });
+    }, 30);
+    const res = { statusCode: 0, body: '', headersSent: false, setHeader: () => undefined, end(s: string) { this.body = s; this.headersSent = true; } };
+    await stuck({ method: 'GET', url: '/api/hotel' } as never, res as never);
+    expect(res.statusCode).toBe(503);
+    release();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(res.statusCode).toBe(503);
+  });
+});

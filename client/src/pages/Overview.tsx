@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fmtTime, type Room } from '../../../shared/types';
 import { useSim } from '../api';
+import { arrivalState, mmss, useActivity, useServerNow, waitingArrivals } from '../hotel/activity';
 import { Icon } from '../components/Icon';
 import { atRisk, STATUS_LABEL, visibleStatus } from '../components/rooms';
 import { RoomTile } from './FrontDesk';
@@ -10,6 +11,9 @@ import { RoomTile } from './FrontDesk';
 export default function Overview() {
   const { state: s } = useSim();
   const navigate = useNavigate();
+  const { arrivals: appArrivals, skew } = useActivity();
+  const now = useServerNow(skew, appArrivals.length > 0);
+  const liveArrivals = waitingArrivals(appArrivals, now).sort((a, b) => a.highMs - b.highMs);
   const [filter, setFilter] = useState<'all' | 'arriving' | 'risk'>('all');
   const [query, setQuery] = useState('');
   if (!s) return null;
@@ -62,12 +66,15 @@ export default function Overview() {
           </section>
           <section className="card next-arrivals" aria-label="Next arrivals">
             <div className="overview-card-head"><h2>Next arrivals</h2><Link className="text-link" to="/front-desk">View all</Link></div>
-            <div className="next-arrival-list">{arrivals.slice(0, 3).map((g) => {
+            <div className="next-arrival-list">{liveArrivals.slice(0, 3).map((a) => {
+              const { phase, left } = arrivalState(a, now);
+              return <Link key={`${a.roomId}-${a.startMs}`} to="/front-desk" className="next-arrival"><span className="arrival-avatar"><Icon name="phoneDevice" size={17} /></span><div><b>{a.first}</b><small>Room {a.roomId} · Guest app</small></div><span className={`pill ${phase === 'ready' ? 'green' : 'ai'}`}>{phase === 'ready' ? 'Key active' : `${mmss(left)} left`}</span></Link>;
+            })}{arrivals.slice(0, Math.max(0, 3 - liveArrivals.length)).map((g) => {
               const r = s.rooms.find((room) => room.id === g.roomId);
               if (!r) return null;
               const status = visibleStatus(s, r);
               return <Link key={g.code} to={`/front-desk?room=${r.id}`} className="next-arrival"><span className="arrival-avatar"><Icon name="user" size={17} /></span><div><b>{g.name}</b><small>Room {r.id} · {fmtTime(g.expectedArrival)}</small></div><span className={`pill ${status === 'ready' ? 'green' : status === 'ooo' ? 'red' : 'slate'}`}>{status === 'ready' ? 'Ready' : s.mode === 'ai' && r.eta ? `By ${fmtTime(r.eta.high)}` : STATUS_LABEL[status]}</span></Link>;
-            })}{arrivals.length === 0 && <p className="empty">Everyone has checked in.</p>}</div>
+            })}{arrivals.length === 0 && liveArrivals.length === 0 && <p className="empty">Everyone has checked in.</p>}</div>
           </section>
         </aside>
       </div>

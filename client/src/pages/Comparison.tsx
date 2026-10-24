@@ -6,7 +6,7 @@ import { useSim } from '../api';
 import { CompareBars, Num } from '../components/Compare';
 import { Icon, type IconName } from '../components/Icon';
 import { sides } from '../components/rooms';
-import { useActivity, type ActivityItem } from '../hotel/activity';
+import { arrivalState, mmss, useActivity, useServerNow, waitingArrivals, type ActivityItem } from '../hotel/activity';
 import { GUEST_TAB, guestQrUrl, guestUrl } from '../links';
 
 type M = Metrics | null;
@@ -38,7 +38,7 @@ export default function Comparison() {
     <main className="page live">
       <header className="sim-head">
         <div><span className="page-eyebrow">TORONTO DOWNTOWN</span><h1>Compare the day</h1><p className="page-subtitle">Room readiness and guest arrivals for Friday, October 16.</p></div>
-        <span className="sim-chip"><Icon name={state.finished ? 'check' : 'clock'} size={13} />{state.finished ? 'Shift complete' : 'Friday, October 16 · Live simulation'}</span>
+        <DayStatus state={state} />
       </header>
       <section className="live-summary" aria-label="Shift at a glance">
         <div className="summary-metric glass"><span className="summary-metric-icon"><Icon name="bed" size={20} /></span><div><span>Rooms ready</span><b><Num value={aiRooms.filter((r) => r.status === 'ready').length} /><small> / 48</small></b></div><span className="summary-metric-note">FHN AI</span></div>
@@ -174,7 +174,9 @@ function Challenge({
 
 /** The QR code that opens the guest app, with how many people are using it right now. */
 function GuestCard() {
-  const { counts, online } = useActivity();
+  const { counts, online, arrivals, skew } = useActivity();
+  const waiting = waitingArrivals(arrivals, Date.now() + skew);
+  const now = useServerNow(skew, waiting.length > 0);
   const url = guestQrUrl();
   const [src, setSrc] = useState('');
   useEffect(() => {
@@ -185,6 +187,9 @@ function GuestCard() {
   }, [url]);
   let count = online ? 'Live' : 'Connecting…';
   if (counts) count = counts.registered ? `${counts.registered} registered · ${counts.checkedIn} checked in` : 'Live · be the first to register';
+  // The next app guest's room, with the same countdown as their phone.
+  const next = waiting.map((a) => ({ a, ...arrivalState(a, now) })).filter((x) => x.phase !== 'ready').sort((x, y) => x.left - y.left)[0];
+  if (next) count = `${next.a.first} · room ${next.a.roomId} · ready in ${next.left > 0 ? mmss(next.left) : 'a moment'}`;
   return (
     <a className="guest-card glass" href={guestUrl('/')} target={GUEST_TAB} title={url}>
       {src ? <img src={src} alt={`QR code to ${url}`} className="fade-img" /> : <span className="qr-blank" />}
@@ -232,13 +237,17 @@ const ago = (at: number) => {
 function HotelLog({ state }: { state: SimState }) {
   const { items } = useActivity();
   // When each of the day's moments appeared, so they interleave with guest activity in the order they happened.
+  // Moments this screen catches up on all at once (opened mid-day, or joining the shared day) didn't happen just
+  // now, so they go below what guests did in the app; moments that pass while it's open appear as they happen.
   const seenAt = useRef(new Map<string, number>());
+  const mounted = useRef(false);
+  useEffect(() => void (mounted.current = true), []);
   const passed = state.events.slice(0, state.nextEventIndex);
   const ids = new Set(passed.map((e) => e.id));
   for (const id of seenAt.current.keys()) if (!ids.has(id)) seenAt.current.delete(id);
-  passed.forEach((e, i) => {
-    if (!seenAt.current.has(e.id)) seenAt.current.set(e.id, Date.now() + i);
-  });
+  const fresh = passed.filter((e) => !seenAt.current.has(e.id));
+  const caughtUp = !mounted.current || fresh.length > 1;
+  for (const e of fresh) seenAt.current.set(e.id, (caughtUp ? 0 : Date.now()) + passed.indexOf(e));
   const ai = state.mode === 'ai';
   const moment = (e: ScenarioEvent): Entry => ({
     key: e.id,
@@ -276,5 +285,25 @@ function HotelLog({ state }: { state: SimState }) {
         </ul>
       )}
     </section>
+  );
+}
+
+/** Where the shared day stands, in a few words: the same on every hotel screen. */
+function DayStatus({ state }: { state: SimState }) {
+  const waiting = state.proposals.some((p) => p.status === 'pending');
+  const [icon, text, tone]: [IconName, string, string] = state.finished
+    ? ['check', 'Shift complete', 'done']
+    : state.autopilot
+      ? ['play', '30-second demo playing', 'on']
+      : waiting
+        ? ['alert', 'Waiting for the supervisor', 'wait']
+        : state.playing
+          ? ['play', 'Day in progress', 'on']
+          : ['pause', `Paused at ${fmtTime(state.now)}`, 'idle'];
+  return (
+    <span className={`sim-chip day-${tone}`} aria-live="polite">
+      <Icon name={icon} size={12} />
+      <span key={tone} className="sim-chip-text">{text}</span>
+    </span>
   );
 }

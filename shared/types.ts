@@ -51,6 +51,8 @@ export interface Room {
   /** Attendant currently cleaning (only room-level; no speed data is kept per person). */
   cleaningBy?: string;
   workStartedAt?: number;
+  /** Minutes it took the attendant to get there (the walk and any elevator wait) — known once they set off. */
+  travelMin?: number;
   workEndsAt?: number; // hidden ground truth
   readyAt?: number;
   eta?: Eta;
@@ -74,6 +76,8 @@ export interface Attendant {
   busyUntil: number; // sim minute when current task (cleaning, travel, wasted knock) ends
   currentRoom?: string;
   lastFloor: number;
+  /** The room they were last at (where they are, for "the closest attendant"); unset at the start of the shift. */
+  lastRoom?: string;
   activity: string;
   breakAt: number;
   hadBreak: boolean;
@@ -423,7 +427,7 @@ export interface GuestView {
     inRoom: boolean;
     housekeeping: HousekeepingPref;
   };
-  room: { id: string | null; type: RoomType; status: RoomStatus; eta: Eta | null; readyAt: number | null; floor: number };
+  room: { id: string | null; type: RoomType; status: RoomStatus; eta: Eta | null; readyAt: number | null; floor: number; attendant?: string };
   climate: { hvac: Hvac; setpoint: number; awayUntil: number | null };
   elevatorNotice: string | null;
   ticket: { id: string; owner: string; issue: string } | null;
@@ -432,7 +436,7 @@ export interface GuestView {
   /** Real-world delivery status of each notification (by notification id). */
   delivery: Record<string, { status: DeliveryStatus; provider: MessagingProvider; error?: string }>;
   /** The guest's room timeline in real time (epoch ms), for the countdown. */
-  progress?: { startMs: number; readyMs: number; highMs: number; secondsPerMinute: number };
+  progress?: { startMs: number; cleanMs: number; checkMs: number; readyMs: number; highMs: number; secondsPerMinute: number };
 }
 
 export const fmtTime = (minutes: number): string => {

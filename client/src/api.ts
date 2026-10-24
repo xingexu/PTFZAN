@@ -17,6 +17,7 @@ export async function api<T = { ok: boolean; message?: string }>(path: string, b
       method: body === undefined ? 'GET' : 'POST',
       headers: body === undefined ? headers : { 'Content-Type': 'application/json', ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout?.(12_000),
     });
   } catch {
     throw new ApiError('Can’t reach the server. Check the connection.', 0);

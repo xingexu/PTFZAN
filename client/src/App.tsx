@@ -4,7 +4,7 @@ import type { SimState } from '../../shared/types';
 import { fmtTime } from '../../shared/types';
 import { SimContext, ToastContext, useToast, type Toast } from './api';
 import { ActivityContext, useActivityFeed } from './hotel/activity';
-import { hotel, useHotel } from './hotel/host';
+import { hotel, onRemoteChange, useHotel, useHotelSync, type SyncInfo } from './hotel/host';
 import { Icon, type IconName } from './components/Icon';
 import { fade } from './components/fade';
 import { useSlide } from './components/slide';
@@ -108,12 +108,17 @@ const NAV: { to: string; label: string; icon: IconName; also?: string }[] = [
 
 function HotelShell() {
   const state = useHotel();
+  const sync = useHotelSync();
+  const toast = useToast();
   const activity = useActivityFeed();
   const { pathname } = useLocation();
   const navRef = useSlide<HTMLElement>(pathname);
   const pending = state.proposals.some((p) => p.status === 'pending');
   useLayoutEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }, [pathname]);
   const current = NAV.find((n) => n.to === pathname || n.also === pathname)?.label ?? 'Compare the day';
+
+  // Changes made on another hotel screen show up here too, with a short note saying so.
+  useEffect(() => onRemoteChange((title) => toast({ title, body: 'Every hotel screen follows the same day.' })), [toast]);
 
   useEffect(() => {
     document.title = 'Founders Hotel Network · Operations';
@@ -122,7 +127,7 @@ function HotelShell() {
   }, []);
 
   return (
-    <SimContext.Provider value={{ state, conn: 'live' }}>
+    <SimContext.Provider value={{ state, conn: sync.status === 'offline' ? 'reconnecting' : sync.status }}>
       <ActivityContext.Provider value={activity}>
         <div className={`shell hq ${state.mode === 'baseline' ? 'mode-today' : 'mode-ai'}`}>
           <div className="backdrop" aria-hidden="true" />
@@ -154,7 +159,7 @@ function HotelShell() {
               <div className="hq-actions">
                 <NavLink className="hq-compare" to="/comparison">Compare</NavLink>
                 <span className="hq-date">Friday, October 16</span>
-                <span className="hq-demo-label"><i />Simulation</span>
+                <SyncChip sync={sync} />
                 {hasServer && (
                   <NavLink className="hq-icon" to="/stage" title="Live text-message demo" aria-label="Live text-message demo">
                     <Icon name="monitor" size={16} />
@@ -169,11 +174,28 @@ function HotelShell() {
             </div>
           </header>
           <div id="hotel-content" className="hotel-content" tabIndex={-1}><Outlet /></div>
-          <DecisionCard state={state} />
+          {pathname !== '/' && pathname !== '/supervisor' && <DecisionCard state={state} />}
           <Player state={state} />
         </div>
       </ActivityContext.Provider>
     </SimContext.Provider>
+  );
+}
+
+/** Says that the day is a simulation, and whether this screen is in step with the hotel's other screens. */
+function SyncChip({ sync }: { sync: SyncInfo }) {
+  const text = sync.status === 'live' ? (sync.viewers > 1 ? `Synced · ${sync.viewers} screens` : 'Synced') : sync.status === 'offline' ? 'This screen only' : 'Connecting';
+  const tip =
+    sync.status === 'offline'
+      ? 'The hotel’s database can’t be reached, so the day is running on this screen only. It reconnects on its own.'
+      : 'A simulation of Friday, October 16. Every open hotel screen shows the same day, kept in the hotel’s database.';
+  return (
+    <span className={`hq-demo-label sync-${sync.status}`} title={tip}>
+      <i />
+      Simulation
+      <span className="sync-sep" aria-hidden="true" />
+      <span key={text} className="sync-text">{text}</span>
+    </span>
   );
 }
 

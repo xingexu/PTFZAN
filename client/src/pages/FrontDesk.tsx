@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Guest, Hvac, Room, SimState } from '../../../shared/types';
 import { fmtRange, fmtTime } from '../../../shared/types';
 import { useSim, useToast } from '../api';
+import { arrivalState, mmss, useActivity, useServerNow, waitingArrivals, type ArrivalPhase } from '../hotel/activity';
 import { hotel } from '../hotel/host';
 import { Icon } from '../components/Icon';
 import { fade } from '../components/fade';
@@ -313,6 +314,13 @@ export function GuestPill({ g }: { g: Guest }) {
   return <span className={`pill ${c}`}>{t}</span>;
 }
 
+const APP_PHASE: Record<ArrivalPhase, (who: string, startsIn: number) => string> = {
+  waiting: (who, startsIn) => (startsIn > 0 ? `${who} starts in ${mmss(startsIn)}` : `${who} is on the way`),
+  cleaning: (who) => `${who} is cleaning`,
+  check: () => 'Final check',
+  ready: () => 'Key active · on the way up',
+};
+
 function Arrivals({ s, onPick }: { s: SimState; onPick: (id: string) => void }) {
   const ai = s.mode === 'ai';
   const pending = s.guests.filter((g) => !g.isDemoGuest && !g.inHouse && g.state !== 'checked-in');
@@ -321,6 +329,10 @@ function Arrivals({ s, onPick }: { s: SimState; onPick: (id: string) => void }) 
   const list = pending
     .filter((g) => !evening.includes(g))
     .sort((a, b) => (a.state === 'waiting' ? -1 : 0) - (b.state === 'waiting' ? -1 : 0) || a.arrivalTime - b.arrivalTime);
+  // Guests checking in on their phones right now (live, from the database) come first.
+  const { arrivals, skew } = useActivity();
+  const app = waitingArrivals(arrivals, Date.now() + skew).sort((a, b) => a.highMs - b.highMs);
+  const now = useServerNow(skew, app.length > 0);
   return (
     <>
       {s.finished && <ShiftSummary s={s} />}
@@ -343,12 +355,36 @@ function Arrivals({ s, onPick }: { s: SimState; onPick: (id: string) => void }) 
       <section className="card" aria-label="Arrivals">
         <div className="card-head">
           <h2>Guests not in their rooms yet</h2>
-          <span className="pill slate">{list.length}</span>
+          <span className="pill slate">{list.length + app.length}</span>
         </div>
+        {app.length > 0 && (
+          <ul className="arrivals app-arrivals" aria-label="Checked in on the guest app">
+            {app.map((a) => {
+              const { phase, left, pct } = arrivalState(a, now);
+              return (
+                <li key={`${a.roomId}-${a.startMs}`} className={`aa-${phase}`}>
+                  <span className="nm">
+                    {a.first} <span className="pill ai">Guest app</span>
+                  </span>
+                  <span className={`aa-clock ${phase}`}>{phase === 'ready' ? 'Ready' : left > 0 ? mmss(left) : 'Soon'}</span>
+                  <span className="sub">
+                    <span className="aa-room">Room {a.roomId}</span>
+                    <span>{APP_PHASE[phase](a.attendant ?? 'Attendant', Math.ceil((a.cleanMs - now) / 1000))}</span>
+                  </span>
+                  <span className="aa-bar" aria-hidden="true">
+                    <i style={{ width: `${phase === 'ready' ? 100 : pct}%` }} />
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
         {list.length === 0 ? (
+          app.length > 0 ? null : (
           <div className="empty row" style={{ justifyContent: 'center', color: 'var(--green-ink)', fontWeight: 600 }}>
             <Icon name="check" size={16} /> Everyone who has arrived is in their room.
           </div>
+          )
         ) : (
           <ul className="arrivals">
             {list.map((g) => {
