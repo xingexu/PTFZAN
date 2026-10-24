@@ -45,31 +45,3 @@ export const guestQrUrl = () => (LINKS.guestQr !== LINKS.guest ? `${LINKS.guestQ
 /** Named tabs, so links from one view reuse the other view's tab where the browser allows it. */
 export const GUEST_TAB = 'fhn-guest';
 export const HOTEL_TAB = 'fhn-hotel';
-
-// ───────── Staff session (a signed token from /api/auth, kept on this device) ─────────
-const SESSION_KEY = 'fhn.session';
-export const getSession = () => {
-  try {
-    return localStorage.getItem(SESSION_KEY) ?? '';
-  } catch {
-    return '';
-  }
-};
-export const setSession = (token: string | null) => {
-  try {
-    if (token) localStorage.setItem(SESSION_KEY, token);
-    else localStorage.removeItem(SESSION_KEY);
-  } catch {
-    /* private mode */
-  }
-};
-/** The signed-in staff member, or null when the session is missing or has expired. The server checks the signature. */
-export function sessionUser(): string | null {
-  const token = getSession();
-  try {
-    const body = JSON.parse(atob(token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'))) as { u?: string; exp?: number };
-    return body.u && body.exp && body.exp > Date.now() ? body.u : null;
-  } catch {
-    return null;
-  }
-}

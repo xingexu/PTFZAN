@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { cleanRegistration } from '../../../../shared/guest/stay';
 import { Icon } from '../../components/Icon';
 import { Brand } from '../../components/Logo';
-import { currentStay, register } from '../../guest/journey';
+import { register, savedStayId } from '../../guest/journey';
 import { guestPath, HOTEL_TAB, hotelUrl } from '../../links';
 import { GuestFrame } from './GuestFrame';
 
@@ -13,26 +14,33 @@ export default function Welcome() {
   const [email, setEmail] = useState('');
   const [party, setParty] = useState(2);
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     document.title = 'Welcome · Founders Hotel Network';
   }, []);
 
-  if (currentStay()) return <Navigate to={guestPath('/stay')} replace />;
+  if (savedStayId()) return <Navigate to={guestPath('/stay')} replace />;
 
-  const join = (e: FormEvent) => {
+  const join = async (e: FormEvent) => {
     e.preventDefault();
     setErr(null);
-    if (!name.trim()) return setErr('Please enter your name.');
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setErr('That email doesn’t look right — or leave it empty.');
-    register({ name, email, party });
-    nav(guestPath('/stay'), { viewTransition: true });
+    try {
+      // Same checks the hotel's server makes, so mistakes show before anything is sent.
+      const input = cleanRegistration({ name, email, party });
+      setBusy(true);
+      await register(input);
+      nav(guestPath('/stay'), { viewTransition: true });
+    } catch (e2) {
+      setErr((e2 as Error).message);
+      setBusy(false);
+    }
   };
 
   return (
     <GuestFrame>
       <header className="onboard-hero gx-hero">
-        <Brand sub="Hotel Network" tone="light" />
+        <Brand />
         <h1>Welcome to Toronto Downtown</h1>
         <p>You&rsquo;re on the guest list for the Chen–Okafor wedding. Register to check in from your phone.</p>
       </header>
@@ -67,16 +75,16 @@ export default function Welcome() {
               {err}
             </p>
           )}
-          <button className="gbtn navy" style={{ marginTop: 18 }}>
-            Register <Icon name="arrow" size={17} />
+          <button className="gbtn navy" style={{ marginTop: 18 }} disabled={busy}>
+            {busy ? 'Registering…' : 'Register'} <Icon name="arrow" size={17} />
           </button>
-          <p className="gx-muted" style={{ fontSize: 12, margin: '10px 0 0' }}>Demo only — what you type stays on this phone.</p>
+          <p className="gx-muted" style={{ fontSize: 12, margin: '10px 0 0' }}>Demo only. Saved with the hotel so staff can see your stay; ending your stay deletes it.</p>
         </form>
         <div className="gx-foot">
           Founders Hotel Network · 42 hotels across Ontario, British Columbia and Alberta
           <br />
-          <a href={hotelUrl('/login')} target={HOTEL_TAB} style={{ display: 'inline-block', marginTop: 8 }}>
-            Hotel staff? Sign in
+          <a href={hotelUrl('/')} target={HOTEL_TAB} style={{ display: 'inline-block', marginTop: 8 }}>
+            Open the hotel view
           </a>
         </div>
       </div>

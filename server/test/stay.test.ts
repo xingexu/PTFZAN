@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { _internals, SECONDS_PER_HOTEL_MINUTE, type Journey } from '../../client/src/guest/journey.js';
+import { activityFor, apply, cleanRegistration, planFor, SECONDS_PER_HOTEL_MINUTE, timeline, viewOf, type Stay } from '../../shared/guest/stay.js';
 import { HIST_AVG, INSPECTION_MIN } from '../../shared/sim/seed.js';
 
-const { planFor, viewOf, apply, timeline } = _internals;
 const T0 = new Date(2026, 9, 16, 14, 0, 0).getTime();
 const hotelMin = (m: number) => m * SECONDS_PER_HOTEL_MINUTE * 1000;
-const guest = (code = 'FHNTEST1'): Journey => ({ code, name: 'Sam Lee', party: 2, createdAt: T0, housekeeping: 'standard', setpoint: 21, requests: [] });
+const guest = (code = 'FHNTEST1'): Stay => ({ id: 'test', code, name: 'Sam Lee', party: 2, createdAt: T0, housekeeping: 'standard', setpoint: 21, requests: [] });
 const checkedIn = (code?: string) => {
   const j = guest(code);
   apply(j, 'check-in', {}, T0);
@@ -76,5 +75,17 @@ describe('guest stay', () => {
     expect(viewOf(j, tl.ready - 1000).climate.hvac).toBe('precool');
     apply(j, 'unlock', {}, tl.ready);
     expect(viewOf(j, tl.ready).climate.hvac).toBe('comfort');
+  });
+
+  it('checks registrations the same way on the phone and the server', () => {
+    expect(cleanRegistration({ name: '  Sam   <b>Lee ', party: 9 })).toEqual({ name: 'Sam bLee', email: undefined, party: 4 });
+    expect(() => cleanRegistration({ name: ' ' })).toThrow(/name/);
+    expect(() => cleanRegistration({ name: 'Sam', email: 'nope' })).toThrow(/email/);
+  });
+
+  it('tells the hotel what happened in plain words, first name only', () => {
+    const j = checkedIn();
+    expect(activityFor(j, 'check-in')?.text).toMatch(/^Sam checked in · room \d{3}, ready in about \d+ min$/);
+    expect(activityFor(j, 'climate')).toBeNull();
   });
 });

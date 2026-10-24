@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { fmtTime } from '../../../../shared/types';
 import { Icon } from '../../components/Icon';
-import { SECONDS_PER_HOTEL_MINUTE } from '../../guest/journey';
+import { Brand } from '../../components/Logo';
+import { SECONDS_PER_HOTEL_MINUTE } from '../../../../shared/guest/stay';
 import { HOTEL_TAB, hotelUrl } from '../../links';
 
 /**
@@ -13,8 +14,10 @@ export function GuestFrame({
 }: { children: ReactNode; now?: number; darkStatus?: boolean; tabs?: ReactNode; demoPace?: boolean; banners?: ReactNode }) {
   return (
     <div className="gx">
+      <div className="backdrop" aria-hidden="true" />
       <div className="gx-stage">
         <aside className="gx-aside">
+          <Brand />
           <span className="eyebrow">Guest view · FHN Toronto Downtown</span>
           <h1>What a guest sees</h1>
           <p>Register, check in, and get a ready time you can plan around — then a message the moment the room is ready.</p>

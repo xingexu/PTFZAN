@@ -2,7 +2,7 @@
   "name": "fhn-operations",
   "version": "1.0.0",
   "private": true,
-  "description": "FHN AI \u2014 one live room-state layer for Founders Hotel Network: room readiness, staffing, maintenance and room climate, plus the guest app (Pitch the Future 2026 prototype)",
+  "description": "FHN AI — one live room-state layer for Founders Hotel Network: room readiness, staffing, maintenance and room climate, plus the guest app (Pitch the Future 2026 prototype)",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "express": "^4.21.2",
+    "postgres": "^3.4.9",
     "tsx": "^4.19.2"
   },
   "devDependencies": {

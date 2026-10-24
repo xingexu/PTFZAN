@@ -1,18 +1,18 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import type { LogEntry, ScenarioEvent, SimState } from '../../shared/types';
+import type { ScenarioEvent, SimState } from '../../shared/types';
 import { fmtTime } from '../../shared/types';
-import { api, ApiError, SimContext, ToastContext, useToast, type Toast } from './api';
+import { SimContext, ToastContext, useToast, type Toast } from './api';
+import { ActivityContext, useActivityFeed } from './hotel/activity';
 import { hotel, useHotel } from './hotel/host';
 import { Icon, type IconName } from './components/Icon';
-import { Brand } from './components/Logo';
-import { getSession, GUEST_TAB, guestUrl, hasServer, HOTEL_TAB, isGuestView, separateSites, sessionUser, setSession } from './links';
+import { Logo } from './components/Logo';
+import { GUEST_TAB, guestUrl, hasServer, HOTEL_TAB, isGuestView, separateSites } from './links';
 import Engineering from './pages/Engineering';
 import FrontDesk from './pages/FrontDesk';
 import GuestApp from './pages/guest/GuestApp';
 import Welcome from './pages/guest/Welcome';
 import Housekeeping from './pages/Housekeeping';
-import Login from './pages/Login';
 import Overview from './pages/Overview';
 import Stage from './pages/Stage';
 import StageRemote from './pages/StageRemote';
@@ -50,7 +50,6 @@ export default function App() {
         </Routes>
       ) : (
         <Routes>
-          <Route path="/login" element={<Login />} />
           {separateSites ? (
             <Route path="/guest/*" element={<Away to={guestUrl('/')} />} />
           ) : (
@@ -60,15 +59,16 @@ export default function App() {
               <Route path="/guest/*" element={<Navigate to="/guest" replace />} />
             </>
           )}
-          {hasServer && <Route path="/stage" element={<Staff><Stage /></Staff>} />}
+          {hasServer && <Route path="/stage" element={<Stage />} />}
           {hasServer && <Route path="/stage/remote" element={<StageRemote />} />}
-          <Route element={<Staff><HotelShell /></Staff>}>
+          <Route element={<HotelShell />}>
             <Route index element={<Overview />} />
             <Route path="front-desk" element={<FrontDesk />} />
             <Route path="supervisor" element={<Supervisor />} />
             <Route path="attendant" element={<Housekeeping />} />
             <Route path="engineering" element={<Engineering />} />
             <Route path="housekeeping" element={<Navigate to="/attendant" replace />} />
+            <Route path="login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
@@ -94,24 +94,6 @@ function Away({ to }: { to: string }) {
   return null;
 }
 
-/** Hotel screens are for signed-in staff. The server re-checks the session's signature in the background. */
-function Staff({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation();
-  const [user, setUser] = useState(sessionUser);
-  useEffect(() => {
-    if (!user) return;
-    api('/api/auth', { action: 'session', token: getSession() }).catch((e) => {
-      // Only a clear "no" signs the user out; an offline laptop keeps working.
-      if (e instanceof ApiError && e.status === 401) {
-        setSession(null);
-        setUser(null);
-      }
-    });
-  }, [user]);
-  if (!user) return <Navigate to="/login" replace state={{ from: pathname }} />;
-  return <>{children}</>;
-}
-
 const NAV: { to: string; label: string; icon: IconName; also?: string }[] = [
   { to: '/', label: 'Live', icon: 'gauge' },
   { to: '/front-desk', label: 'Rooms', icon: 'bed' },
@@ -121,83 +103,58 @@ const NAV: { to: string; label: string; icon: IconName; also?: string }[] = [
 
 function HotelShell() {
   const state = useHotel();
-  const nav = useNavigate();
+  const activity = useActivityFeed();
   const { pathname } = useLocation();
   const pending = state.proposals.some((p) => p.status === 'pending');
-  useGuestActivity(state);
 
   useEffect(() => {
-    document.title = 'Hotel view · Founders';
+    document.title = 'FHN · Hotel view';
     document.body.classList.add('hq-body');
     return () => document.body.classList.remove('hq-body');
   }, []);
 
-  const signOut = () => {
-    setSession(null);
-    nav('/login', { replace: true });
-  };
-
   return (
     <SimContext.Provider value={{ state, conn: 'live' }}>
-      <div className={`shell hq ${state.mode === 'baseline' ? 'mode-today' : 'mode-ai'}`}>
-        <div className="hq-backdrop" aria-hidden="true" />
-        <header className="hq-top">
-          <NavLink to="/" className="brand light" aria-label="Hotel view home" viewTransition>
-            <Brand sub="Hotel view" tone="light" />
-          </NavLink>
-          <nav className="hq-nav" aria-label="Screens">
-            {NAV.map((n) => (
-              <NavLink key={n.to} to={n.to} end={n.to === '/'} viewTransition className={({ isActive }) => (isActive || pathname === n.also ? 'active' : '')}>
-                <Icon name={n.icon} size={16} />
-                <span>{n.label}</span>
-                {n.to === '/supervisor' && pending && <span className="badge" aria-label="decision needed" />}
+      <ActivityContext.Provider value={activity}>
+        <div className={`shell hq ${state.mode === 'baseline' ? 'mode-today' : 'mode-ai'}`}>
+          <div className="backdrop" aria-hidden="true" />
+          <header className="hq-top">
+            <div className="hq-bar glass">
+              <NavLink to="/" className="hq-brand" aria-label="FHN · hotel view home" viewTransition>
+                <Logo className="brand-mark" />
+                <span>FHN</span>
               </NavLink>
-            ))}
-          </nav>
-          <div className="hq-actions">
-            <a className="hq-pill guest" href={guestUrl('/')} target={GUEST_TAB} title="Open the guest app in its own tab">
-              <Icon name="phoneDevice" size={15} />
-              <span>Guest app</span>
-              <Icon name="external" size={13} />
-            </a>
-            {hasServer && (
-              <NavLink className="hq-icon" to="/stage" title="Live text-message demo" aria-label="Live text-message demo">
-                <Icon name="monitor" size={16} />
-              </NavLink>
-            )}
-            <button className="hq-icon" onClick={signOut} title={`Signed in as ${sessionUser() ?? 'staff'} · sign out`} aria-label="Sign out">
-              <Icon name="logout" size={16} />
-            </button>
-          </div>
-        </header>
-        <Outlet />
-        <Caption state={state} />
-        <DecisionCard state={state} />
-        <Player state={state} />
-      </div>
+              <nav className="hq-nav" aria-label="Screens">
+                {NAV.map((n) => (
+                  <NavLink key={n.to} to={n.to} end={n.to === '/'} viewTransition className={({ isActive }) => (isActive || pathname === n.also ? 'active' : '')}>
+                    <Icon name={n.icon} size={16} />
+                    <span>{n.label}</span>
+                    {n.to === '/supervisor' && pending && <span className="badge" aria-label="decision needed" />}
+                  </NavLink>
+                ))}
+              </nav>
+              <div className="hq-actions">
+                {hasServer && (
+                  <NavLink className="hq-icon" to="/stage" title="Live text-message demo" aria-label="Live text-message demo">
+                    <Icon name="monitor" size={16} />
+                  </NavLink>
+                )}
+                <a className="hq-guest" href={guestUrl('/')} target={GUEST_TAB} title="Open the guest app in its own tab">
+                  <Icon name="phoneDevice" size={15} />
+                  <span>Guest app</span>
+                  {!!activity.counts?.registered && <span className="hq-count">{activity.counts.registered}</span>}
+                </a>
+              </div>
+            </div>
+          </header>
+          <Outlet />
+          <Caption state={state} />
+          <DecisionCard state={state} />
+          <Player state={state} />
+        </div>
+      </ActivityContext.Provider>
     </SimContext.Provider>
   );
-}
-
-/** When a guest does something in the guest app, the hotel sees it right away. */
-function useGuestActivity(state: SimState | null) {
-  const toast = useToast();
-  const seen = useRef<Set<string> | null>(null);
-  const log = state?.log;
-  useEffect(() => {
-    if (!log) return;
-    const key = (l: LogEntry) => `${l.at}|${l.text}`;
-    if (seen.current === null) {
-      seen.current = new Set(log.map(key));
-      return;
-    }
-    for (const l of [...log].reverse()) {
-      const k = key(l);
-      if (seen.current.has(k)) continue;
-      seen.current.add(k);
-      if (l.fromApp) toast({ title: 'From the guest app', body: l.text, fromGuest: true });
-    }
-  }, [log, toast]);
 }
 
 /** Calls an API action, surfacing failures as a toast. */

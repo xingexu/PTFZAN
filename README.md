@@ -38,7 +38,7 @@ Requires **Node 20+**.
 
 ```bash
 npm install
-cp .env.example .env   # then set ADMIN_USERNAME and ADMIN_PASSWORD (staff sign-in)
+cp .env.example .env   # then set DATABASE_URL (optional locally — without it, guest stays are kept in memory)
 npm run demo           # builds, starts, and opens both views in their own tabs
 ```
 
@@ -46,35 +46,34 @@ That opens two separate sites:
 
 | Tab | Address | Who it's for |
 |---|---|---|
-| **Hotel view** | http://localhost:8787 | Staff, after signing in: the live day, rooms, team, building |
+| **Hotel view** | http://localhost:8787 | The hotel team and the judges: the live day, rooms, team, building |
 | **Guest view** | http://localhost:8788 | Guests: the hotel's app — register, check in, ready time, mobile key, requests, messages |
 
-The hotel view asks staff to sign in (`/login`). The sign-in page also has a **Guest** tab with a QR code and an **Open the guest app** button; in the hotel view, the gold **Guest app** button in the top bar opens it too. The two tabs have different icons and each links to the other.
+The mint **Guest app** button in the hotel view's top bar opens the guest app; the QR code on the Live screen does the same for phones. The two tabs have different icons and each links to the other.
 
-`npm start` does the same without opening tabs. For development with hot reload: `npm run dev` (web on http://localhost:5173, guest app at `/guest`, sign-in API proxied to :8787).
+`npm start` does the same without opening tabs. For development with hot reload: `npm run dev` (web on http://localhost:5173, guest app at `/guest`, API proxied to :8787).
 
-Other scripts: `npm test` (simulation, guest stay and sign-in tests), `npm run typecheck`.
+Other scripts: `npm test` (simulation, guest stay and API tests — they never touch the real database), `npm run typecheck`.
 
-The start-up log prints the addresses phones on the same Wi-Fi can use; the QR codes point phones at the guest view automatically. If macOS asks whether **node** may accept incoming connections, allow it. If the ports are busy, run `PORT=8790 npm start` (the guest view takes the next port, or set `GUEST_PORT`).
+The start-up log prints the addresses phones on the same Wi-Fi can use, and where guest stays are being saved. If macOS asks whether **node** may accept incoming connections, allow it. If the ports are busy, run `PORT=8790 npm start` (the guest view takes the next port, or set `GUEST_PORT`).
 
-### How the two views work
+### How it fits together
 
-- **The hotel day runs in the browser.** The hotel view replays October 16 on the presenter's screen, with a shadow run of the same day in the other mode for the side-by-side comparison. No server is needed for it.
-- **Each guest's stay runs on their own phone.** Registration and the stay are kept on that phone. At check-in the app calculates the wait the same way the hotel forecast does — the attendant's current room, the room type's clean time (King 35, Double Queen 39, Suite 52 min) and the 6-minute final check — and promises the late end of a window that widens with the room's place in the list. Messages then arrive when each moment comes: checked in with the ready time, cleaning started, final check, room ready (with the key active). The guest app runs at demo speed — one hotel minute every 2 seconds — so a wait is about 1½–2 minutes.
-- **Staff sign-in** is a small serverless function (`api/auth.ts`, also served by the local server). Credentials come only from environment variables; a successful sign-in returns a signed session that lasts 12 hours.
-
-Because the two views no longer share a server, guest actions don't appear on the hotel screen. Linking them live again would need a realtime backend (for example Supabase).
+- **The hotel day runs in the browser.** The hotel view replays October 16 on the presenter's screen, with a shadow run of the same day in the other mode for the side-by-side comparison.
+- **Guest stays are saved in PostgreSQL** (a Supabase project in Canada, `ca-central-1`). Registering, checking in and everything a guest does in the app goes through two small API functions (`api/guest.ts`, `api/activity.ts`) — Vercel serverless functions in production, mounted by the local server on a laptop.
+- **The calculated wait.** At check-in the server works out the wait the same way the hotel forecast does — the attendant's current room, the room type's clean time (King 35, Double Queen 39, Suite 52 min) and the 6-minute final check — and promises the late end of a window that widens with the room's place in the list. Messages then arrive when each moment comes: checked in with the ready time, cleaning started, final check, room ready (with the key active). The guest app runs at demo speed — one hotel minute every 2 seconds — so a wait is about 1½–2 minutes.
+- **Both views stay linked.** The hotel view reads the guests' activity every few seconds: new registrations, check-ins, phone-key unlocks and problem reports pop up on the hotel screen and in its **Hotel log**, and the Guest app button shows how many people have registered.
+- **Privacy.** The hotel screen shows first names only. A guest's phone keeps just a secret id for their stay; **End this stay** in the app deletes their details from the database.
 
 ---
 
 ## Screens
 
-The hotel view is a dark, cinematic console with four screens and a video-style player bar at the bottom (Today / FHN AI, play, skip, the day's moments on a scrubber, the clock, the 30-sec demo). Each moment of the day appears as a subtitle as the playhead passes it; supervisor decisions float above the player. Panels are frosted "liquid glass" over soft moving light.
+The hotel view is one dark console in the Western Founders Network colours (charcoal, mint and deep blue, with the flowing-line motif from the case package). Panels are liquid glass; the top bar and the player float above the page. Each moment of the day appears as a subtitle above the player; supervisor decisions float in the same place.
 
 | Route | Screen | What it shows |
 |---|---|---|
-| `/login` | **Sign in** | Hotel staff sign in; guests get the QR code and a link to the guest app |
-| `/` | **Live** | Today's way vs FHN AI, head to head: all 48 rooms per side, floor by floor — each room pops green the moment it's ready — with wedding rooms ready out of 20 and the wedding party in the lobby; one number per challenge; QR code; live feed |
+| `/` | **Live** | Today's way vs FHN AI, side by side: all 48 rooms per side, floor by floor — each room pops green the moment it's ready — a ring for wedding rooms ready out of 20, and the 40 wedding guests in the lobby lighting up as they wait. Below, the four challenges as simple two-bar comparisons. On the right, the guest app QR code and the **Hotel log**: the day's big moments in plain words, plus what real guests are doing in the app |
 | `/front-desk` | **Rooms** | Room grid with expected ready time, how sure, "why this time", a temperature layer, arrivals, report a problem |
 | `/supervisor` | **Team** · Supervisor | Plan to approve, attendant lists, tomorrow's staffing forecast, decision history |
 | `/attendant` | **Team** · Attendant phone | What an attendant sees: current room, what's next, one-tap problem reports |
@@ -212,7 +211,7 @@ Pilot path: start rules-based exactly like this, then train a gradient-boosted m
 ## Guardrails
 
 - **Rooms, not people** — no per-person speed data, tracking or leaderboards (union concern). The staffing forecast is built from reservations, never from individuals.
-- **PIPEDA by design** — texts only with consent; a guest's details stay on their own phone; no guest personal data in the model.
+- **PIPEDA by design** — texts only with consent; guest data is stored in Canada, shown to the hotel by first name only, and deleted when the guest ends their stay; no guest personal data in the model.
 - **Ranges, not promises** — guests are promised the late end of the window.
 - **Approval for guest-impacting changes.**
 - **Comfort first** — an occupied room is never set back; guests can override from the app.
@@ -243,39 +242,51 @@ How today's process reproduces the log (modelling choices, all from the case tex
 ## Architecture
 
 ```
-api/auth.ts          staff sign-in (Vercel serverless function; the local server mounts the same handler)
+api/                 serverless functions (Vercel); the local server mounts the same handlers
+  guest.ts           a guest's stay: register, read, every action in the app, end (delete)
+  activity.ts        what guests are doing, for the hotel screen
+  _lib/store.ts      PostgreSQL (DATABASE_URL) or memory; _lib/http.ts small request helpers
 client/  React + Vite + TypeScript
   hotel/host.ts      runs the hotel day in the browser (main run + shadow run, 30-second autopilot)
-  guest/journey.ts   one guest's stay on their phone: calculated wait, timed messages, requests
-  pages/             Login, Overview (Live), FrontDesk, Supervisor, Housekeeping (attendant), Engineering,
-                     Stage, StageRemote
+  hotel/activity.ts  reads guest activity for the hotel view every few seconds
+  guest/journey.ts   the guest app's link to its stay (optimistic actions, server clock)
+  pages/             Overview (Live), FrontDesk, Supervisor, Housekeeping (attendant), Engineering, Stage, StageRemote
   pages/guest/       Welcome (register), GuestApp, GuestFrame (phone frame on desktop)
-  components/        Icon (inline SVG set), Logo, rooms (labels/colours), JoinQr
-  links.ts           which view this tab is (hotel or guest), where the other view lives, staff session
-  api.ts             fetch helper + SSE hook (stage) with reconnect/backoff
+  components/        Icon (inline SVG set), Logo (the FHN mark), rooms (labels/colours), PageHead
+  links.ts           which view this tab is (hotel or guest) and where the other view lives
 shared/
+  guest/stay.ts      one guest's stay: the calculated wait, timed messages, requests — used by server and phone
   sim/seed.ts        Oct 16 scenario data, maintenance history, tomorrow's reservations
   sim/model.ts       forecast + planner + plan diff + staffing forecast + recurring faults
   sim/engine.ts      minute-by-minute simulation (readiness, labour, maintenance, climate)
   sim/demo.ts        30-second autopilot speed profile
   types.ts           domain types used everywhere
 server/  Express + TypeScript (run with tsx), local only
-  src/index.ts       serves both views on two ports, staff sign-in, the live SMS moment
+  src/index.ts       serves both views on two ports, the API, the live SMS moment
   src/messaging.ts   Twilio SMS / your own phone / ntfy push / simulated, with delivery tracking
   src/stage.ts       the on-cue "Mike" scene
-  test/              Vitest: simulation, four challenges, demo timing, guest stay, sign-in, messaging, stage
+  test/              Vitest: simulation, four challenges, demo timing, guest stay, API, messaging, stage
 ```
 
-Locally the server listens on two ports (hotel view and guest view) and tells each page which view it is. On Vercel each view is its own project built from this repo; `VITE_VIEW` picks the view at build time. A pilot would move the simulation to the server, persist to PostgreSQL and integrate with the PMS through a read-only adapter.
+### Database
+
+Three tables in their own `fhn` schema (not exposed through Supabase's public Data API):
+
+| Table | What's in it |
+|---|---|
+| `fhn.guests` | One row per registration: name, optional email, party size, check-in time, the room and calculated wait (`plan`), preferences |
+| `fhn.requests` | Problems reported and items requested, per guest |
+| `fhn.activity` | The lines shown in the hotel's log (first names only) |
+
+The app connects as `fhn_app`, a login that can only read and write these three tables, through Supabase's connection pooler (port 6543). Browse the data in the Supabase dashboard → project **fhn-ai** → Table Editor → schema `fhn`.
 
 ### Environment variables
 
-See `.env.example`. Only the staff sign-in is required; with nothing else set, messages are simulated on screen.
+See `.env.example`. Everything is optional locally; with nothing set, guest stays live in memory and messages are simulated on screen.
 
 | Variable | Purpose |
 |---|---|
-| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Staff sign-in (quote a password that contains `$`) |
-| `SESSION_SECRET` | Signs staff sessions (any long random string) |
+| `DATABASE_URL` | PostgreSQL connection string for guest stays (Supabase transaction pooler, `fhn_app` login) |
 | `VITE_VIEW`, `VITE_HOTEL_URL`, `VITE_GUEST_URL` | Vercel builds: which view this site is, and where the other one lives |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (or `TWILIO_MESSAGING_SERVICE_SID`) | Real SMS |
 | `TWILIO_TRIAL_TEMPLATE` | Trial accounts: send a Twilio template instead of custom text |
@@ -292,7 +303,11 @@ See `.env.example`. Only the staff sign-in is required; with nothing else set, m
 
 | Method | Path | Body |
 |---|---|---|
-| POST | `/api/auth` | `{ action: "login", username, password }` → `{ token }` · `{ action: "session", token }` → `{ user }` |
+| POST | `/api/guest` | `{ action: "register", name, email?, party }` → `{ stay }` |
+| GET | `/api/guest?id=…` | — → `{ stay }` |
+| POST | `/api/guest` | `{ action: "check-in" \| "unlock" \| "issue" \| "request" \| "climate" \| "housekeeping" \| "prefs", id, … }` → `{ stay }` |
+| POST | `/api/guest` | `{ action: "end", id }` — deletes the guest's data |
+| GET | `/api/activity?after=<id>` | — → `{ items, counts }` (first names only) |
 | GET | `/api/messaging/status` | — (local server) |
 | GET | `/api/stage/state`, `/api/stage/stream` | — (local server) |
 | POST | `/api/stage/next` · `check-in` · `ready` · `reset` · `test` | header `x-stage-pin` when `STAGE_PIN` is set (local server) |
@@ -309,10 +324,10 @@ See `.env.example`. Only the staff sign-in is required; with nothing else set, m
 
 | Project | Environment variables |
 |---|---|
-| **Hotel view** (e.g. `fhn-hotel`) | `VITE_VIEW=hotel`, `VITE_GUEST_URL=https://<guest project>.vercel.app`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `SESSION_SECRET` |
-| **Guest view** (e.g. `fhn-guest`) | `VITE_VIEW=guest`, `VITE_HOTEL_URL=https://<hotel project>.vercel.app` |
+| **Hotel view** (e.g. `fhn-hotel`) | `VITE_VIEW=hotel`, `VITE_GUEST_URL=https://<guest project>.vercel.app`, `DATABASE_URL` |
+| **Guest view** (e.g. `fhn-guest`) | `VITE_VIEW=guest`, `VITE_HOTEL_URL=https://<hotel project>.vercel.app`, `DATABASE_URL` |
 
-Set the variables for Production (and Preview if you use it), then redeploy so the build picks them up. Never put the staff password in the repository — only in Vercel and in your local `.env`. With a single project and no `VITE_GUEST_URL`, the guest app lives at `/guest` on the same site.
+Set the variables for Production (and Preview if you use it), then redeploy so the build picks them up. Never put the database password in the repository — only in Vercel and in your local `.env`. With a single project and no `VITE_GUEST_URL`, the guest app lives at `/guest` on the same site.
 
 The live SMS moment (`/stage`) needs the long-running local server, so it is hidden on Vercel; run it from the presenting laptop with `npm start`, or on a Node/Docker host (`render.yaml` and the `Dockerfile` are included).
 

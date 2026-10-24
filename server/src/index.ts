@@ -5,12 +5,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import authHandler, { adminConfigured } from '../../api/auth.js';
+import activityHandler from '../../api/activity.js';
+import guestHandler from '../../api/guest.js';
+import { store } from '../../api/_lib/store.js';
 import { Messenger } from './messaging.js';
 import { maskPhone, normalizePhone } from './phone.js';
 import { Stage } from './stage.js';
 
-// Locally this server hosts both views (the hotel day itself runs in the browser), staff sign-in,
+// Locally this server hosts both views (the hotel day itself runs in the browser), the guest API,
 // and the live text-message demo, which needs a long-running process to send real texts.
 const PORT = Number(process.env.PORT ?? 8787);
 
@@ -66,8 +68,9 @@ const stagePin = (req: Request, res: Response, next: NextFunction) =>
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, messaging: messenger.status.provider }));
 app.get('/api/messaging/status', (_req, res) => res.json(messenger.status));
-// Staff sign-in: the same handler Vercel runs as a serverless function.
-app.post('/api/auth', (req, res) => void authHandler(req, res));
+// Guest stays and the hotel's activity log: the same handlers Vercel runs as serverless functions.
+app.all('/api/guest', (req, res) => void guestHandler(req, res));
+app.get('/api/activity', (req, res) => void activityHandler(req, res));
 
 // ───────────── Stage mode ─────────────
 app.get('/api/stage/state', (_req, res) => res.json(stage.state()));
@@ -200,7 +203,7 @@ const server = app.listen(PORT, () => {
     console.log(`  Hotel view (staff):  http://localhost:${PORT}`);
     console.log(`  Guest view (app):    http://localhost:${GUEST_PORT}`);
     for (const h of lanHosts()) console.log(`  phones on the same Wi-Fi: guest app http://${h}:${GUEST_PORT} · stage remote http://${h}:${PORT}/stage/remote`);
-    console.log(`Staff sign-in: ${adminConfigured() ? 'on' : 'not set up — add ADMIN_USERNAME and ADMIN_PASSWORD to .env'}`);
+    console.log(`Guest stays saved to: ${store().kind === 'postgres' ? 'Postgres (DATABASE_URL)' : 'memory — set DATABASE_URL in .env to use the database'}`);
     console.log(`Messaging: ${m.provider} — ${m.note}`);
     console.log(`Stage guest "${STAGE.name}" · room ${STAGE.room} · phone ${STAGE.phone ? maskPhone(normalizePhone(STAGE.phone)) || 'invalid' : 'not set'}${STAGE.pin ? ' · PIN on' : ''}`);
     console.log('Press Ctrl+C to stop.\n');

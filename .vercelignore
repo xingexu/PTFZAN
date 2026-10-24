@@ -1,0 +1,6 @@
+# Never upload local secrets or build output from a CLI deploy (Git deploys only see committed files anyway).
+.env
+.env.*
+!.env.example
+node_modules
+dist

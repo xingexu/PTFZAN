@@ -7,7 +7,7 @@ import { ToastContext, useToast, type Toast } from '../../api';
 import { chime } from '../../components/chime';
 import { Icon, type IconName } from '../../components/Icon';
 import { Brand, Logo } from '../../components/Logo';
-import { endStay, useJourney } from '../../guest/journey';
+import { useJourney } from '../../guest/journey';
 import { guestPath } from '../../links';
 import { GuestFrame } from './GuestFrame';
 
@@ -15,14 +15,17 @@ type Tab = 'home' | 'key' | 'requests' | 'chat';
 const TAB_ORDER: Tab[] = ['home', 'key', 'requests', 'chat'];
 const SHEET_EXIT_MS = 180;
 
-type ViewTransitionDoc = Document & { startViewTransition?: (update: () => void) => { finished: Promise<void> } };
+type ViewTransitionDoc = Document & { startViewTransition?: (update: () => void) => { finished: Promise<void>; ready: Promise<void> } };
 
 /** Switches screens with a short slide (view transitions where supported, a CSS fade otherwise). */
 function withTransition(dir: 'fwd' | 'back', update: () => void) {
   const doc = document as ViewTransitionDoc;
-  if (!doc.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return update();
+  if (!doc.startViewTransition || document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return update();
   document.documentElement.dataset.vt = dir;
-  doc.startViewTransition(() => flushSync(update)).finished.finally(() => delete document.documentElement.dataset.vt);
+  const t = doc.startViewTransition(() => flushSync(update));
+  // A skipped transition (e.g. the tab went to the background) still applies the update; nothing to report.
+  t.ready.catch(() => undefined);
+  t.finished.catch(() => undefined).finally(() => delete document.documentElement.dataset.vt);
 }
 type Sheet = 'climate' | 'housekeeping' | 'issue' | 'items' | 'wifi';
 
@@ -39,7 +42,7 @@ const ITEMS = ['Extra towels', 'Extra pillows', 'Toiletries', 'Iron & board', 'C
 
 export default function GuestApp() {
   const [banners, toast] = usePhoneBanners();
-  const { view: v, act: run } = useJourney();
+  const { view: v, status, act: run, end } = useJourney();
   const [tab, setTab] = useState<Tab>('home');
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [closing, setClosing] = useState(false);
@@ -94,12 +97,25 @@ export default function GuestApp() {
     }, SHEET_EXIT_MS);
   };
 
-  if (!v) return <Navigate to={guestPath('/')} replace />;
+  if (status === 'none') return <Navigate to={guestPath('/')} replace />;
+  if (!v) {
+    return (
+      <GuestFrame>
+        <div className="gx-pad gx-top-pad">
+          <div className="gx-card pad gx-wait" role="status">
+            <Logo className="brand-mark" />
+            <b>{status === 'offline' ? 'Can’t reach the hotel right now' : 'Opening your stay…'}</b>
+            {status === 'offline' && <span className="gx-muted">We’ll keep trying — check your connection.</span>}
+          </div>
+        </div>
+      </GuestFrame>
+    );
+  }
 
   /** Runs a guest action. `ok: false` when the hotel's own message already confirms it. */
   const act: Act = async (path, body, ok) => {
     try {
-      const message = run(path, body as Record<string, unknown>);
+      const message = await run(path, body as Record<string, unknown>);
       if (ok !== false) toast({ title: ok ?? 'Done', body: message, tone: 'good' });
       return true;
     } catch (e) {
@@ -116,7 +132,7 @@ export default function GuestApp() {
     const p = await Notification.requestPermission();
     setPerm(p);
     if (p === 'granted') {
-      run('prefs', { notifyBrowser: true });
+      void run('prefs', { notifyBrowser: true }).catch(() => undefined);
       toast({ title: 'Notifications on', body: 'We’ll tell you the moment your room is ready.', tone: 'good' });
     }
   };
@@ -148,7 +164,7 @@ export default function GuestApp() {
     <ToastContext.Provider value={toast}>
       <GuestFrame now={v.now} darkStatus={tab !== 'home'} tabs={tabs} demoPace banners={<PhoneBanners items={banners} />}>
         <div className="gx-pane" key={tab}>
-          {tab === 'home' && <Home v={v} perm={perm} unread={unread} onEnable={enableNotifications} open={setSheet} go={goTab} act={act} />}
+          {tab === 'home' && <Home v={v} perm={perm} unread={unread} onEnable={enableNotifications} open={setSheet} go={goTab} act={act} onEnd={end} />}
           {tab === 'key' && <KeyTab v={v} act={act} />}
           {tab === 'requests' && <RequestsTab v={v} open={setSheet} />}
           {tab === 'chat' && <ChatTab v={v} />}
@@ -186,7 +202,7 @@ function PhoneBanners({ items }: { items: Banner[] }) {
           </span>
           <div className="grow">
             <div className="meta">
-              <span>Founders</span>
+              <span>FHN</span>
               <span>now</span>
             </div>
             <b>{b.title}</b>
@@ -199,7 +215,7 @@ function PhoneBanners({ items }: { items: Banner[] }) {
 }
 
 // ───────────────────────── Home ─────────────────────────
-function Home({ v, perm, unread, onEnable, open, go, act }: { v: GuestView; perm: string; unread: number; onEnable: () => void; open: (s: Sheet) => void; go: (t: Tab) => void; act: Act }) {
+function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestView; perm: string; unread: number; onEnable: () => void; open: (s: Sheet) => void; go: (t: Tab) => void; act: Act; onEnd: () => Promise<void> }) {
   const nav = useNavigate();
   const first = v.guest.name.split(' ')[0];
   const h = Math.floor(v.now / 60);
@@ -212,7 +228,7 @@ function Home({ v, perm, unread, onEnable, open, go, act }: { v: GuestView; perm
     <>
       <header className="gx-hero">
         <div className="gx-top">
-          <Brand sub="Hotel Network" tone="light" />
+          <Brand />
           <button className="gx-iconbtn" onClick={() => go('chat')} aria-label={`Messages${unread ? `, ${unread} new` : ''}`}>
             <Icon name="bell" size={18} />
             {unread > 0 && <span className="badge" />}
@@ -269,10 +285,10 @@ function Home({ v, perm, unread, onEnable, open, go, act }: { v: GuestView; perm
           <span className="gx-muted" style={{ fontSize: 12.5 }}>Toronto Downtown</span>
         </div>
         <div className="explore">
-          <Explore icon="utensils" title="Founders Kitchen" sub="Breakfast 6:30–10:30 AM" bg="linear-gradient(135deg,#7a4b21,#b8894a)" />
-          <Explore icon="coffee" title="Lobby bar" sub="Open 4–11 PM · wedding welcome drinks" bg="linear-gradient(135deg,#1d2c50,#3b5bdb)" />
-          <Explore icon="bag" title="Bell desk" sub="Bags held free while your room is prepared" bg="linear-gradient(135deg,#0e5e57,#0e9384)" />
-          <Explore icon="clock" title="Late checkout" sub="Request until 1 PM — subject to availability" bg="linear-gradient(135deg,#43325f,#7a5af8)" />
+          <Explore icon="utensils" title="Founders Kitchen" sub="Breakfast 6:30–10:30 AM" bg="linear-gradient(135deg,#2d4a6b,#4e9f93)" />
+          <Explore icon="coffee" title="Lobby bar" sub="Open 4–11 PM · wedding welcome drinks" bg="linear-gradient(135deg,#232628,#2d4a6b)" />
+          <Explore icon="bag" title="Bell desk" sub="Bags held free while your room is prepared" bg="linear-gradient(135deg,#1f3a37,#3e9c8e)" />
+          <Explore icon="clock" title="Late checkout" sub="Request until 1 PM — subject to availability" bg="linear-gradient(135deg,#2a2f45,#55608f)" />
         </div>
 
         <div className="gx-foot">
@@ -282,8 +298,7 @@ function Home({ v, perm, unread, onEnable, open, go, act }: { v: GuestView; perm
             className="why-toggle"
             style={{ marginTop: 8, color: 'var(--g-muted)' }}
             onClick={() => {
-              endStay();
-              nav(guestPath('/'));
+              void onEnd().then(() => nav(guestPath('/')));
             }}
           >
             <Icon name="logout" size={13} /> End this stay
