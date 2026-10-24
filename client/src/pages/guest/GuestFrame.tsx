@@ -58,8 +58,10 @@ export function GuestFrame({
             </span>
           </div>
           {banners}
-          {onLogout && <div className="guest-session-bar"><span>Your stay</span><div className="guest-session-actions">{onAccessCode && <button onClick={onAccessCode}>Access code</button>}<button onClick={onLogout}><Icon name="logout" size={15} />Log out</button></div></div>}
-          <div className="gx-scroll">{children}</div>
+          <div className="gx-scroll">
+            {onLogout && <nav className="guest-session-bar" aria-label="Your stay account"><span>Your stay</span><div className="guest-session-actions">{onAccessCode && <button type="button" onClick={onAccessCode}>Access code</button>}<button type="button" onClick={onLogout}><Icon name="logout" size={15} />Log out</button></div></nav>}
+            {children}
+          </div>
           {tabs}
         </div>
       </div>
