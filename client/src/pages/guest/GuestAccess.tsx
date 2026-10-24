@@ -5,7 +5,7 @@ import { activeStayId, logOutGuest } from '../../guest/access';
 import { guestPath } from '../../links';
 import { GuestFrame } from './GuestFrame';
 
-export function GuestLogoutDialog({ onClose, onLogout }: { onClose: () => void; onLogout: () => void }) {
+export function GuestLogoutDialog({ onClose, onLogout, intent = 'logout' }: { onClose: () => void; onLogout: () => void; intent?: 'code' | 'logout' }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
@@ -16,12 +16,12 @@ export function GuestLogoutDialog({ onClose, onLogout }: { onClose: () => void; 
     catch { setCopyError(true); }
   };
   return <dialog ref={dialog} className="guest-logout-dialog" aria-labelledby="guest-logout-title" onCancel={onClose}>
-    <div className="access-card-heading"><span className="eyebrow">YOUR STAY</span><button className="round" onClick={onClose} aria-label="Close logout"><Icon name="x" size={16} /></button></div>
-    <h2 id="guest-logout-title">Heading out?</h2><p>Logging out keeps your stay and room active. Save your private access code to sign in again.</p>
+    <div className="access-card-heading"><span className="eyebrow">YOUR STAY</span><button className="round" onClick={onClose} aria-label={intent === 'code' ? 'Close access code' : 'Close logout'}><Icon name="x" size={16} /></button></div>
+    <h2 id="guest-logout-title">{intent === 'code' ? 'Your access code.' : 'Heading out?'}</h2><p>{intent === 'code' ? 'Save this code to reopen your stay after closing this tab or logging out.' : 'Logging out keeps your stay and room active. Save your private access code to sign in again.'}</p>
     <label htmlFor="stay-access-code">Private access code</label><textarea id="stay-access-code" className="input" readOnly rows={2} value={code} onFocus={(e) => e.target.select()} />
     <button className="btn access-copy" onClick={() => void copy()}>{copied ? 'Code copied' : 'Copy access code'}<Icon name={copied ? 'check' : 'key'} size={16} /></button>
     <p className="access-code-note" role="status">{copyError ? 'Select the code above to copy it manually.' : 'Keep this code private. It opens your stay and mobile key.'}</p>
-    <button className="gbtn navy" onClick={onLogout}>Log out<Icon name="logout" size={17} /></button>
+    <button className="gbtn navy" onClick={intent === 'code' ? onClose : onLogout}>{intent === 'code' ? 'Done' : 'Log out'}<Icon name={intent === 'code' ? 'check' : 'logout'} size={17} /></button>
   </dialog>;
 }
 

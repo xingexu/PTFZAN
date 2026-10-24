@@ -10,8 +10,8 @@ import { HOTEL_TAB, hotelUrl } from '../../links';
  * with a short explanation beside it for the audience.
  */
 export function GuestFrame({
-  children, now, darkStatus, tabs, demoPace, banners, guestName = 'Felix Qin', onLogout,
-}: { children: ReactNode; now?: number; darkStatus?: boolean; tabs?: ReactNode; demoPace?: boolean; banners?: ReactNode; guestName?: string; onLogout?: () => void }) {
+  children, now, darkStatus, tabs, demoPace, banners, guestName = 'Felix Qin', onLogout, onAccessCode,
+}: { children: ReactNode; now?: number; darkStatus?: boolean; tabs?: ReactNode; demoPace?: boolean; banners?: ReactNode; guestName?: string; onLogout?: () => void; onAccessCode?: () => void }) {
   useLayoutEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }, []);
   return (
     <div className="gx">
@@ -58,7 +58,7 @@ export function GuestFrame({
             </span>
           </div>
           {banners}
-          {onLogout && <div className="guest-session-bar"><span>Your stay</span><button onClick={onLogout}><Icon name="logout" size={15} />Log out</button></div>}
+          {onLogout && <div className="guest-session-bar"><span>Your stay</span><div className="guest-session-actions">{onAccessCode && <button onClick={onAccessCode}>Access code</button>}<button onClick={onLogout}><Icon name="logout" size={15} />Log out</button></div></div>}
           <div className="gx-scroll">{children}</div>
           {tabs}
         </div>

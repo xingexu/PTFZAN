@@ -45,7 +45,7 @@ const ITEMS = ['Extra towels', 'Extra pillows', 'Toiletries', 'Iron & board', 'C
 
 export default function GuestApp() {
   const nav = useNavigate();
-  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [accessDialog, setAccessDialog] = useState<'code' | 'logout' | null>(null);
   const [banners, toast] = usePhoneBanners();
   const { view: v, status, act: run, end } = useJourney();
   const [tab, setTab] = useState<Tab>('home');
@@ -168,7 +168,7 @@ export default function GuestApp() {
 
   return (
     <ToastContext.Provider value={toast}>
-      <GuestFrame guestName={v.guest.name} now={v.now} darkStatus={tab !== 'home'} tabs={tabs} demoPace banners={<PhoneBanners items={banners} />} onLogout={() => setLogoutOpen(true)}>
+      <GuestFrame guestName={v.guest.name} now={v.now} darkStatus={tab !== 'home'} tabs={tabs} demoPace banners={<PhoneBanners items={banners} />} onLogout={() => setAccessDialog('logout')} onAccessCode={() => setAccessDialog('code')}>
         <div className="gx-pane" key={tab}>
           {tab === 'home' && <Home v={v} perm={perm} unread={unread} onEnable={enableNotifications} open={setSheet} go={goTab} act={act} onEnd={end} />}
           {tab === 'key' && <KeyTab v={v} act={act} />}
@@ -176,7 +176,7 @@ export default function GuestApp() {
           {tab === 'chat' && <ChatTab v={v} />}
         </div>
       </GuestFrame>
-      {logoutOpen && <GuestLogoutDialog onClose={() => setLogoutOpen(false)} onLogout={() => { logOutGuest(); nav(guestPath('/logout'), { replace: true }); }} />}
+      {accessDialog && <GuestLogoutDialog intent={accessDialog} onClose={() => setAccessDialog(null)} onLogout={() => { logOutGuest(); nav(guestPath('/logout'), { replace: true }); }} />}
     </ToastContext.Provider>
   );
 }
