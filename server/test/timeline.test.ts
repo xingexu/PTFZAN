@@ -133,10 +133,13 @@ describe('shared hotel day', () => {
 // No DATABASE_URL: the API keeps the day in memory, so this never touches the real database.
 vi.stubEnv('DATABASE_URL', '');
 const { default: hotel } = await import('../../api/hotel.js');
+const { configureTestAdmin, mockRequest, mockResponse, testLogin } = await import('./admin-fixture.js');
+await configureTestAdmin();
+const adminCookie = await testLogin();
 type Reply = { ok: boolean; control: Control; events: TimelineEvent[]; serverNow: number; viewers?: number; message?: string };
 const call = async (method: string, url: string, body?: object) => {
-  const res = { statusCode: 0, body: '', setHeader: () => undefined, end(s: string) { this.body = s; } };
-  await hotel({ method, url, body } as never, res as never);
+  const res = mockResponse();
+  await hotel(mockRequest(method, url, body, adminCookie), res as never);
   return { status: res.statusCode, data: JSON.parse(res.body) as Reply };
 };
 

@@ -29,6 +29,7 @@ export async function api<T = { ok: boolean; message?: string }>(path: string, b
     /* non-JSON */
   }
   if (!res.ok) {
+    if (res.status === 401 && (data as { code?: string } | null)?.code === 'ADMIN_SESSION_REQUIRED') window.dispatchEvent(new Event('fhn:session-expired'));
     const msg = (data as { message?: string } | null)?.message ?? `Request failed (${res.status})`;
     throw new ApiError(msg, res.status);
   }

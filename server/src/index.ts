@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import activityHandler from '../../api/activity.js';
 import guestHandler from '../../api/guest.js';
 import hotelHandler from '../../api/hotel.js';
+import authHandler from '../../api/auth.js';
+import { requireAdmin } from '../../api/_lib/admin-auth.js';
 import { store } from '../../api/_lib/store.js';
 import { Messenger } from './messaging.js';
 import { maskPhone, normalizePhone } from './phone.js';
@@ -71,6 +73,8 @@ const stagePin = (req: Request, res: Response, next: NextFunction) =>
   stage.checkPin(req.get('x-stage-pin') ?? undefined) ? next() : bad(res, 401, 'Stage PIN required');
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, messaging: messenger.status.provider }));
+app.all('/api/auth', (req, res) => void authHandler(req, res));
+app.use(['/api/stage', '/api/messaging'], (req, res, next) => { void requireAdmin(req, res).then((session) => { if (session) next(); }).catch(() => bad(res, 503, 'Sign-in is unavailable.')); });
 app.get('/api/messaging/status', (_req, res) => res.json(messenger.status));
 // Guest stays, the hotel's activity log and the shared hotel day: the same handlers Vercel runs as serverless functions.
 app.all('/api/guest', (req, res) => void guestHandler(req, res));

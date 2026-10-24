@@ -9,6 +9,7 @@ import { fmtTime } from '../shared/types.js';
 import { ActionError, applyAction, Replay, type Control } from '../shared/sim/timeline.js';
 import { queryOf, readBody, send, withDeadline, type Req } from './_lib/http.js';
 import { store, type HotelStore, type RoomRow } from './_lib/store.js';
+import { requireAdmin } from './_lib/admin-auth.js';
 
 const SNAPSHOT_EVERY_MS = 4000;
 const VIEWER = /^[A-Za-z0-9_-]{8,40}$/;
@@ -49,6 +50,7 @@ async function refreshTables(db: HotelStore, control: Control) {
 
 export default withDeadline(async function hotel(req: Req, res: ServerResponse) {
   try {
+    if (!(await requireAdmin(req, res))) return;
     const db = store().hotel;
     if (req.method === 'GET') {
       const q = queryOf(req);

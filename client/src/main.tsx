@@ -3,11 +3,13 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { installGlassLight } from './components/glassLight';
+import { installScrollMotion } from './components/scrollMotion';
 import './styles.css';
 import './liquid-glass.css';
 import './hospitality.css';
 
 installGlassLight();
+installScrollMotion();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

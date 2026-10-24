@@ -1,15 +1,18 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Stay } from '../../shared/guest/stay.js';
+import { configureTestAdmin, mockRequest, mockResponse, testLogin } from './admin-fixture.js';
 
 // No DATABASE_URL: the API saves to memory, so these tests never touch the real database.
 vi.stubEnv('DATABASE_URL', '');
 const { default: guest } = await import('../../api/guest.js');
 const { default: activity } = await import('../../api/activity.js');
+await configureTestAdmin();
+const adminCookie = await testLogin();
 
 type Out = { status: number; data: { ok: boolean; stay?: Stay; message?: string; items?: { kind: string; text: string }[]; counts?: { registered: number; checkedIn: number } } };
 const call = async (handler: typeof guest, method: string, url: string, body?: object): Promise<Out> => {
-  const res = { statusCode: 0, body: '', setHeader: () => undefined, end(s: string) { this.body = s; } };
-  await handler({ method, url, body } as never, res as never);
+  const res = mockResponse();
+  await handler(mockRequest(method, url, body, adminCookie), res as never);
   return { status: res.statusCode, data: JSON.parse(res.body) };
 };
 

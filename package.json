@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "express": "^4.21.2",
+    "iron-session": "^9.0.1",
     "postgres": "^3.4.9",
     "tsx": "^4.19.2"
   },
