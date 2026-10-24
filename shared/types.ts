@@ -423,7 +423,7 @@ export interface GuestView {
     inRoom: boolean;
     housekeeping: HousekeepingPref;
   };
-  room: { id: string | null; type: RoomType; status: RoomStatus; eta: Eta | null; readyAt: number | null; floor: number };
+  room: { id: string | null; type: RoomType; status: RoomStatus; eta: Eta | null; readyAt: number | null; floor: number; attendant?: string };
   climate: { hvac: Hvac; setpoint: number; awayUntil: number | null };
   elevatorNotice: string | null;
   ticket: { id: string; owner: string; issue: string } | null;
@@ -432,7 +432,7 @@ export interface GuestView {
   /** Real-world delivery status of each notification (by notification id). */
   delivery: Record<string, { status: DeliveryStatus; provider: MessagingProvider; error?: string }>;
   /** The guest's room timeline in real time (epoch ms), for the countdown. */
-  progress?: { startMs: number; readyMs: number; highMs: number; secondsPerMinute: number };
+  progress?: { startMs: number; cleanMs: number; checkMs: number; readyMs: number; highMs: number; secondsPerMinute: number };
 }
 
 export const fmtTime = (minutes: number): string => {

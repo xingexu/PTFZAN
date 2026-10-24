@@ -8,7 +8,7 @@ import { chime } from '../../components/chime';
 import { Icon, type IconName } from '../../components/Icon';
 import { Brand } from '../../components/Logo';
 import { useSlide } from '../../components/slide';
-import { useJourney } from '../../guest/journey';
+import { serverNow, useJourney } from '../../guest/journey';
 import { guestPath, HOTEL_TAB, hotelUrl } from '../../links';
 import { GuestFrame } from './GuestFrame';
 
@@ -357,17 +357,28 @@ function RoomStatusCard({ v, go, act }: { v: GuestView; go: (t: Tab) => void; ac
             <Icon name="key" size={17} /> Go straight up with your mobile key
           </li>
         </ul>
-        <button
-          className="gbtn brass"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            await act('check-in', {}, false);
-            setBusy(false);
-          }}
-        >
-          {busy ? 'Checking you in…' : 'Check in now'}
-        </button>
+        {busy ? (
+          <div className="choosing" role="status">
+            <span className="choosing-orb" aria-hidden="true">
+              <Icon name="sparkles" size={18} />
+            </span>
+            <span>
+              <b>FHN AI is choosing your room</b>
+              <span>Checking every free room and each attendant’s list…</span>
+            </span>
+          </div>
+        ) : (
+          <button
+            className="gbtn brass"
+            onClick={async () => {
+              setBusy(true);
+              await act('check-in', {}, false);
+              setBusy(false);
+            }}
+          >
+            Check in now
+          </button>
+        )}
       </section>
     );
   }
@@ -383,10 +394,16 @@ function RoomStatusCard({ v, go, act }: { v: GuestView; go: (t: Tab) => void; ac
     );
   }
   if (r.status === 'ready') {
+    const early = v.progress ? Math.round((v.progress.highMs - v.progress.readyMs) / 1000) : 0;
     return (
       <section className="gx-card room-status ready-card" key="ready">
         <span className="rs-k">Ready{r.readyAt ? ` since ${fmtTime(Math.floor(r.readyAt))}` : ''}</span>
         <h2>Room {r.id} is ready</h2>
+        {early > 0 && (
+          <span className="ready-early">
+            <Icon name="check" size={13} /> {early} s earlier than we promised
+          </span>
+        )}
         <p className="rs-note">Floor {r.floor}. Your mobile key opens the room door and the elevator.</p>
         <button className="gbtn white" onClick={() => go('key')}>
           <Icon name="key" size={17} /> Open mobile key
@@ -408,10 +425,23 @@ function RoomStatusCard({ v, go, act }: { v: GuestView; go: (t: Tab) => void; ac
     );
   }
   return (
-    <section className="gx-card room-status" key="eta" aria-live="polite">
-      <span className="rs-k">Room {r.id} · ready by</span>
-      <div className="eta">{r.eta ? fmtTime(r.eta.high) : 'Scheduling…'}</div>
-      {v.progress && <Countdown p={v.progress} />}
+    <section className="gx-card room-status eta-card" key="eta">
+      <div className="eta-top">
+        <div className="eta-text">
+          <span className="rs-k">
+            Room {r.id} · {r.type}
+          </span>
+          <div className="eta">{r.eta ? fmtTime(r.eta.high) : 'Scheduling…'}</div>
+          <span className="eta-by">ready by — usually sooner</span>
+        </div>
+        {v.progress && <RoomTimer p={v.progress} />}
+      </div>
+      {v.progress && (
+        <span className="eta-phase" aria-live="polite">
+          <i aria-hidden="true" />
+          {phaseLine(v.progress, r.status, r.attendant)}
+        </span>
+      )}
       <Steps status={r.status} />
       <div className="ai-line">
         <Icon name="sparkles" size={14} /> {r.eta ? `FHN AI estimate · most likely ${fmtRange(r.eta.low, r.eta.high)}` : 'FHN AI is checking with housekeeping'}
@@ -438,20 +468,43 @@ function RoomStatusCard({ v, go, act }: { v: GuestView; go: (t: Tab) => void; ac
   );
 }
 
-/** Time left until the promised time, as a bar that fills. */
-function Countdown({ p }: { p: NonNullable<GuestView['progress']> }) {
-  const now = Date.now();
-  const pct = Math.min(100, Math.max(0, ((now - p.startMs) / (p.highMs - p.startMs)) * 100));
-  const left = Math.max(0, Math.round((p.highMs - now) / 1000));
-  const text = left >= 60 ? `About ${Math.floor(left / 60)} min ${String(left % 60).padStart(2, '0')} s left` : `Under ${Math.max(1, left)} s left`;
+const RING_R = 46;
+const RING_C = 2 * Math.PI * RING_R;
+const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+
+/** The room timer: a ring that fills toward the promised time, with the time left in the middle (server clock). */
+function RoomTimer({ p }: { p: NonNullable<GuestView['progress']> }) {
+  const now = serverNow();
+  const frac = Math.min(1, Math.max(0, (now - p.startMs) / Math.max(1, p.highMs - p.startMs)));
+  const left = Math.max(0, Math.ceil((p.highMs - now) / 1000));
   return (
-    <div className="countdown" aria-label={text}>
-      <div className="cd-bar">
-        <i style={{ width: `${pct}%` }} />
-      </div>
-      <span className="cd-left">{text}</span>
+    <div className="room-timer" role="timer" aria-label={left > 0 ? `${Math.floor(left / 60)} min ${left % 60} s until the promised time` : 'Any moment now'}>
+      <svg viewBox="0 0 108 108" aria-hidden="true">
+        <defs>
+          <linearGradient id="rt-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#7cb6ff" />
+            <stop offset="1" stopColor="#2f6fd6" />
+          </linearGradient>
+        </defs>
+        <circle className="rt-track" cx="54" cy="54" r={RING_R} />
+        <circle className="rt-fill" cx="54" cy="54" r={RING_R} strokeDasharray={RING_C} strokeDashoffset={RING_C * (1 - frac)} />
+      </svg>
+      <span className="rt-mid">
+        <b>{left > 0 ? mmss(left) : 'Soon'}</b>
+        <span>{left > 0 ? 'left' : 'any moment'}</span>
+      </span>
     </div>
   );
+}
+
+/** What is happening to the room right now, in a line. */
+function phaseLine(p: NonNullable<GuestView['progress']>, status: RoomStatus, attendant = 'Your attendant') {
+  const now = serverNow();
+  if (now > p.highMs) return 'Just a few more minutes';
+  if (status === 'inspection') return 'Cleaning done — final check under way';
+  if (status === 'cleaning') return `${attendant} is cleaning your room`;
+  const toStart = Math.ceil((p.cleanMs - now) / 1000);
+  return toStart > 0 ? `${attendant} starts on it in ${mmss(toStart)}` : `${attendant} is on the way`;
 }
 
 function Steps({ status }: { status: RoomStatus }) {

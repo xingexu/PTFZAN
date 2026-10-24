@@ -4049,3 +4049,221 @@ input.switch:focus-visible {
   .climate-grid { padding:9px 21px; gap:5px; }
   .energy-comfort-note { padding:9px 14px; margin:0 20px 13px; }
 }
+
+/* ── Guest app: the room timer ─────────────────────────────────────────────── */
+.eta-top {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.eta-text {
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+}
+.eta-card .eta {
+  font-size:40px;
+  margin:4px 0 2px;
+}
+.eta-by {
+  font-size:12.5px;
+  color:var(--muted);
+}
+.eta-phase {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:14px;
+  font-size:14px;
+  font-weight:500;
+  color:var(--ink);
+  font-variant-numeric:tabular-nums;
+  animation:chip-in .32s cubic-bezier(.2,.8,.2,1) both;
+}
+.eta-phase i {
+  width:8px;
+  height:8px;
+  flex:none;
+  border-radius:50%;
+  background:var(--accent);
+  animation:phase-pulse 2.2s ease-in-out infinite;
+}
+@keyframes phase-pulse {
+  0%,100% { box-shadow:0 0 0 3px rgba(57,121,214,.2) }
+  50% { box-shadow:0 0 0 6px rgba(57,121,214,.04) }
+}
+
+.room-timer {
+  position:relative;
+  flex:none;
+  width:112px;
+  height:112px;
+}
+/* A glass disc behind the numbers, so the timer reads like a control rather than a chart. */
+.room-timer::before {
+  content:'';
+  position:absolute;
+  inset:13px;
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 22%,rgba(255,255,255,.9),rgba(255,255,255,.28) 70%);
+  box-shadow:inset 0 1px 1px #fff,inset 0 -1px 1px rgba(255,255,255,.5),0 8px 18px -12px rgba(40,80,140,.45);
+}
+.room-timer svg {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  transform:rotate(-90deg);
+}
+.rt-track {
+  fill:none;
+  stroke:rgba(110,135,170,.16);
+  stroke-width:7;
+}
+.rt-fill {
+  fill:none;
+  stroke:url(#rt-grad);
+  stroke-width:7;
+  stroke-linecap:round;
+  transition:stroke-dashoffset 1s linear;
+  filter:drop-shadow(0 2px 4px rgba(47,111,214,.35));
+}
+.rt-mid {
+  position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+}
+.rt-mid b {
+  font-family:var(--display);
+  font-size:25px;
+  font-weight:700;
+  letter-spacing:-.03em;
+  line-height:1;
+  color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.rt-mid span {
+  margin-top:4px;
+  font-size:11.5px;
+  font-weight:500;
+  color:var(--muted);
+}
+@media (max-width:350px) {
+  .room-timer { width:96px; height:96px; }
+  .rt-mid b { font-size:21px; }
+  .eta-card .eta { font-size:34px; }
+}
+
+/* Check-in: the moment FHN AI chooses the room on the server. */
+.choosing {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-top:16px;
+  padding:14px 16px;
+  border-radius:20px;
+  background:linear-gradient(150deg,rgba(83,153,237,.14),rgba(83,153,237,.05));
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.85),0 0 0 .5px rgba(57,121,214,.2);
+  animation:chip-in .3s cubic-bezier(.2,.8,.2,1) both;
+}
+.choosing b {
+  display:block;
+  font-size:15px;
+  font-weight:600;
+  color:var(--ink);
+}
+.choosing span span {
+  display:block;
+  margin-top:2px;
+  font-size:13px;
+  color:var(--muted);
+}
+.choosing-orb {
+  display:grid;
+  place-items:center;
+  flex:none;
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  color:#fff;
+  background:var(--tint-glass);
+  box-shadow:var(--tint-shadow);
+  animation:orb-think 1.4s ease-in-out infinite;
+}
+@keyframes orb-think {
+  0%,100% { transform:scale(1) rotate(0) }
+  50% { transform:scale(1.08) rotate(12deg) }
+}
+
+.ready-early {
+  align-self:flex-start;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-top:10px;
+  padding:5px 11px;
+  border-radius:999px;
+  font-size:12.5px;
+  font-weight:600;
+  color:var(--green-ink);
+  background:rgba(71,166,126,.14);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.7),0 0 0 .5px rgba(38,115,88,.2);
+}
+@media (prefers-reduced-motion:reduce) {
+  .eta-phase i,.choosing-orb { animation:none; }
+  .rt-fill { transition:none; }
+}
+
+/* Hotel view: guests checking in on their phones, with the same clock as the phone. */
+.app-arrivals li {
+  position:relative;
+  grid-template-columns:1fr auto;
+  align-items:center;
+  background:linear-gradient(90deg,rgba(83,153,237,.08),transparent 70%);
+  animation:chip-in .35s cubic-bezier(.2,.8,.2,1) both;
+}
+.app-arrivals .pill.ai {
+  margin-left:4px;
+  vertical-align:1px;
+}
+.aa-clock {
+  font-size:15px;
+  font-weight:650;
+  letter-spacing:-.02em;
+  color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.aa-clock.ready {
+  color:var(--green-ink);
+  font-size:12px;
+}
+.aa-room {
+  padding:3px 8px;
+  border-radius:999px;
+  font-weight:600;
+  color:var(--ink);
+  background:var(--btn-glass);
+  box-shadow:var(--btn-shadow);
+}
+.aa-bar {
+  grid-column:1/-1;
+  height:3px;
+  border-radius:99px;
+  background:rgba(110,135,170,.15);
+  overflow:hidden;
+}
+.aa-bar i {
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#7cb6ff,#2f6fd6);
+  transition:width 1s linear;
+}
+.aa-ready .aa-bar i {
+  background:linear-gradient(90deg,#7fd1a8,#2f9c6c);
+}

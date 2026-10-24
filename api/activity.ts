@@ -1,5 +1,8 @@
-// What guests are doing in the app, for the hotel screen: GET /api/activity?after=<last id> → { items, counts, now }
+// What guests are doing in the app, for the hotel screen:
+// GET /api/activity?after=<last id> → { items, counts, arrivals, now } — arrivals carry the same clock as each guest's phone
 import type { ServerResponse } from 'node:http';
+import { HOLD_MS } from '../shared/guest/assign.js';
+import { liveArrival, type LiveArrival } from '../shared/guest/stay.js';
 import { queryOf, send, withDeadline, type Req } from './_lib/http.js';
 import { store } from './_lib/store.js';
 
@@ -13,7 +16,8 @@ export default withDeadline(async function activity(req: Req, res: ServerRespons
     const now = Date.now();
     const items = await db.activity(after, 30);
     const counts = await db.counts(now - DAY_MS);
-    return send(res, 200, { ok: true, items, counts, now, saved: db.kind });
+    const arrivals = (await db.arrivals(now - HOLD_MS, 8)).map(liveArrival).filter((a): a is LiveArrival => !!a);
+    return send(res, 200, { ok: true, items, counts, arrivals, now, saved: db.kind });
   } catch (e) {
     console.error('activity api', e);
     return send(res, 503, { ok: false, message: 'The hotel’s system didn’t answer.' });

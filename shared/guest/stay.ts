@@ -1,6 +1,6 @@
-// One guest's stay. At check-in the wait is calculated from the same numbers the hotel model uses (room
-// type clean time, place in the attendant's list, the final check), a window is promised, and each message
-// arrives when that moment comes — at demo pace, so a 45-minute clean takes a couple of minutes on screen.
+// One guest's stay. At check-in the server chooses the room and works out the wait (see assign.ts), a window
+// is promised, and each message arrives when that moment comes — at demo pace, so a 45-minute clean takes a
+// couple of minutes on screen.
 // Everything is derived from stored timestamps, so the server (which saves the stay) and the guest's phone
 // (which shows it) always agree. Pure functions only: no storage, no network.
 import { HIST_AVG, INSPECTION_MIN } from '../sim/seed.js';
@@ -16,19 +16,25 @@ const TECH_TRAVEL_MIN = 20;
 const FIX_MIN = 12;
 const DELIVERY_MIN = 15;
 
-const typeFor = (n: number): RoomType => (n <= 6 ? 'King' : n <= 10 ? 'Double Queen' : 'Suite');
-const WEDDING_ROOMS = [5, 6].flatMap((floor) => Array.from({ length: 10 }, (_, i) => ({ id: `${floor}${String(i + 1).padStart(2, '0')}`, floor, type: typeFor(i + 1) })));
-
+/** The hotel's decision at check-in. Minutes are hotel minutes from the moment of check-in. */
 export interface Plan {
   roomId: string;
   floor: number;
   type: RoomType;
-  /** Hotel minutes. */
+  /** Until the attendant starts cleaning (their list ahead, and the walk there). */
   queueMin: number;
+  /** How long the clean really takes (the forecast doesn't know this). */
   cleanMin: number;
+  /** The forecast: cleaning starts, the room type's average clean, the final check. */
   predictedMin: number;
+  /** Half the promised window. */
   bandMin: number;
+  /** The room's place in the attendant's list. */
   position: number;
+  attendantId?: string;
+  attendant?: string;
+  /** Why this room, in plain words, for "How FHN AI worked this out". */
+  reasons?: string[];
 }
 
 export interface Stay {
@@ -54,8 +60,8 @@ export interface Stay {
 export type StayAction = 'check-in' | 'unlock' | 'issue' | 'request' | 'climate' | 'housekeeping' | 'prefs';
 export const STAY_ACTIONS: StayAction[] = ['check-in', 'unlock', 'issue', 'request', 'climate', 'housekeeping', 'prefs'];
 
-const hash = (s: string) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 2166136261);
-const hm = (minutes: number) => minutes * SECONDS_PER_HOTEL_MINUTE * 1000;
+/** Hotel minutes → real milliseconds at demo pace. */
+export const hm = (minutes: number) => minutes * SECONDS_PER_HOTEL_MINUTE * 1000;
 /** Minutes since local midnight — the unit every time on the guest's screen uses. */
 const minuteOfDay = (ms: number) => {
   const d = new Date(ms);
@@ -75,31 +81,6 @@ export function cleanRegistration(input: { name?: unknown; email?: unknown; part
 export function newCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return `FHN${Array.from({ length: 5 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('')}`;
-}
-
-/**
- * The calculated wait: whatever the attendant is finishing first, then the room's own clean (the model's
- * average for that room type) and the final check. The window widens with the room's place in the list,
- * exactly as the hotel forecast does, and the guest is promised its late end.
- */
-export function planFor(code: string): Plan {
-  const h = hash(code);
-  const room = WEDDING_ROOMS[h % WEDDING_ROOMS.length];
-  const position = 1 + ((h >>> 5) % 2);
-  const queueMin = position === 1 ? 0 : 8 + ((h >>> 9) % 11);
-  const predicted = queueMin + HIST_AVG[room.type] + INSPECTION_MIN;
-  // How messy the room really is (the forecast never knows this): 92–110% of the average.
-  const condition = 0.92 + ((h >>> 13) % 19) / 100;
-  return {
-    roomId: room.id,
-    floor: room.floor,
-    type: room.type,
-    queueMin,
-    cleanMin: Math.round(HIST_AVG[room.type] * condition),
-    predictedMin: predicted,
-    bandMin: Math.round(6 + 4 * Math.sqrt(position)),
-    position,
-  };
 }
 
 interface Timeline {
@@ -147,7 +128,9 @@ export function viewOf(j: Stay, now: number): GuestView {
     status = now >= tl.ready ? 'ready' : now >= tl.inspectStart ? 'inspection' : now >= tl.cleanStart ? 'cleaning' : 'dirty';
     note('eta', tl.start, 'eta', 'You’re checked in',
       `Hi ${first}, room ${p.roomId} will be ready by ${fmtTime(promise(tl.high))} — within ${Math.ceil((tl.high - tl.start) / 60000)} min. We’ll message you the moment it’s ready.`);
-    if (p.queueMin > 0) note('clean', tl.cleanStart, 'info', 'Cleaning has started', `An attendant is cleaning room ${p.roomId} now.`);
+    if (p.queueMin > 0) note('clean', tl.cleanStart, 'info', 'Cleaning has started', `${p.attendant ?? 'An attendant'} is cleaning room ${p.roomId} now.`);
+    // Rarely the room takes longer than the window allowed: say so rather than let the promise pass quietly.
+    if (tl.ready > tl.high) note('late', tl.high, 'info', 'Running a little late', `Sorry, ${first} — room ${p.roomId} needs a few more minutes. We’ll message you the moment it’s ready.`);
     note('check', tl.inspectStart, 'info', 'Almost ready', `Cleaning is done — the final check is under way.`);
     const early = Math.round((tl.high - tl.ready) / 1000);
     note('ready', tl.ready, 'ready', `Room ${p.roomId} is ready`,
@@ -203,15 +186,18 @@ export function viewOf(j: Stay, now: number): GuestView {
             high: promise(tl.high),
             confidence: p.position === 1 ? 'high' : 'medium',
             drivers: [
-              p.queueMin > 0 ? 'Next on an attendant’s list' : 'An attendant is starting on it now',
-              `${p.type} rooms take about ${HIST_AVG[p.type]} minutes to clean`,
-              `A ${INSPECTION_MIN}-minute final check`,
+              ...(p.reasons ?? [
+                p.queueMin > 0 ? 'Next on an attendant’s list' : 'An attendant is starting on it now',
+                `${p.type} rooms take about ${HIST_AVG[p.type]} minutes to clean`,
+                `A ${INSPECTION_MIN}-minute final check`,
+              ]),
               `Shown at demo speed — ${p.predictedMin} hotel minutes take about ${realMinutes(p.predictedMin)} min here`,
             ],
           }
         : null,
       readyAt: tl && now >= tl.ready ? minuteOfDay(tl.ready) : null,
       floor: p?.floor ?? 5,
+      attendant: p?.attendant,
     },
     climate: { hvac, setpoint: j.setpoint, awayUntil: j.awayUntil ? minuteOfDay(j.awayUntil) : null },
     elevatorNotice: null,
@@ -219,7 +205,9 @@ export function viewOf(j: Stay, now: number): GuestView {
     requests: requests.sort((a, b) => b.openedAt - a.openedAt),
     notifications: notes.sort((a, b) => b.at - a.at),
     delivery: {},
-    progress: tl ? { startMs: tl.start, readyMs: tl.ready, highMs: tl.high, secondsPerMinute: SECONDS_PER_HOTEL_MINUTE } : undefined,
+    progress: tl
+      ? { startMs: tl.start, cleanMs: tl.cleanStart, checkMs: tl.inspectStart, readyMs: tl.ready, highMs: tl.high, secondsPerMinute: SECONDS_PER_HOTEL_MINUTE }
+      : undefined,
   };
 }
 
@@ -231,11 +219,15 @@ export function apply(j: Stay, action: string, body: Record<string, unknown>, no
   const tl = timeline(j);
   const inRoom = !!tl && now >= tl.inRoom;
   switch (action) {
-    case 'check-in':
+    case 'check-in': {
+      // The room is the hotel's decision (assign.ts, on the server); this records it.
       if (j.checkInAt) return 'Already checked in';
+      const plan = body.plan as Plan | undefined;
+      if (!plan?.roomId) throw new Error('The hotel assigns your room when you check in.');
       j.checkInAt = now;
-      j.plan = planFor(j.code);
-      return `Room ${j.plan.roomId}`;
+      j.plan = plan;
+      return `Room ${plan.roomId}`;
+    }
     case 'unlock':
       if (!tl || now < tl.ready) throw new Error('Your key works the moment your room is ready.');
       j.inRoomAt ??= now;
@@ -276,7 +268,9 @@ export function activityFor(j: Stay, action: string): { kind: string; text: stri
     case 'register':
       return { kind: 'register', text: `${first} registered${j.party > 1 ? ` · party of ${j.party}` : ''}` };
     case 'check-in':
-      return p ? { kind: 'check-in', text: `${first} checked in · room ${p.roomId}, ready in about ${Math.ceil(((p.predictedMin + p.bandMin) * SECONDS_PER_HOTEL_MINUTE) / 60)} min` } : null;
+      return p
+        ? { kind: 'check-in', text: `${first} checked in · FHN AI chose room ${p.roomId}${p.attendant ? ` (${p.attendant})` : ''}, ready in about ${Math.ceil(((p.predictedMin + p.bandMin) * SECONDS_PER_HOTEL_MINUTE) / 60)} min` }
+        : null;
     case 'unlock':
       return p ? { kind: 'unlock', text: `${first} opened room ${p.roomId} with the phone key` } : null;
     case 'issue':
@@ -288,4 +282,36 @@ export function activityFor(j: Stay, action: string): { kind: string; text: stri
     default:
       return null;
   }
+}
+
+/** A checked-in guest as the hotel screen shows them: first name, room, attendant and the same clock as their phone. */
+export interface LiveArrival {
+  first: string;
+  roomId: string;
+  type: RoomType;
+  attendant?: string;
+  /** Epoch ms: checked in, cleaning starts, final check starts, ready, the promised time, in the room. */
+  startMs: number;
+  cleanMs: number;
+  checkMs: number;
+  readyMs: number;
+  highMs: number;
+  inRoomMs?: number;
+}
+
+export function liveArrival(a: Pick<Stay, 'name' | 'checkInAt' | 'inRoomAt' | 'plan'>): LiveArrival | null {
+  const tl = timeline(a as Stay);
+  if (!tl || !a.plan) return null;
+  return {
+    first: a.name.split(' ')[0],
+    roomId: a.plan.roomId,
+    type: a.plan.type,
+    attendant: a.plan.attendant,
+    startMs: tl.start,
+    cleanMs: tl.cleanStart,
+    checkMs: tl.inspectStart,
+    readyMs: tl.ready,
+    highMs: tl.high,
+    inRoomMs: a.inRoomAt,
+  };
 }

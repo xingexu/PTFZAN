@@ -1,12 +1,15 @@
 // The guest's stay as the guest app sees it: saved by the hotel's API (Postgres), shown on this phone.
 // The phone keeps only the stay's secret id; the stay itself comes from the server. Actions show at once
-// (worked out here with the same rules the server uses) and are then confirmed by the server.
-import { useCallback, useEffect, useRef, useState } from 'react';
+// (worked out here with the same rules the server uses) and are then confirmed by the server — except
+// check-in, where the server chooses the room, so the phone waits for its answer.
+import { useCallback, useEffect, useState } from 'react';
 import { apply, viewOf, type Stay } from '../../../shared/guest/stay';
 import { api, ApiError } from '../api';
 
 const ID_KEY = 'fhn.guest.id';
 const SYNC_MS = 15000;
+/** Check-in shows "FHN AI is choosing your room" for at least this long, so the moment registers. */
+const CHOOSING_MS = 1300;
 
 export const savedStayId = () => {
   try {
@@ -26,6 +29,10 @@ const remember = (id: string | null) => {
 
 type Reply = { ok: boolean; stay: Stay; now: number };
 
+/** The server's clock minus this phone's: every time on screen (and the countdown) uses the server's clock. */
+let skewMs = 0;
+export const serverNow = () => Date.now() + skewMs;
+
 /** Registers a guest. Resolves once the hotel has saved them. */
 export async function register(input: { name: string; email?: string; party: number }) {
   const r = await api<Reply>('/api/guest', { action: 'register', ...input });
@@ -39,13 +46,11 @@ export type StayStatus = 'loading' | 'ready' | 'none' | 'offline';
 export function useJourney() {
   const [stay, setStay] = useState<Stay | null>(null);
   const [status, setStatus] = useState<StayStatus>(() => (savedStayId() ? 'loading' : 'none'));
-  // The phone's clock may be off; times come from the server's clock.
-  const skew = useRef(0);
-  const [now, setNow] = useState(() => Date.now());
-  const sync = (r: { now: number }) => (skew.current = r.now - Date.now());
+  const [now, setNow] = useState(serverNow);
+  const sync = (r: { now: number }) => (skewMs = r.now - Date.now());
 
   useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now() + skew.current), 1000);
+    const t = window.setInterval(() => setNow(serverNow()), 1000);
     return () => window.clearInterval(t);
   }, []);
 
@@ -89,8 +94,15 @@ export function useJourney() {
   const act = useCallback(
     async (action: string, body: Record<string, unknown> = {}) => {
       if (!stay) throw new Error('Please register first.');
+      if (action === 'check-in') {
+        const [r] = await Promise.all([api<Reply>('/api/guest', { action, id: stay.id }), new Promise((ok) => setTimeout(ok, CHOOSING_MS))]);
+        sync(r);
+        setStay(r.stay);
+        setNow(serverNow());
+        return r.stay.plan ? `Room ${r.stay.plan.roomId}` : 'Checked in';
+      }
       const draft = structuredClone(stay);
-      const message = apply(draft, action, body, Date.now() + skew.current);
+      const message = apply(draft, action, body, serverNow());
       setStay(draft);
       try {
         const r = await api<Reply>('/api/guest', { ...body, action, id: stay.id });
@@ -100,7 +112,7 @@ export function useJourney() {
         setStay(stay);
         throw e;
       }
-      setNow(Date.now() + skew.current);
+      setNow(serverNow());
       return message;
     },
     [stay],

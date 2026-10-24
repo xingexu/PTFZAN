@@ -1,7 +1,8 @@
 // Where everything is saved: Postgres when DATABASE_URL is set (the Supabase project in production),
 // otherwise in memory for a quick local run. Guest stays, and the shared hotel day.
 import postgres from 'postgres';
-import type { Plan, Stay } from '../../shared/guest/stay.js';
+import { HOLD_MS } from '../../shared/guest/assign.js';
+import { timeline, type Plan, type Stay } from '../../shared/guest/stay.js';
 import { initialControl, type Control, type TimelineEvent } from '../../shared/sim/timeline.js';
 import type { Metrics } from '../../shared/types.js';
 
@@ -67,7 +68,16 @@ export interface Store {
   log(guestId: string, kind: string, text: string, at: number): Promise<void>;
   activity(after: number, limit: number): Promise<ActivityItem[]>;
   counts(since: number): Promise<{ registered: number; checkedIn: number }>;
+  /**
+   * Checks a guest in, one check-in at a time across every server: `decide` sees the guest and every other guest
+   * still holding a room, and records the hotel's choice on the stay, which is then saved. Null if no such stay.
+   */
+  checkIn(id: string, now: number, decide: (stay: Stay, others: Pick<Stay, 'checkInAt' | 'plan'>[]) => void): Promise<Stay | null>;
+  /** Guests checked in since `since`, newest first, for the hotel's live arrivals. */
+  arrivals(since: number, limit: number): Promise<Arrival[]>;
 }
+
+export type Arrival = Pick<Stay, 'name' | 'checkInAt' | 'inRoomAt' | 'plan'>;
 
 // ───────── Postgres ─────────
 interface GuestRow {
@@ -93,6 +103,8 @@ interface RequestRow {
 }
 
 const ms = (d: Date | null) => (d ? d.getTime() : undefined);
+/** Any number: the key for Postgres's check-in lock (pg_advisory_xact_lock). */
+const CHECK_IN_LOCK = 7_417_001;
 const date = (n?: number) => (n === undefined ? null : new Date(n));
 
 const toStay = (g: GuestRow, reqs: RequestRow[]): Stay => ({
@@ -273,6 +285,35 @@ function postgresStore(url: string): Store {
         select count(*)::int as registered, count(checked_in_at)::int as checked_in from fhn.guests where created_at > ${new Date(since)}`;
       return { registered: c.registered, checkedIn: c.checked_in };
     },
+    async checkIn(id, now, decide) {
+      return sql.begin(async (tx) => {
+        // One check-in at a time, so two guests never see the same free room.
+        await tx`select pg_advisory_xact_lock(${CHECK_IN_LOCK})`;
+        const [g] = await tx<GuestRow[]>`select * from fhn.guests where id = ${id} for update`;
+        if (!g) return null;
+        const reqs = await tx<RequestRow[]>`select n, kind, title, created_at from fhn.requests where guest_id = ${id} order by n`;
+        const stay = toStay(g, reqs);
+        if (stay.checkInAt) return stay;
+        const others = await tx<{ checked_in_at: Date; plan: Plan }[]>`
+          select checked_in_at, plan from fhn.guests
+          where checked_in_at > ${new Date(now - HOLD_MS)} and plan is not null and id <> ${id}`;
+        decide(stay, others.map((o) => ({ checkInAt: o.checked_in_at.getTime(), plan: o.plan })));
+        const p = stay.plan!;
+        const tl = timeline(stay)!;
+        await tx`
+          update fhn.guests set
+            checked_in_at = ${date(stay.checkInAt)}, plan = ${tx.json(p as unknown as postgres.JSONValue)},
+            room_id = ${p.roomId}, attendant = ${p.attendant ?? null}, ready_at = ${new Date(tl.ready)}, promised_at = ${new Date(tl.high)}
+          where id = ${id}`;
+        return stay;
+      });
+    },
+    async arrivals(since, limit) {
+      const rows = await sql<{ name: string; checked_in_at: Date; in_room_at: Date | null; plan: Plan }[]>`
+        select name, checked_in_at, in_room_at, plan from fhn.guests
+        where checked_in_at > ${new Date(since)} and plan is not null order by checked_in_at desc limit ${limit}`;
+      return rows.map((r) => ({ name: r.name, checkInAt: r.checked_in_at.getTime(), inRoomAt: ms(r.in_room_at), plan: r.plan }));
+    },
   }, turn);
   // Closing doesn't wait its turn: it's how a connection stuck behind an unanswered query is let go.
   return { ...db, close: () => sql.end({ timeout: 3 }) };
@@ -355,6 +396,22 @@ function memoryStore(): Store {
     async counts(since) {
       const recent = [...guests.values()].filter((g) => g.createdAt > since);
       return { registered: recent.length, checkedIn: recent.filter((g) => g.checkInAt).length };
+    },
+    async checkIn(id, now, decide) {
+      const g = guests.get(id);
+      if (!g) return null;
+      if (!g.checkInAt) {
+        const others = [...guests.values()].filter((o) => o.id !== id && o.plan && o.checkInAt && o.checkInAt > now - HOLD_MS);
+        decide(g, others.map((o) => ({ checkInAt: o.checkInAt, plan: o.plan })));
+      }
+      return copy(g);
+    },
+    async arrivals(since, limit) {
+      return [...guests.values()]
+        .filter((g) => g.plan && g.checkInAt && g.checkInAt > since)
+        .sort((a, b) => b.checkInAt! - a.checkInAt!)
+        .slice(0, limit)
+        .map((g) => ({ name: g.name, checkInAt: g.checkInAt, inRoomAt: g.inRoomAt, plan: copy(g).plan }));
     },
   };
 }

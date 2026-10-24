@@ -6,7 +6,7 @@ import { useSim } from '../api';
 import { CompareBars, Num } from '../components/Compare';
 import { Icon, type IconName } from '../components/Icon';
 import { sides } from '../components/rooms';
-import { useActivity, type ActivityItem } from '../hotel/activity';
+import { arrivalState, mmss, useActivity, useServerNow, waitingArrivals, type ActivityItem } from '../hotel/activity';
 import { GUEST_TAB, guestQrUrl, guestUrl } from '../links';
 
 type M = Metrics | null;
@@ -174,7 +174,9 @@ function Challenge({
 
 /** The QR code that opens the guest app, with how many people are using it right now. */
 function GuestCard() {
-  const { counts, online } = useActivity();
+  const { counts, online, arrivals, skew } = useActivity();
+  const waiting = waitingArrivals(arrivals, Date.now() + skew);
+  const now = useServerNow(skew, waiting.length > 0);
   const url = guestQrUrl();
   const [src, setSrc] = useState('');
   useEffect(() => {
@@ -185,6 +187,9 @@ function GuestCard() {
   }, [url]);
   let count = online ? 'Live' : 'Connecting…';
   if (counts) count = counts.registered ? `${counts.registered} registered · ${counts.checkedIn} checked in` : 'Live · be the first to register';
+  // The next app guest's room, with the same countdown as their phone.
+  const next = waiting.map((a) => ({ a, ...arrivalState(a, now) })).filter((x) => x.phase !== 'ready').sort((x, y) => x.left - y.left)[0];
+  if (next) count = `${next.a.first} · room ${next.a.roomId} · ready in ${next.left > 0 ? mmss(next.left) : 'a moment'}`;
   return (
     <a className="guest-card glass" href={guestUrl('/')} target={GUEST_TAB} title={url}>
       {src ? <img src={src} alt={`QR code to ${url}`} className="fade-img" /> : <span className="qr-blank" />}
