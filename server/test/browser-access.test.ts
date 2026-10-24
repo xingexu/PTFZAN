@@ -47,3 +47,27 @@ describe('admin tab access', () => {
     expect(session.adminHeaders()).toEqual({});
   });
 });
+
+describe('single-site navigation', () => {
+  it('keeps guest links on the current site even with legacy split-site metadata', async () => {
+    vi.stubGlobal('window', {
+      location: { origin: 'https://hotel.example' },
+      __FHN__: { view: 'guest', hotel: 'https://old-hotel.example', guest: 'https://old-guest.example' },
+    });
+    const links = await import('../../client/src/links');
+    expect(links.guestPath()).toBe('/guest');
+    expect(links.guestUrl('/stay')).toBe('https://hotel.example/guest/stay');
+    expect(links.guestQrUrl()).toBe('https://hotel.example/guest');
+    expect(links.hasServer).toBe(false);
+  });
+  it('uses the same app path on the Wi-Fi address for local guest QR codes', async () => {
+    vi.stubGlobal('window', {
+      location: { origin: 'http://localhost:8790' },
+      __FHN__: { server: true, guestQr: 'http://192.168.1.10:8790' },
+    });
+    const links = await import('../../client/src/links');
+    expect(links.guestQrUrl()).toBe('http://192.168.1.10:8790/guest');
+    expect(links.guestUrl('/logout')).toBe('http://localhost:8790/guest/logout');
+    expect(links.hasServer).toBe(true);
+  });
+});

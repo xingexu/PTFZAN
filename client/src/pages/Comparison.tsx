@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { Link } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import type { CompareSnapshot, Metrics, RoomStatus, ScenarioEvent, SimState } from '../../../shared/types';
 import { fmtTime } from '../../../shared/types';
@@ -7,7 +8,7 @@ import { CompareBars, Num } from '../components/Compare';
 import { Icon, type IconName } from '../components/Icon';
 import { sides } from '../components/rooms';
 import { arrivalState, mmss, useActivity, useServerNow, waitingArrivals, type ActivityItem } from '../hotel/activity';
-import { GUEST_TAB, guestQrUrl, guestUrl } from '../links';
+import { guestPath, guestQrUrl } from '../links';
 
 type M = Metrics | null;
 type BoardRoom = CompareSnapshot['rooms'][number];
@@ -191,7 +192,7 @@ function GuestCard() {
   const next = waiting.map((a) => ({ a, ...arrivalState(a, now) })).filter((x) => x.phase !== 'ready').sort((x, y) => x.left - y.left)[0];
   if (next) count = `${next.a.first} · room ${next.a.roomId} · ready in ${next.left > 0 ? mmss(next.left) : 'a moment'}`;
   return (
-    <a className="guest-card glass" href={guestUrl('/')} target={GUEST_TAB} title={url}>
+    <Link className="guest-card glass" to={guestPath()} title={url}>
       {src ? <img src={src} alt={`QR code to ${url}`} className="fade-img" /> : <span className="qr-blank" />}
       <span className="gc-text">
         <b>Be a wedding guest</b>
@@ -201,7 +202,7 @@ function GuestCard() {
           {count}
         </span>
       </span>
-    </a>
+    </Link>
   );
 }
 

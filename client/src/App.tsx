@@ -4,11 +4,12 @@ import type { SimState } from '../../shared/types';
 import { fmtTime } from '../../shared/types';
 import { SimContext, ToastContext, useToast, type Toast } from './api';
 import { ActivityContext, useActivityFeed } from './hotel/activity';
-import { hotel, onRemoteChange, useHotel, useHotelSync } from './hotel/host';
+import { hotel, onRemoteChange, stopHotel, useHotel, useHotelSync } from './hotel/host';
 import { Icon, type IconName } from './components/Icon';
 import { fade } from './components/fade';
 import { useSlide } from './components/slide';
-import { GUEST_TAB, guestUrl, hasServer, HOTEL_TAB, isGuestView, separateSites } from './links';
+import { guestPath, hasServer } from './links';
+import Start from './pages/Start';
 import Engineering, { EnergyPage } from './pages/Engineering';
 import Comparison from './pages/Comparison';
 import FrontDesk from './pages/FrontDesk';
@@ -25,10 +26,6 @@ import { GuestSignedOut } from './pages/guest/GuestAccess';
 const TOAST_MS = 3800;
 const TOAST_EXIT_MS = 200;
 
-// Each view names its tab (so links from the other view can reuse it) and gets its own tab icon.
-window.name = isGuestView ? GUEST_TAB : HOTEL_TAB;
-if (isGuestView) document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.setAttribute('href', '/favicon-guest.svg');
-
 type LiveToast = Toast & { leaving?: boolean };
 
 export default function App() {
@@ -41,49 +38,39 @@ export default function App() {
     setTimeout(() => setToasts((x) => x.filter((y) => y.id !== id)), TOAST_MS);
   }, []);
   // Guest screens show notifications at the top like a phone; the hotel view keeps them in a corner, clear of the controls.
-  const guestScreen = isGuestView || useLocation().pathname.startsWith('/guest');
+  const { pathname } = useLocation();
+  const guestScreen = pathname.startsWith('/guest');
+  useEffect(() => {
+    if (guestScreen || ['/', '/login', '/logout'].includes(pathname)) stopHotel();
+  }, [guestScreen, pathname]);
 
   return (
     <ToastContext.Provider value={push}>
-      {isGuestView ? (
-        // The guest view is its own site: only the hotel's app lives here.
-        <Routes>
-          <Route path="/" element={<Welcome />} />
-          <Route path="/stay" element={<GuestApp />} />
-          <Route path="/logout" element={<GuestSignedOut />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      ) : (
-        <Routes>
-          {separateSites ? (
-            <Route path="/guest/*" element={<Away to={guestUrl('/')} />} />
-          ) : (
-            <>
-              <Route path="/guest" element={<Welcome />} />
-              <Route path="/guest/stay" element={<GuestApp />} />
-              <Route path="/guest/logout" element={<GuestSignedOut />} />
-              <Route path="/guest/*" element={<Navigate to="/guest" replace />} />
-            </>
-          )}
-          <Route path="/login" element={<SignIn />} />
-          <Route path="/logout" element={<SignOut />} />
-          <Route element={<RequireAdmin />}>
+      <Routes>
+        <Route path="/" element={<Start />} />
+        <Route path="/guest" element={<Welcome />} />
+        <Route path="/guest/stay" element={<GuestApp />} />
+        <Route path="/guest/logout" element={<GuestSignedOut />} />
+        <Route path="/guest/*" element={<Navigate to="/guest" replace />} />
+        <Route path="/stay" element={<Navigate to="/guest/stay" replace />} />
+        <Route path="/login" element={<SignIn />} />
+        <Route path="/logout" element={<SignOut />} />
+        <Route element={<RequireAdmin />}>
           {hasServer && <Route path="/stage" element={<Stage />} />}
           {hasServer && <Route path="/stage/remote" element={<StageRemote />} />}
           <Route element={<HotelShell />}>
-            <Route index element={<Overview />} />
-            <Route path="front-desk" element={<FrontDesk />} />
-            <Route path="supervisor" element={<Supervisor />} />
-            <Route path="attendant" element={<Housekeeping />} />
-            <Route path="engineering" element={<Engineering />} />
-            <Route path="energy" element={<EnergyPage />} />
-            <Route path="comparison" element={<Comparison />} />
-            <Route path="housekeeping" element={<Navigate to="/attendant" replace />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/overview" element={<Overview />} />
+            <Route path="/front-desk" element={<FrontDesk />} />
+            <Route path="/supervisor" element={<Supervisor />} />
+            <Route path="/attendant" element={<Housekeeping />} />
+            <Route path="/engineering" element={<Engineering />} />
+            <Route path="/energy" element={<EnergyPage />} />
+            <Route path="/comparison" element={<Comparison />} />
+            <Route path="/housekeeping" element={<Navigate to="/attendant" replace />} />
           </Route>
-          </Route>
-        </Routes>
-      )}
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
       <div className={`toast-stack ${guestScreen ? 'top' : 'corner'}`} role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.tone ?? ''} ${t.fromGuest ? 'from-guest' : ''} ${t.leaving ? 'leaving' : ''}`}>
@@ -99,14 +86,8 @@ export default function App() {
   );
 }
 
-/** Sends the browser to the other site (the guest app lives on its own site). */
-function Away({ to }: { to: string }) {
-  useEffect(() => window.location.replace(to), [to]);
-  return null;
-}
-
 const NAV: { to: string; label: string; icon: IconName; also?: string }[] = [
-  { to: '/', label: 'Overview', icon: 'gauge' },
+  { to: '/overview', label: 'Overview', icon: 'gauge' },
   { to: '/front-desk', label: 'Rooms', icon: 'bed' },
   { to: '/supervisor', label: 'Housekeeping', icon: 'users', also: '/attendant' },
   { to: '/engineering', label: 'Maintenance', icon: 'wrench' },
@@ -140,14 +121,14 @@ function HotelShell() {
           <div className="backdrop" aria-hidden="true" />
           <a className="skip-nav" href="#hotel-content">Skip to content</a>
           <aside className="hq-rail glass" aria-label="Hotel workspace">
-            <NavLink to="/" className="rail-brand" aria-label="Founders Hotel Network · hotel view home" viewTransition>
+            <NavLink to="/overview" className="rail-brand" aria-label="Founders Hotel Network · hotel view home" viewTransition>
               <span>Founders Hotel<br />Network</span>
             </NavLink>
             <div className="rail-property"><span className="rail-property-icon"><Icon name="building" size={19} /></span><div><b>Toronto Downtown</b><span>48 rooms · Floors 3–6</span></div></div>
             <span className="rail-label">WORKSPACE</span>
             <nav className="hq-nav slide" aria-label="Screens" ref={navRef}>
               {NAV.map((n) => (
-                <NavLink key={n.to} to={n.to} end={n.to === '/'} viewTransition title={n.label} aria-label={n.label} className={({ isActive }) => (isActive || pathname === n.also ? 'active' : '')}>
+                <NavLink key={n.to} to={n.to} end viewTransition title={n.label} aria-label={n.label} className={({ isActive }) => (isActive || pathname === n.also ? 'active' : '')}>
                   <Icon name={n.icon} size={18} /><span>{n.label}</span>
                   {n.to === '/supervisor' && pending && <span className="badge" aria-label="decision needed" />}
                 </NavLink>
@@ -155,23 +136,24 @@ function HotelShell() {
             </nav>
             <div className="rail-bottom">
               <NavLink className="rail-guest" to="/comparison"><span><Icon name="gauge" size={17} />Compare the day</span><Icon name="right" size={14} /></NavLink>
-              <a className="rail-guest" href={guestUrl('/')} target={GUEST_TAB}><span><Icon name="phoneDevice" size={17} />Guest app</span><Icon name="external" size={14} /></a>
+              <NavLink className="rail-guest" to={guestPath()}><span><Icon name="phoneDevice" size={17} />Guest access</span><Icon name="right" size={14} /></NavLink>
+              <NavLink className="rail-guest" to="/"><span><Icon name="home" size={17} />Welcome page</span><Icon name="right" size={14} /></NavLink>
               {hasServer && <NavLink className="rail-guest" to="/stage"><span><Icon name="monitor" size={17} />Message demo</span><Icon name="right" size={14} /></NavLink>}
               <div className="rail-footer"><span className="rail-avatar"><Icon name="shield" size={17} /></span><div><b>Hotel operations</b><span>Pitch the Future · 2026</span></div></div>
             </div>
           </aside>
           <header className="hq-top">
             <div className="hq-bar glass">
-              <NavLink to="/" className="hq-mobile-brand" aria-label="Founders Hotel Network home">Founders<br />Hotel Network</NavLink>
+              <NavLink to="/overview" className="hq-mobile-brand" aria-label="Founders Hotel Network home">Founders<br />Hotel Network</NavLink>
               <div className="hq-breadcrumb"><span>Operations</span><Icon name="right" size={13} /><b>{current}</b></div>
               <div className="hq-actions">
-                <NavLink className="hq-compare" to="/comparison">Compare</NavLink>
+                <NavLink className="hq-compare" to="/">Welcome</NavLink>
                 <NavLink className="hq-signout" to="/logout"><Icon name="logout" size={16} /><span>Log out</span></NavLink>
               </div>
             </div>
           </header>
           <div id="hotel-content" className="hotel-content" tabIndex={-1}><Outlet /></div>
-          {pathname !== '/' && pathname !== '/supervisor' && <DecisionCard state={state} />}
+          {pathname !== '/overview' && pathname !== '/supervisor' && <DecisionCard state={state} />}
           <Player state={state} />
         </div>
       </ActivityContext.Provider>

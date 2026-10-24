@@ -39,17 +39,16 @@ Requires **Node 20+**.
 ```bash
 npm install
 cp .env.example .env   # then set DATABASE_URL (optional locally — without it, the shared day and guest stays are kept in memory)
-npm run demo           # builds, starts, and opens both views in their own tabs
+npm run demo           # builds, starts, and opens the welcome page
 ```
 
-That opens two separate sites:
+Open **http://localhost:8787** locally, or **https://pitchthefuturedaz.vercel.app/** in production. This is the single starting page for the whole app.
 
-| Tab | Address | Who it's for |
-|---|---|---|
-| **Hotel view** | http://localhost:8787 | The hotel team and the judges: the live day, rooms, team, building |
-| **Guest view** | http://localhost:8788 | Guests: the hotel's app — register, check in, ready time, mobile key, requests, messages |
+- **Guest access** → new or returning stay → check-in, mobile key, requests and messages.
+- **Hotel team** → sign-in → Overview, Rooms, Housekeeping, Maintenance and Energy.
+- **Welcome** links bring either view back to the starting page in the same tab. Existing tab sessions remain available until logout or the tab closes.
 
-The **Guest app** link in the hotel sidebar opens the guest app; the QR code on the Compare the day screen does the same for phones. The two tabs have different icons and each links to the other.
+The QR code on Compare the day opens `/guest` on the same site (using a Wi-Fi address locally). The retired guest domain redirects to the starting page. Old `/stay` links on this site forward to `/guest/stay`.
 
 ### Hotel admin sign-in
 
@@ -57,11 +56,11 @@ Set `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH` and `ADMIN_SESSION_SECRET` in the lo
 
 `/login` opens the admin sign-in screen and `/logout` clears the browser's session. Staff pages, hotel/activity APIs and local stage APIs require authentication. Sessions use [iron-session](https://github.com/vvo/iron-session) encrypted HttpOnly cookies with SameSite=Strict, Secure on Vercel, an explicit one-hour expiry and same-origin checks for mutations. Changing the admin credentials invalidates earlier sessions. Logout removes this browser's cookie; stateless sessions cannot revoke already copied session credentials before expiry. The bounded login throttle is per server instance, not a distributed rate limiter. Admin sessions also require a random key held only in the current tab’s sessionStorage; a browser cookie by itself cannot open staff APIs. A fresh tab starts signed out, while refreshing the current tab keeps access until logout or expiry. Signing in in another tab replaces the browser’s earlier admin session.
 
-`npm start` does the same without opening tabs. For development with hot reload: `npm run dev` (web on http://localhost:5173, guest app at `/guest`, API proxied to :8787).
+`npm start` does the same without opening a browser. For development with hot reload: `npm run dev` (web on http://localhost:5173, guest app at `/guest`, API proxied to :8787).
 
 Other scripts: `npm test` (simulation, guest stay and API tests — they never touch the real database), `npm run typecheck`.
 
-The start-up log prints the addresses phones on the same Wi-Fi can use, and where guest stays are being saved. If macOS asks whether **node** may accept incoming connections, allow it. If the ports are busy, run `PORT=8790 npm start` (the guest view takes the next port, or set `GUEST_PORT`).
+The start-up log prints the addresses phones on the same Wi-Fi can use, and where guest stays are being saved. If macOS asks whether **node** may accept incoming connections, allow it. If the ports are busy, run `PORT=8790 npm start` .
 
 ### How it fits together
 
@@ -81,14 +80,15 @@ The hotel workspace uses a dark navy sidebar on desktop, warm editorial headings
 | Route | Screen | What it shows |
 |---|---|---|
 | `/comparison` | **Compare the day** | Labelled as a simulation. The previous method vs the new AI, side by side, each drawn as a 2D cross-section of the hotel: four guest floors over the lobby, every room a window that changes colour as it's prepared and turns green when ready; wedding rooms ready out of 20 with a progress bar; and the 40 wedding guests in the lobby, shown in colour while they wait. Below, the four challenges as simple two-bar comparisons. On the right, the guest app QR code and the **Hotel log**: the day's big moments in plain words, plus what real guests are doing in the app |
-| `/` | **Overview** | Room readiness, attention items, next arrivals and current housekeeping queues; room search and arrival/risk filters |
+| `/` | **Welcome** | Guest access and hotel team sign-in |
+| `/overview` | **Overview** | Room readiness, attention items, next arrivals and current housekeeping queues; room search and arrival/risk filters |
 | `/front-desk` | **Rooms** | Room grid with expected ready time, how sure, "why this time", a temperature layer, arrivals, report a problem |
 | `/supervisor` | **Housekeeping** · Supervisor | Plan to approve, attendant lists, tomorrow's staffing forecast, decision history |
 | `/attendant` | **Housekeeping** · Attendant phone | Every attendant at a glance; tap one to see their phone (current room, what's next, one-tap problem reports); and what changes for attendants, today's way vs FHN AI |
 | `/engineering` | **Maintenance** | Repairs with who has them and when, plus recurring problems in old repair notes |
 | `/energy` | **Energy** | Energy savings and a live room-temperature map |
-| `/` (guest view) | Guests (QR code target) | Welcome: register with name, optional email and party size |
-| `/stay` (guest view) | Guests | The guest app: online check-in, FHN AI's calculated ready time with a countdown, mobile key, temperature, housekeeping (skip cleaning), report a problem, request items, messages — with in-phone notification banners, and a link to the hotel's FHN AI view. Phones and tablets get the app full screen, laid out like an iOS app (large titles, grouped lists, safe areas for the notch and home indicator); a laptop shows it in a phone frame |
+| `/guest` | Guests (QR code target) | Welcome: register with name, optional email and party size |
+| `/guest/stay` | Guests | The guest app: online check-in, FHN AI's calculated ready time with a countdown, mobile key, temperature, housekeeping (skip cleaning), report a problem, request items, messages — with in-phone notification banners, and a link to the hotel's FHN AI view. Phones and tablets get the app full screen, laid out like an iOS app (large titles, grouped lists, safe areas for the notch and home indicator); a laptop shows it in a phone frame |
 | `/stage` | Projector (local server only) | **Live SMS moment**: Mike's phone, behind-the-scenes steps, live delivery status |
 | `/stage/remote` | Teammate's phone (local server only) | One big button that triggers the next step of the live moment |
 
@@ -263,7 +263,7 @@ client/  React + Vite + TypeScript
   pages/             Overview (Live), FrontDesk, Supervisor, Housekeeping (attendant), Engineering, Stage, StageRemote
   pages/guest/       Welcome (register), GuestApp, GuestFrame (phone frame on desktop)
   components/        Icon (inline SVG set), Logo (the FHN mark), rooms (labels/colours), PageHead
-  links.ts           which view this tab is (hotel or guest) and where the other view lives
+  links.ts           same-origin guest links and local Wi-Fi QR codes
 shared/
   guest/assign.ts    FHN AI's check-in decision: which room, which attendant, the promised window (run on the server)
   guest/stay.ts      one guest's stay: the timeline, timed messages, requests — used by server and phone
@@ -274,7 +274,7 @@ shared/
   sim/timeline.ts    the shared day: controls → clock + decision log, and Replay, which rebuilds the hotel from them
   types.ts           domain types used everywhere
 server/  Express + TypeScript (run with tsx), local only
-  src/index.ts       serves both views on two ports, the API, the live SMS moment
+  src/index.ts       serves the whole app on one port, the API, the live SMS moment
   src/messaging.ts   Twilio SMS / your own phone / ntfy push / simulated, with delivery tracking
   src/stage.ts       the on-cue "Mike" scene
   test/              Vitest: simulation, four challenges, demo timing, shared day, guest stay, APIs, messaging
@@ -308,7 +308,6 @@ See `.env.example`. Everything is optional locally; with nothing set, the shared
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string for the shared hotel day and guest stays (Supabase transaction pooler, `fhn_app` login) |
-| `VITE_VIEW`, `VITE_HOTEL_URL`, `VITE_GUEST_URL` | Vercel builds: which view this site is, and where the other one lives |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (or `TWILIO_MESSAGING_SERVICE_SID`) | Real SMS |
 | `TWILIO_TRIAL_TEMPLATE` | Trial accounts: send a Twilio template instead of custom text |
 | `HTTPSMS_API_KEY`, `HTTPSMS_FROM` | Send from your own Android phone's number |
@@ -317,7 +316,7 @@ See `.env.example`. Everything is optional locally; with nothing set, the shared
 | `NTFY_TOPIC`, `NTFY_SERVER` | Free push-notification fallback for the stage guest |
 | `STAGE_NAME`, `STAGE_ROOM`, `STAGE_PHONE`, `STAGE_PIN` | Stage guest and control lock |
 | `SMS_MAX_PER_HOUR`, `SMS_MAX_PER_GUEST_PER_HOUR` | Spending caps |
-| `PORT`, `GUEST_PORT` | Hotel view port (default 8787) and guest view port (default PORT+1) |
+| `PORT` | The app’s local port (default 8787) |
 | `HOTEL_TIME_ZONE`, `PUBLIC_URL` | Misc |
 
 ### API

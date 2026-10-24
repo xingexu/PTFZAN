@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { cleanRegistration } from '../../../../shared/guest/stay';
 import { Icon } from '../../components/Icon';
 import { Brand } from '../../components/Logo';
 import { register, resumeStay, savedStayId } from '../../guest/journey';
 import { legacyStayId } from '../../guest/access';
-import { guestPath, HOTEL_TAB, hotelUrl } from '../../links';
+import { guestPath } from '../../links';
 import { GuestFrame } from './GuestFrame';
 
 /** New visits open here; returning guests choose to open their stay explicitly. */
@@ -53,7 +53,7 @@ export default function Welcome() {
             <p className="guest-entry-note guest-entry-foot">{mode === 'new' ? 'Demo stay · Your details are saved with the hotel.' : 'Your access code is private. Keep it somewhere safe.'}</p>
           </form>
         </section>
-        <div className="gx-foot"><span>Founders Hotel Network</span><a className="access-secondary" href={hotelUrl('/')} target={HOTEL_TAB} rel="noopener">Hotel team sign-in <Icon name="arrow" size={14} /></a></div>
+        <div className="gx-foot"><span>Founders Hotel Network</span><Link className="access-secondary" to="/login">Hotel team sign-in <Icon name="arrow" size={14} /></Link></div>
       </div>
     </GuestFrame>
   );

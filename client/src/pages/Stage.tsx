@@ -89,7 +89,7 @@ export default function Stage() {
   return (
     <div className="stage">
       <header className="stage-top">
-        <Link to="/" aria-label="Back to FHN Operations">
+        <Link to="/overview" aria-label="Back to hotel operations">
           <Brand sub="Live text demo" />
         </Link>
         <ProviderBadge s={s} />
