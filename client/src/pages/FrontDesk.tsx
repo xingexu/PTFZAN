@@ -4,6 +4,7 @@ import { fmtRange, fmtTime } from '../../../shared/types';
 import { useSim, useToast } from '../api';
 import { hotel } from '../hotel/host';
 import { Icon } from '../components/Icon';
+import { fade } from '../components/fade';
 import { PageHead } from '../components/PageHead';
 import { atRisk, CONF_COLOR, CONF_WIDTH, HVAC_COLOR, HVAC_LABEL, HVAC_TILE, STATUS_COLOR, STATUS_LABEL, TILE_LABEL, visibleStatus } from '../components/rooms';
 
@@ -24,20 +25,20 @@ export default function FrontDesk() {
   const selected = sel ? state.rooms.find((r) => r.id === sel) : undefined;
 
   return (
-    <main className="page">
+    <main className="page fit">
       <PageHead title="Rooms">
         <div className="layer-seg" role="tablist" aria-label="Map layer">
-          <button role="tab" aria-selected={layer === 'readiness'} className={layer === 'readiness' ? 'on' : ''} onClick={() => setLayer('readiness')}>
+          <button role="tab" aria-selected={layer === 'readiness'} className={layer === 'readiness' ? 'on' : ''} onClick={() => fade(() => setLayer('readiness'))}>
             <Icon name="bed" size={14} /> Room status
           </button>
-          <button role="tab" aria-selected={layer === 'climate'} className={layer === 'climate' ? 'on' : ''} onClick={() => setLayer('climate')}>
+          <button role="tab" aria-selected={layer === 'climate'} className={layer === 'climate' ? 'on' : ''} onClick={() => fade(() => setLayer('climate'))}>
             <Icon name="thermo" size={14} /> Temperature
           </button>
         </div>
       </PageHead>
 
       <div className="grid fd">
-        <section className="card" aria-label="Room grid">
+        <section className="card fd-map" aria-label="Room grid">
           <div className="card-head">
             <Legend layer={layer} ai={ai} />
             {!ai && layer === 'readiness' && <span className="pill red">Last phone update · {fmtTime(state.frontDeskSnapshotAt)}</span>}
@@ -48,14 +49,14 @@ export default function FrontDesk() {
               </span>
             )}
           </div>
-          <div className="floors">
+          <div className="floors fd-floors">
             {floors.map((f) => (
               <div className="floor" key={f}>
                 <div className="floor-label">{f}</div>
                 {state.rooms
                   .filter((r) => r.floor === f)
                   .map((r) => (
-                    <RoomTile key={r.id} s={state} r={r} layer={layer} selected={sel === r.id} onClick={() => setSel(sel === r.id ? null : r.id)} />
+                    <RoomTile key={r.id} s={state} r={r} layer={layer} selected={sel === r.id} onClick={() => fade(() => setSel(sel === r.id ? null : r.id))} />
                   ))}
               </div>
             ))}
@@ -63,7 +64,7 @@ export default function FrontDesk() {
         </section>
 
         <aside className="side">
-          {selected ? <RoomDetail s={state} r={selected} onClose={() => setSel(null)} /> : <Arrivals s={state} onPick={setSel} />}
+          {selected ? <RoomDetail s={state} r={selected} onClose={() => fade(() => setSel(null))} /> : <Arrivals s={state} onPick={(id) => fade(() => setSel(id))} />}
         </aside>
       </div>
     </main>

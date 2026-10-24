@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import type { ScenarioEvent, SimState } from '../../shared/types';
+import type { SimState } from '../../shared/types';
 import { fmtTime } from '../../shared/types';
 import { SimContext, ToastContext, useToast, type Toast } from './api';
 import { ActivityContext, useActivityFeed } from './hotel/activity';
 import { hotel, useHotel } from './hotel/host';
 import { Icon, type IconName } from './components/Icon';
+import { fade } from './components/fade';
 import { Logo } from './components/Logo';
 import { GUEST_TAB, guestUrl, hasServer, HOTEL_TAB, isGuestView, separateSites } from './links';
 import Engineering from './pages/Engineering';
@@ -148,7 +149,6 @@ function HotelShell() {
             </div>
           </header>
           <Outlet />
-          <Caption state={state} />
           <DecisionCard state={state} />
           <Player state={state} />
         </div>
@@ -157,7 +157,10 @@ function HotelShell() {
   );
 }
 
-/** Calls an API action, surfacing failures as a toast. */
+/** Actions that change the whole screen (a new day, a different mode) cross-fade instead of jumping. */
+const SCREEN_CHANGES = new Set(['reset', 'demo', 'next-event']);
+
+/** Runs a hotel control, surfacing failures as a toast. */
 function useAction() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -165,7 +168,10 @@ function useAction() {
     async (action: string, body: Record<string, unknown> = {}) => {
       setBusy(true);
       try {
-        await hotel(action, body);
+        let done: Promise<unknown> = Promise.resolve();
+        if (SCREEN_CHANGES.has(action)) fade(() => (done = hotel(action, body)));
+        else done = hotel(action, body);
+        await done;
       } catch (e) {
         toast({ title: 'That didn’t work', body: (e as Error).message, tone: 'bad' });
       } finally {
@@ -262,36 +268,6 @@ function Scrubber({ state }: { state: SimState }) {
   );
 }
 
-const CAPTION_MS = 3400;
-
-/** A film-style caption for each moment of the day as the playhead passes it. */
-function Caption({ state }: { state: SimState }) {
-  const [shown, setShown] = useState<ScenarioEvent | null>(null);
-  const last = useRef(state.nextEventIndex);
-  useEffect(() => {
-    const i = state.nextEventIndex;
-    if (i > last.current && i > 0) setShown(state.events[i - 1]);
-    if (i < last.current) setShown(null);
-    last.current = i;
-  }, [state.nextEventIndex, state.events]);
-  useEffect(() => {
-    if (!shown) return;
-    const t = setTimeout(() => setShown(null), CAPTION_MS);
-    return () => clearTimeout(t);
-  }, [shown]);
-  if (!shown) return null;
-  return (
-    <div className={`caption ${state.mode === 'ai' ? 'ai' : 'today'}`} key={shown.id} role="status">
-      <span className="cap-time">{fmtTime(shown.at)}</span>
-      <b>{shown.title}</b>
-      <span className="cap-line">
-        {state.mode === 'ai' && <Icon name="sparkles" size={13} />}
-        {state.mode === 'ai' ? shown.ai : shown.today}
-      </span>
-    </div>
-  );
-}
-
 /** A decision floats above the player while the supervisor's approval is needed. */
 function DecisionCard({ state }: { state: SimState }) {
   const nav = useNavigate();
@@ -328,3 +304,4 @@ function DecisionCard({ state }: { state: SimState }) {
   }
   return null;
 }
+

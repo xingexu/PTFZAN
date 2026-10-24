@@ -6,6 +6,7 @@ import { apply, viewOf, type Stay } from '../../../shared/guest/stay';
 import { api, ApiError } from '../api';
 
 const ID_KEY = 'fhn.guest.id';
+const SYNC_MS = 15000;
 
 export const savedStayId = () => {
   try {
@@ -72,9 +73,15 @@ export function useJourney() {
           }
         });
     void load();
+    // Stay in step with the hotel's records: re-read every so often and whenever the app comes back into view.
+    const every = window.setInterval(() => void (document.hidden || load()), SYNC_MS);
+    const onShow = () => !document.hidden && void load();
+    document.addEventListener('visibilitychange', onShow);
     return () => {
       stop = true;
       window.clearTimeout(retry);
+      window.clearInterval(every);
+      document.removeEventListener('visibilitychange', onShow);
     };
   }, []);
 

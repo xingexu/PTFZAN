@@ -10,10 +10,10 @@ export default function Engineering() {
   if (!state) return null;
 
   return (
-    <main className="page">
+    <main className="page fit">
       <PageHead title="Building" />
       <div className="grid eng">
-        <div className="grid">
+        <div className="col">
           <Tickets s={state} />
           <Insights insights={state.insights} />
         </div>
@@ -29,7 +29,7 @@ function Tickets({ s }: { s: SimState }) {
   const issues = s.requests.filter((r) => r.kind === 'issue');
   const elevator = s.tickets.filter((t) => !s.requests.some((r) => r.ticketId === t.id));
   return (
-    <section className="card" aria-label="Maintenance tickets">
+    <section className="card tickets-card" aria-label="Maintenance tickets">
       <div className="card-head">
         <div className="title">
           <Icon name="wrench" size={16} />
@@ -40,7 +40,7 @@ function Tickets({ s }: { s: SimState }) {
       {issues.length === 0 && elevator.length === 0 ? (
         <div className="empty">No repairs yet. Elevator B fails at 12:00 PM; suite 411&rsquo;s AC at 2:05 PM.</div>
       ) : (
-        <ul className="tickets">
+        <ul className="tickets card-scroll">
           {elevator.map((t) => (
             <li key={t.id}>
               <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -93,7 +93,7 @@ function Tickets({ s }: { s: SimState }) {
 
 function Insights({ insights }: { insights: MaintenanceInsight[] }) {
   return (
-    <section className="card" aria-label="Recurring faults">
+    <section className="card fill" aria-label="Recurring faults">
       <div className="card-head">
         <div className="title">
           <Icon name="sparkles" size={16} />
@@ -101,6 +101,7 @@ function Insights({ insights }: { insights: MaintenanceInsight[] }) {
         </div>
         <span className="sub">Last 60 days</span>
       </div>
+      <div className="card-scroll">
       {insights.map((i) => (
         <div className="insight" key={`${i.asset}-${i.location}`}>
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -126,6 +127,7 @@ function Insights({ insights }: { insights: MaintenanceInsight[] }) {
           </ul>
         </div>
       ))}
+      </div>
     </section>
   );
 }
@@ -135,7 +137,7 @@ function Energy({ s }: { s: SimState }) {
   const floors = [6, 5, 4, 3];
   const count = (h: string) => s.rooms.filter((r) => r.hvac === h).length;
   return (
-    <section className="card" aria-label="Room climate">
+    <section className="card fill" aria-label="Room climate">
       <div className="card-head">
         <div className="title">
           <Icon name="leaf" size={16} />

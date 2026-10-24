@@ -16,21 +16,21 @@ export default function Supervisor() {
   const history = state.proposals.filter((p) => p.status !== 'pending' && p.trigger !== 'Regular update').slice(0, 12);
 
   return (
-    <main className="page">
+    <main className="page fit">
       <PageHead title="Team">
         {ai && <AutoApprove s={state} />}
         <TeamTabs />
       </PageHead>
 
       <div className="grid sup">
-        <div className="grid">
+        <div className="col">
           {ai && (pending ? <ProposalCard p={pending} s={state} /> : <NoPending s={state} />)}
-          <section className="card" aria-label="Attendant queues">
+          <section className="card fill" aria-label="Attendant queues">
             <div className="card-head">
               <h2>Attendant lists</h2>
               <span className="sub">Tracks rooms, never people</span>
             </div>
-            <div className="queues">
+            <div className="queues card-scroll">
               {state.attendants.map((a) => {
                 const items = [...(a.currentRoom ? [a.currentRoom] : []), ...a.queue];
                 return (
@@ -70,17 +70,17 @@ export default function Supervisor() {
           </section>
         </div>
 
-        <aside className="side">
+        <aside className="col">
           <StaffingCard f={state.staffing} />
           {ai && (
-            <section className="card" aria-label="Decision history">
+            <section className="card fill" aria-label="Decision history">
               <div className="card-head">
                 <h2>Decision history</h2>
               </div>
               {history.length === 0 ? (
                 <div className="empty">No plan changes yet.</div>
               ) : (
-                <ul className="history">
+                <ul className="history card-scroll">
                   {history.map((p) => (
                     <li key={p.id}>
                       <div className="row" style={{ justifyContent: 'space-between' }}>

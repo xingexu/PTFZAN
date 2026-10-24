@@ -8,7 +8,7 @@ import { chime } from '../../components/chime';
 import { Icon, type IconName } from '../../components/Icon';
 import { Brand, Logo } from '../../components/Logo';
 import { useJourney } from '../../guest/journey';
-import { guestPath } from '../../links';
+import { guestPath, HOTEL_TAB, hotelUrl } from '../../links';
 import { GuestFrame } from './GuestFrame';
 
 type Tab = 'home' | 'key' | 'requests' | 'chat';
@@ -291,8 +291,19 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
           <Explore icon="clock" title="Late checkout" sub="Request until 1 PM — subject to availability" bg="linear-gradient(135deg,#2a2f45,#55608f)" />
         </div>
 
+        <a className="fhn-ai-link" href={hotelUrl('/')} target={HOTEL_TAB}>
+          <span className="qa-ic">
+            <Icon name="sparkles" size={17} />
+          </span>
+          <span className="grow">
+            <b>See FHN AI run the hotel</b>
+            <span>The same live day the hotel team sees</span>
+          </span>
+          <Icon name="right" size={16} />
+        </a>
+
         <div className="gx-foot">
-          This app shows only your booking. Demo data, kept on this phone.
+          This app shows only your booking. Demo data, saved with the hotel.
           <br />
           <button
             className="why-toggle"
@@ -388,13 +399,13 @@ function RoomStatusCard({ v, perm, onEnable, go, act }: { v: GuestView; perm: st
       <div className="eta">{r.eta ? fmtTime(r.eta.high) : 'Scheduling…'}</div>
       {v.progress && <Countdown p={v.progress} />}
       <div className="ai-line">
-        <Icon name="sparkles" size={14} /> {r.eta ? `Most likely ${fmtRange(r.eta.low, r.eta.high)} · ${SURE[r.eta.confidence]}` : 'Based on live updates from housekeeping'}
+        <Icon name="sparkles" size={14} /> {r.eta ? `FHN AI · most likely ${fmtRange(r.eta.low, r.eta.high)} · ${SURE[r.eta.confidence]}` : 'FHN AI is checking with housekeeping'}
       </div>
       <Steps status={r.status} />
       {r.eta && (
         <>
           <button className="why-toggle" onClick={() => setWhy(!why)} aria-expanded={why}>
-            Why this time? <Icon name="down" size={14} />
+            How FHN AI worked this out <Icon name="down" size={14} />
           </button>
           {why && (
             <div className="why-box">

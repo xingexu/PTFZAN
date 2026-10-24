@@ -69,17 +69,17 @@ The start-up log prints the addresses phones on the same Wi-Fi can use, and wher
 
 ## Screens
 
-The hotel view is one dark console in the Western Founders Network colours (charcoal, mint and deep blue, with the flowing-line motif from the case package). Panels are liquid glass; the top bar and the player float above the page. Each moment of the day appears as a subtitle above the player; supervisor decisions float in the same place.
+The hotel view is one dark console in the Western Founders Network colours (charcoal, mint and deep blue, with the flowing-line motif from the case package). Panels are frosted glass; the top bar and the player float above the page. On a laptop or projector every screen fits exactly — long lists scroll inside their own panel — and switching screens, modes or layers cross-fades. The day's moments are written into the Hotel log; a supervisor decision appears just above the player. On a phone the screens stack and scroll normally.
 
 | Route | Screen | What it shows |
 |---|---|---|
-| `/` | **Live** | Today's way vs FHN AI, side by side: all 48 rooms per side, floor by floor — each room pops green the moment it's ready — a ring for wedding rooms ready out of 20, and the 40 wedding guests in the lobby lighting up as they wait. Below, the four challenges as simple two-bar comparisons. On the right, the guest app QR code and the **Hotel log**: the day's big moments in plain words, plus what real guests are doing in the app |
+| `/` | **Live** | Today's way vs FHN AI, side by side, like a building directory: all 48 rooms per side, floor by floor, each turning green as it's ready; wedding rooms ready out of 20 with a progress bar; and the 40 wedding guests in the lobby, shown in colour while they wait. Below, the four challenges as simple two-bar comparisons. On the right, the guest app QR code and the **Hotel log**: the day's big moments in plain words, plus what real guests are doing in the app |
 | `/front-desk` | **Rooms** | Room grid with expected ready time, how sure, "why this time", a temperature layer, arrivals, report a problem |
 | `/supervisor` | **Team** · Supervisor | Plan to approve, attendant lists, tomorrow's staffing forecast, decision history |
-| `/attendant` | **Team** · Attendant phone | What an attendant sees: current room, what's next, one-tap problem reports |
+| `/attendant` | **Team** · Attendant phone | Every attendant at a glance; tap one to see their phone (current room, what's next, one-tap problem reports); and what changes for attendants, today's way vs FHN AI |
 | `/engineering` | **Building** | Repairs with who has them and when, repeat problems in old repair notes, live room-temperature map |
 | `/` (guest view) | Guests (QR code target) | Welcome: register with name, optional email and party size |
-| `/stay` (guest view) | Guests | The guest app: online check-in, calculated ready time with a countdown, mobile key, temperature, housekeeping (skip cleaning), report a problem, request items, messages — with in-phone notification banners |
+| `/stay` (guest view) | Guests | The guest app: online check-in, FHN AI's calculated ready time with a countdown, mobile key, temperature, housekeeping (skip cleaning), report a problem, request items, messages — with in-phone notification banners, and a link to the hotel's FHN AI view. Phones and tablets get the app full screen; a laptop shows it in a phone frame |
 | `/stage` | Projector (local server only) | **Live SMS moment**: Mike's phone, behind-the-scenes steps, live delivery status |
 | `/stage/remote` | Teammate's phone (local server only) | One big button that triggers the next step of the live moment |
 
@@ -278,7 +278,9 @@ Three tables in their own `fhn` schema (not exposed through Supabase's public Da
 | `fhn.requests` | Problems reported and items requested, per guest |
 | `fhn.activity` | The lines shown in the hotel's log (first names only) |
 
-The app connects as `fhn_app`, a login that can only read and write these three tables, through Supabase's connection pooler (port 6543). Browse the data in the Supabase dashboard → project **fhn-ai** → Table Editor → schema `fhn`.
+The app connects as `fhn_app`, a login that can only read and write these three tables, through Supabase's connection pooler (port 6543). Browse the data in the Supabase dashboard → project **fhn-ai** → Table Editor → schema `fhn`. The schema is in `supabase/migrations/` (the login's password is set separately and never stored in the repository).
+
+The guest app re-reads its stay every 15 seconds and whenever it comes back into view; the hotel view reads guest activity every 4 seconds.
 
 ### Environment variables
 
