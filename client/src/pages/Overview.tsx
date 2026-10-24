@@ -178,8 +178,8 @@ function GuestCard() {
   const url = guestQrUrl();
   const [src, setSrc] = useState('');
   useEffect(() => {
-    // Light modules on a transparent background, so the code sits on the glass instead of a white box.
-    QRCode.toDataURL(url, { margin: 2, width: 260, color: { dark: '#eef3f2', light: '#00000000' } })
+    // Dark modules on a clear background, so the code sits on the glass instead of a white box.
+    QRCode.toDataURL(url, { margin: 2, width: 260, color: { dark: '#1d1d1f', light: '#00000000' } })
       .then(setSrc)
       .catch(() => setSrc(''));
   }, [url]);

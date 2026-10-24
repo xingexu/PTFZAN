@@ -90,7 +90,7 @@ export default function Stage() {
     <div className="stage">
       <header className="stage-top">
         <Link to="/" aria-label="Back to FHN Operations">
-          <Brand sub="Live text demo" tone="light" />
+          <Brand sub="Live text demo" />
         </Link>
         <ProviderBadge s={s} />
         <div className="stage-top-right">
@@ -268,7 +268,7 @@ function PhoneMock({ s }: { s: StageState }) {
         </div>
         <div className="sms-head">
           <div className="sms-avatar" aria-hidden="true">
-            <Logo className="brand-mark" tone="light" />
+            <Logo className="brand-mark" />
           </div>
           <div className="sms-name">FHN Toronto</div>
           <div className="muted" style={{ fontSize: 12 }}>Text Message</div>

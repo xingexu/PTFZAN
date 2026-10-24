@@ -8,11 +8,11 @@ const WAVES = Array.from({ length: 12 }, (_, i) => {
 
 /**
  * The Founders Hotel Network mark: a charcoal arch with a mint rim, filled low with flowing lines.
- * `tone="light"` keeps it readable on the dark glass the whole product uses.
+ * The default suits the white pages; `tone="light"` brightens the lines for dark surfaces.
  */
-export function Logo({ className, tone = 'light' }: { className?: string; tone?: 'light' | 'ink' }) {
+export function Logo({ className, tone = 'ink' }: { className?: string; tone?: 'light' | 'ink' }) {
   const clip = useId();
-  const mint = tone === 'light' ? '#7fdccb' : '#4e9f93';
+  const mint = tone === 'light' ? '#7fdccb' : '#4fae9f';
   return (
     <svg className={className} viewBox="0 0 40 48" aria-hidden="true">
       <defs>
@@ -28,7 +28,7 @@ export function Logo({ className, tone = 'light' }: { className?: string; tone?:
 }
 
 /** Mark + wordmark, as on the case cover: "FHN" over "Founders Hotel Network". */
-export function Brand({ sub, tone = 'light' }: { sub?: string; tone?: 'light' | 'ink' }) {
+export function Brand({ sub, tone = 'ink' }: { sub?: string; tone?: 'light' | 'ink' }) {
   return (
     <span className={`brand ${tone}`}>
       <Logo className="brand-mark" tone={tone} />

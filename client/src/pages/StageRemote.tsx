@@ -50,7 +50,7 @@ export default function StageRemote() {
   return (
     <div className="remote">
       <header className="remote-top">
-        <Logo className="brand-mark" tone="light" />
+        <Logo className="brand-mark" />
         <div>
           <div style={{ fontWeight: 800 }}>Stage remote</div>
           <div className="muted" style={{ fontSize: 12 }}>

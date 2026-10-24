@@ -198,7 +198,7 @@ function PhoneBanners({ items }: { items: Banner[] }) {
       {items.map((b) => (
         <div key={b.id} className={`gx-banner ${b.tone ?? ''} ${b.leaving ? 'leaving' : ''}`}>
           <span className="app-ic">
-            <Logo className="brand-mark" tone="light" />
+            <Logo className="brand-mark" />
           </span>
           <div className="grow">
             <div className="meta">
@@ -512,7 +512,7 @@ function KeyTab({ v, act }: { v: GuestView; act: Act }) {
         <div className={`key-card ${live ? '' : 'locked'}`}>
           {live && <span className="shine" />}
           <div className="row" style={{ justifyContent: 'space-between', position: 'relative' }}>
-            <Brand sub="Toronto Downtown" tone="light" />
+            <Brand sub="Toronto Downtown" />
             <Icon name={live ? 'key' : 'lock'} size={20} />
           </div>
           <div style={{ position: 'relative' }}>
