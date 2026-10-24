@@ -164,7 +164,7 @@ export default function GuestApp() {
 
   return (
     <ToastContext.Provider value={toast}>
-      <GuestFrame now={v.now} darkStatus={tab !== 'home'} tabs={tabs} demoPace banners={<PhoneBanners items={banners} />}>
+      <GuestFrame guestName={v.guest.name} now={v.now} darkStatus={tab !== 'home'} tabs={tabs} demoPace banners={<PhoneBanners items={banners} />}>
         <div className="gx-pane" key={tab}>
           {tab === 'home' && <Home v={v} perm={perm} unread={unread} onEnable={enableNotifications} open={setSheet} go={goTab} act={act} onEnd={end} />}
           {tab === 'key' && <KeyTab v={v} act={act} />}
@@ -217,9 +217,6 @@ function PhoneBanners({ items }: { items: Banner[] }) {
 // ───────────────────────── Home ─────────────────────────
 function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestView; perm: string; unread: number; onEnable: () => void; open: (s: Sheet) => void; go: (t: Tab) => void; act: Act; onEnd: () => Promise<void> }) {
   const nav = useNavigate();
-  const first = v.guest.name.split(' ')[0];
-  const h = Math.floor(v.now / 60);
-  const hello = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
   const ready = v.room.status === 'ready';
   const inRoom = v.guest.inRoom;
   const keyLive = ready || inRoom;
@@ -236,7 +233,7 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
           </button>
         </div>
         <h1 className="gx-title">
-          {hello}, {first}
+          Good Evening<br />{v.guest.name || 'Felix Qin'}
         </h1>
         <p className="gx-sub">
           {v.guest.group ? `${v.guest.group} · ` : ''}Party of {v.guest.partySize}

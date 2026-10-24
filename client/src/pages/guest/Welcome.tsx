@@ -10,7 +10,7 @@ import { GuestFrame } from './GuestFrame';
 /** Where a guest starts: register for the stay, then continue in the app. */
 export default function Welcome() {
   const nav = useNavigate();
-  const [name, setName] = useState('');
+  const [name, setName] = useState('Felix Qin');
   const [email, setEmail] = useState('');
   const [party, setParty] = useState(2);
   const [err, setErr] = useState<string | null>(null);
@@ -38,11 +38,11 @@ export default function Welcome() {
   };
 
   return (
-    <GuestFrame>
+    <GuestFrame guestName={name}>
       <header className="onboard-hero gx-hero">
         <Brand />
-        <h1>Welcome to Toronto Downtown</h1>
-        <p>You&rsquo;re on the guest list for the Chen–Okafor wedding. Register to check in from your phone.</p>
+        <h1>Good Evening<br />{name.trim() || 'Felix Qin'}</h1>
+        <p>Welcome to Toronto Downtown. Register to begin your stay.</p>
       </header>
       <div className="gx-body">
         <form className="gx-card pad" onSubmit={join} noValidate>

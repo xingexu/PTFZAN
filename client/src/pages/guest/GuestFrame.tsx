@@ -10,8 +10,8 @@ import { HOTEL_TAB, hotelUrl } from '../../links';
  * with a short explanation beside it for the audience.
  */
 export function GuestFrame({
-  children, now, darkStatus, tabs, demoPace, banners,
-}: { children: ReactNode; now?: number; darkStatus?: boolean; tabs?: ReactNode; demoPace?: boolean; banners?: ReactNode }) {
+  children, now, darkStatus, tabs, demoPace, banners, guestName = 'Felix Qin',
+}: { children: ReactNode; now?: number; darkStatus?: boolean; tabs?: ReactNode; demoPace?: boolean; banners?: ReactNode; guestName?: string }) {
   useLayoutEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }, []);
   return (
     <div className="gx">
@@ -20,36 +20,27 @@ export function GuestFrame({
         <aside className="gx-aside">
           <Brand />
           <span className="eyebrow">Toronto Downtown · Guest app</span>
-          <h1>Welcome to<br />Toronto Downtown.</h1>
-          <p>Check in, see when your room is ready, and use your mobile key.</p>
+          <h1>Good Evening<br />{guestName.trim() || 'Felix Qin'}</h1>
+          <p>Your room, key and requests in one place.</p>
           {demoPace && (
             <span className="live-pill on">
-              <span className="dot" /> Demo speed · one hotel minute every {SECONDS_PER_HOTEL_MINUTE} seconds
+              <span className="dot" /> Demo · 1 hotel min = {SECONDS_PER_HOTEL_MINUTE} sec
             </span>
           )}
           <ul>
             <li>
-              <Icon name="clock" size={16} /> Check in online and see when your room will be ready
+              <Icon name="clock" size={16} /> Check-in &amp; room updates
             </li>
             <li>
-              <Icon name="bell" size={16} /> Get a message when your room is ready
+              <Icon name="key" size={16} /> Room &amp; elevator key
             </li>
             <li>
-              <Icon name="key" size={16} /> Mobile key on the door and elevator
-            </li>
-            <li>
-              <Icon name="wrench" size={16} /> Report a problem and follow the repair
-            </li>
-            <li>
-              <Icon name="leaf" size={16} /> Set your room temperature
-            </li>
-            <li>
-              <Icon name="calendar" size={16} /> Choose whether you need housekeeping tomorrow
+              <Icon name="wrench" size={16} /> Room controls &amp; requests
             </li>
           </ul>
           <p style={{ marginTop: 18, fontSize: 13 }}>
             <a href={hotelUrl('/')} target={HOTEL_TAB}>
-              Open the hotel view ↗
+              Hotel view ↗
             </a>
           </p>
         </aside>
