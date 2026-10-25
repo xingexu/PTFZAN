@@ -13,7 +13,7 @@ export default function Welcome() {
   const nav = useNavigate();
   const [params] = useSearchParams();
   const [mode, setMode] = useState<'new' | 'return'>(params.get('access') === 'return' ? 'return' : 'new');
-  const [name, setName] = useState('Felix Qin');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [party, setParty] = useState(2);
   const [code, setCode] = useState('');
@@ -33,8 +33,9 @@ export default function Welcome() {
     } catch (error) { setErr((error as Error).message); setBusy(false); }
   };
   return (
-    <GuestFrame guestName={mode === 'new' ? name : 'Felix Qin'}>
-      <header className="onboard-hero gx-hero"><Brand /><span className="guest-access-label">GUEST ACCESS</span><h1>Good Evening<br />{mode === 'new' ? name.trim() || 'Felix Qin' : 'Felix Qin'}</h1><p>Welcome to Toronto Downtown.</p></header>
+    <GuestFrame>
+      {/* Nobody is named until they type their own name; a returning guest is only known once their code opens the stay. */}
+      <header className="onboard-hero gx-hero"><Brand /><span className="guest-access-label">GUEST ACCESS</span><h1>{mode === 'new' ? <>Good Evening{name.trim() && <><br />{name.trim()}</>}</> : 'Welcome back'}</h1><p>Welcome to Toronto Downtown.</p></header>
       <div className="gx-body">
         <section className="gx-card pad guest-entry-card">
           <div className="guest-access-tabs" aria-label="Guest access options">
