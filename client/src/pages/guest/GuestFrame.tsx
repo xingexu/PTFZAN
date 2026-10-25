@@ -10,8 +10,8 @@ import { Link } from 'react-router-dom';
  * with a short explanation beside it for the audience.
  */
 export function GuestFrame({
-  children, now, darkStatus, tabs, demoPace, banners, guestName = 'Felix Qin', onLogout, onAccessCode,
-}: { children: ReactNode; now?: number; darkStatus?: boolean; tabs?: ReactNode; demoPace?: boolean; banners?: ReactNode; guestName?: string; onLogout?: () => void; onAccessCode?: () => void }) {
+  children, now, darkStatus, tabs, demoPace, banners, onLogout, onAccessCode,
+}: { children: ReactNode; now?: number; darkStatus?: boolean; tabs?: ReactNode; demoPace?: boolean; banners?: ReactNode; onLogout?: () => void; onAccessCode?: () => void }) {
   useLayoutEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }, []);
   return (
     <div className="gx">
@@ -20,7 +20,7 @@ export function GuestFrame({
         <aside className="gx-aside">
           <Brand />
           <span className="eyebrow">Toronto Downtown · Guest app</span>
-          <h1>Good Evening<br />{guestName.trim() || 'Felix Qin'}</h1>
+          <h1>Your stay,<br />on your phone.</h1>
           <p>Your room, key and requests in one place.</p>
           {demoPace && (
             <span className="live-pill on">

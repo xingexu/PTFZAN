@@ -168,7 +168,7 @@ export default function GuestApp() {
 
   return (
     <ToastContext.Provider value={toast}>
-      <GuestFrame guestName={v.guest.name} now={v.now} darkStatus={tab !== 'home'} tabs={tabs} demoPace banners={<PhoneBanners items={banners} />} onLogout={() => setAccessDialog('logout')} onAccessCode={() => setAccessDialog('code')}>
+      <GuestFrame now={v.now} darkStatus={tab !== 'home'} tabs={tabs} demoPace banners={<PhoneBanners items={banners} />} onLogout={() => setAccessDialog('logout')} onAccessCode={() => setAccessDialog('code')}>
         <div className="gx-pane" key={tab}>
           {tab === 'home' && <Home v={v} perm={perm} unread={unread} onEnable={enableNotifications} open={setSheet} go={goTab} act={act} onEnd={end} />}
           {tab === 'key' && <KeyTab v={v} act={act} />}
@@ -238,7 +238,7 @@ function Home({ v, perm, unread, onEnable, open, go, act, onEnd }: { v: GuestVie
           </button>
         </div>
         <h1 className="gx-title">
-          Good Evening<br />{v.guest.name || 'Felix Qin'}
+          Good Evening<br />{v.guest.name}
         </h1>
         <p className="gx-sub">
           {v.guest.group ? `${v.guest.group} · ` : ''}Party of {v.guest.partySize}
